@@ -1,6 +1,7 @@
 # Wolfie Companion
 CSE 416 Project - Harvey Cao, Karen Elshemy, Mina Jaromy, Addison Young
 
+## Written Proposal
 Wolfie Companion is a social and utility platform for Stony Brook students. It provides a centralized application for students to connect with one another while promoting academic productivity. 
 ## Problem Statement
 Stony Brook students often rely on multiple disconnected platforms (Navigate360, CampusGroups, SBEngaged Website, GroupMe, etc.) to manage their academic and campus lives. Existing student communities are scattered across messaging apps, social media, and university-supported platforms, making it difficult for students to connect with classmates and manage their productivity. In addition, these platforms lack the connection piece in that they don’t have algorithms to recommend students who you may get along with. This fragmentation can also make it harder to stay organized, manage time effectively, collaborate with classmates, make informed course decisions, and find suitable study spaces. Our app aims to improve student productivity and connection by centralizing these everyday needs into one student-focused platform that provides scheduling and planning tools, course-based student communities, campus study space information, real-time crowd reporting, and verified anonymous course evaluations.
