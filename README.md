@@ -9,19 +9,17 @@ Stony Brook students often rely on multiple disconnected platforms (Navigate360,
 ### Stony Brook Students
 This application is specifically designed for students who want to improve their academic productivity, connect with classmates, and more easily navigate through campus resources. This application may be particularly useful for freshmen and transfer students who are transitioning into a new academic and social environment. Commuter students may also benefit from having an easier way to meet other classmates, discover study groups, and campus resources despite spending less time on campus. 
 ## Why is it a semester-long project?
-* **Stony Brook student verification:** Users are required to log in using their Stony Brook email account and verify their email address before being granted access to the application, ensuring a secure and safe environment for students.
-* **Automatic class retrieval from uploaded schedule:** Users can upload an image of their schedule and the application will automatically retrieve their classes, help them connect with other students enrolled in the same courses, and display reviews for those courses.
-* **Student recommendations:** Users will be recommended to other students 
-who share the same major, have similar interests, or are enrolled in the same courses.
-* **Multiple workflows that are interconnected:** Student dashboard, group chats, individual student messaging, course assignment reminders, course ratings/reviews, study spot finder
-* **Real-time system:** Users can update their availability status and provide 
-information about study spot availability, requiring the application to update and retrieve data continuously and without delay.
-* **User-friendly interface:** Due to the many features the application provides, 
-significant testing is needed to ensure that each workflow functions effectively and that the platform is organized, cohesive, and easy for users to navigate. 
-* **Scalable database:** The application must account for a large student user 
-base and therefore be able to store many users, courses, and large amounts of shared data while maintaining reliable and efficient CRUD operations. 
-* **Future maintenance of data:** Ensuring that data is well-maintained and free 
-of unnecessary duplicates or overlapping user data as more users interact with the application, given the large amount of user-generated data that must be stored and managed. 
+* **Stony Brook student verification:** Users are required to log in using their Stony Brook email account and verify their email address before being granted access to the application. The application must securely authenticate users, maintain login sessions, and enforce the proper access permissions.
+* **Automatic class retrieval from uploaded schedule:** Users can upload an image of their schedule and the application will automatically retrieve their classes, help them connect with other students enrolled in the same courses, and display reviews for those courses. This requires the use of computer vision and data extraction to accurately detect the courses the student is enrolled in. 
+* **Student recommendations:** Users will be recommended to other students who share the same major, have similar interests, or are enrolled in the same courses. This requires us to design a ranking logic rather than displaying a simple list of users.
+* **Multiple workflows that are interconnected:** Student dashboard, group chats, individual student messaging, course assignment reminders, course evals, schedules, and study spot finder all share user and course data. Changes within one portion of the application may need to impact several other features. 
+* **Real-time functionality:**  Users can update their availability status and provide information about study spot availability, requiring real-time communication so that the application is able to update and retrieve data continuously and without delay. 
+* **User-friendly interface:** Due to the many features the application provides, significant testing is needed to ensure that each workflow functions effectively and that the platform is organized, cohesive, and easy for users to navigate. 
+* **Scalable and relational data management:**  The application must account for a large student user base and maintain relationships among users, courses, schedules, and connections. Therefore, we must be able to store many users, courses, and large amounts of shared data while maintaining reliable and efficient CRUD operations. 
+* **Maintenance of dynamic data:** Ensuring that data is well-maintained and free of unnecessary duplicates or overlapping user data as more users interact with the application, given the large amount of user-generated data that must be stored and managed.
+* **Safety and moderation:** Since users can message others and publish content, the platform requires blocking, reporting, permissions, and moderation tools that must be enforced throughout the application.
+* **Ongoing user-driven development:** Even after the core features are implemented, the team will gather student feedback, identify additional challenges students face, and improve or expand the platform accordingly. Evaluating and integrating these ideas adds further design, development, and testing work throughout the semester.
+
 ## Scope
 ### Inside of Scope (V1)
 * User accounts and profiles
@@ -68,8 +66,57 @@ of unnecessary duplicates or overlapping user data as more users interact with t
 **How:** Verification and authentication credentials must be stored securely and student-only functionality must be restricted to these verified accounts.
 
 ## Roles
+* **AY- Frontend/UI:** Responsible for the React/TypeScript user interface, navigation, dashboard, responsive design, and integrating frontend components with backend APIs
+* **MJ- Backend & Database:** Responsible for the Node.js/Express backend, PostgreSQL/Prisma database schema, API endpoints, and core application logic
+* **KE- Social & Real-Time Features:** Responsible for message, group chats, user status, classmate connections, availability comparison, and Socket.IO integration
+* **HC- Campus Service & Intelligent Features:** Responsible for study space/crowd reporting, course evaluations, student recommendations, schedule-image extraction, and integrations with external APIs
+
+**All developers will contribute to testing, debugging, code reviews, documentation, and integration across the whole application.**
+
+**Branches & Pull Requests:** Developers work on individual feature branches to avoid disrupting the stable main branch. Completed features must be submitted through pull requests for the team to review and test before being merged into main.
 
 ## Rough Architecture Sketch
+### Frontend: React + TypeScript
+* React builds the pages/components:
+    * Login
+    * Dashboard
+    * Classmate recommendations
+    * Messages
+    * Study spaces
+    * Course reviews
+* TypeScript is JS with type checking which helps catch mistakes earlier
+### Backend: Node.js + Express + TypeScript
+* Node.js lets us run JS and TypeScript on the server
+* Express is a good framework for creating API routes easily
+### Database: PostgreSQL
+* Database that will store our permanent app data, PostgreSQL is relational which fits our app perfectly because our data has many relationships
+  * Users, courses, schedules, friendships, messages, assignments, course evaluations, study spaces, crowd reports
+### ORM (object-relational mapping): Prisma
+* Prisma will sit between our backend and PostgreSQL
+* With Prisma we can write more TypeScript friendly queries rather than raw SQL
+### Auth: Firebase Auth for student verification
+* Use this to verify through their SBU email address before granting access 
+### Real-Time messaging/status: Socket.IO
+* Socket.IO keeps a live connection between the frontend and backend so messaging doesn’t have to constantly refresh to get live state 
+### File/image uploads: Firebase Storage
+* Store profile pictures, schedule screenshots
+### Resend/SendGrid: Email reminders 
+* Firebase Auth’s templates are designed for login and verification, so reminder emails are sent through Resend/SendGrid instead.
+### Maps/Location: Mapbox
+* Power the campus map/study-space portion 
+* Click location → crowd level, noise, amenities, etc
+* Maintain our own studyspace records in PostgreSQL and use mapbox to visualize them
+### AI/Vision service
+* Vision API for schedule extraction
+* Must be checked with our database 
+
+
+
+
+
+
+
+
 
 
 
