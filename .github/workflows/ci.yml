@@ -57,3 +57,6 @@ jobs:
 
       - name: Build server
         run: npm run build
+
+      - name: Test server
+        run: npm test
