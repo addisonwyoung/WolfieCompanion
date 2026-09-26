@@ -64,6 +64,42 @@ button.primary:hover { background: #8d1929; }
 .empty-state p { margin-top: 8px; }
 footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 50px; padding-block: 22px; color: #74747d; font-size: 11px; border-top: 1px solid #e1e1e4; }
 footer > span:first-child { font-weight: 600; }
+.app-nav { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 18px 4px; }
+.app-nav button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; color: #9b2030; box-shadow: inset 0 0 0 1px #b22c3c; }
+.evaluation-intro { padding: 34px 0 26px; }
+.evaluation-intro .eyebrow { color: #a12434; margin-bottom: 8px; }
+.evaluation-intro > p:last-child { color: #65656e; margin-top: 12px; max-width: 680px; }
+.evaluation-layout { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.offering-panel, .summary-panel, .submission-panel { padding: 22px; }
+.offering-panel > label { margin-top: 18px; }
+.offering-list, .review-list { list-style: none; padding: 0; margin: 14px 0 0; }
+.offering-list { display: grid; gap: 8px; }
+.offering-button { width: 100%; display: grid; text-align: left; gap: 3px; padding: 11px; }
+.offering-button strong { font-size: 13px; }
+.offering-button span { color: #65656e; font-size: 11px; }
+.offering-button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; box-shadow: inset 0 0 0 1px #b22c3c; }
+.evaluation-content { display: grid; gap: 18px; min-width: 0; }
+.summary-panel > .eyebrow, .submission-panel > .eyebrow { margin-bottom: 6px; }
+.summary-panel h2 { margin-bottom: 5px; }
+.evaluation-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+.evaluation-stats > div { display: flex; flex-direction: column; padding: 12px; background: #f7f7f5; border-radius: 8px; }
+.evaluation-stats strong { font-size: 20px; }
+.evaluation-stats span { color: #65656e; font-size: 11px; }
+.review-heading { margin-top: 24px; }
+.review-list { display: grid; gap: 10px; }
+.review-list li { border: 1px solid #e8e8ea; border-radius: 8px; padding: 13px; }
+.review-list li p { line-height: 1.6; }
+.review-list li span { display: block; margin-top: 8px; color: #65656e; font-size: 11px; }
+.review-empty-note { margin-top: 7px; font-size: 12px; }
+.no-reviews { margin-top: 20px; background: #f7f7f5; border-radius: 8px; }
+.no-reviews h3, .search-empty h3 { font-size: 15px; }
+.submission-panel form { margin-top: 8px; }
+.submission-panel textarea { min-height: 110px; }
+.publish-button { margin-top: 16px; }
+.submission-notice, .submitted-note { margin-top: 14px; border-radius: 7px; padding: 10px 12px; background: #f0f6ef; color: #315c35; font-size: 12px; }
+.submission-panel .session-note { border-top: 1px solid #ededee; padding-top: 12px; }
+.search-empty { padding: 16px 0; }
+.search-empty p { font-size: 12px; }
 @media (max-width: 1000px) {
   .dashboard { grid-template-columns: 260px minmax(0, 1fr); gap: 20px; }
   .course-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -80,5 +116,9 @@ footer > span:first-child { font-weight: 600; }
   .profile, .courses { padding: 22px; }
   .roster-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .roster-heading h2 { font-size: 21px; }
+  .evaluation-layout { grid-template-columns: minmax(0, 1fr); }
+  .evaluation-intro h1 { font-size: 34px; }
+  .offering-panel, .summary-panel, .submission-panel { padding: 18px; }
+  .evaluation-stats { grid-template-columns: 1fr; }
   footer { flex-direction: column; gap: 6px; margin-top: 32px; }
 }
