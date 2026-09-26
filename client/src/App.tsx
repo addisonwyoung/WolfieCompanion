@@ -4,6 +4,7 @@ import type { CourseId } from './sampleData'
 import Profile from './Profile'
 import CourseBrowser from './CourseBrowser'
 import CrowdMeter from './CrowdMeter'
+import CourseEvaluations from './CourseEvaluations'
 import './App.css'
 
 function App() {
@@ -13,12 +14,13 @@ function App() {
   return <>
     <header className="site-header"><div className="header-inner"><a href="#main" className="brand"><span className="brand-mark" aria-hidden="true">W</span><span>Wolfie <strong>Companion</strong></span></a><span className="demo-badge"><span aria-hidden="true">●</span> Sample-data prototype</span></div></header>
     <main id="main">
-      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => setView('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => setView('spaces')}>Study spaces</button></nav>
+      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => setView('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => setView('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => setView('evaluations')}>Course evaluations</button></nav>
       <div hidden={view !== 'dashboard'}>
       <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
       <div className="dashboard"><Profile profile={profile} onSave={setProfile} /><CourseBrowser selectedId={selectedId} onSelect={setSelectedId} students={students} currentUserId={profile.id} /></div>
       </div>
       {view === 'spaces' && <CrowdMeter />}
+      {view === 'evaluations' && <CourseEvaluations />}
     </main>
     <footer><span>Wolfie Companion</span><span>A small step toward a more connected campus.</span></footer>
   </>
