@@ -7,12 +7,14 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts",
+    "ocr:schedule": "tsx src/ocr/cli.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/vision": "^6.1.1",
     "express": "^5.2.1"
   },
   "devDependencies": {

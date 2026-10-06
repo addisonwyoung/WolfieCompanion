@@ -1,22 +1,26 @@
-﻿import { courses, getClassmates } from './sampleData'
-import type { CourseId, Student } from './sampleData'
+﻿import ScheduleImportPreview from './ScheduleImportPreview'
+import { getClassmates } from './sampleData'
+import type { CourseId, Course, Student } from './sampleData'
 import { Avatar, Interests } from './Profile'
 
-export default function CourseBrowser({ selectedId, onSelect, students, currentUserId }: {
+export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedId, onSelect, students, currentUserId }: {
+  enrolledCourses: Course[]
+  onAddClasses: (rows: { code: string; section: string }[]) => void
   selectedId: CourseId
   onSelect: (id: CourseId) => void
   students: Student[]
   currentUserId: string
 }) {
-  const selected = courses.find(course => course.id === selectedId)!
+  const selected = enrolledCourses.find(course => course.id === selectedId)!
   const classmates = getClassmates(students, selectedId, currentUserId)
   return <div className="course-browser">
     <section className="panel courses" aria-labelledby="courses-heading">
-      <div className="section-top"><h2 id="courses-heading">Your courses</h2><span className="muted">4 sample courses</span></div>
+      <div className="section-top"><h2 id="courses-heading">Your courses</h2><span className="muted">{enrolledCourses.length} {enrolledCourses.length === 1 ? 'course' : 'courses'}</span></div>
       <p className="muted">Pick a course to see who’s learning alongside you.</p>
-      <div className="course-controls">{courses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
+      <ScheduleImportPreview onAddClasses={onAddClasses} />
+      <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
         <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
-        <strong>{course.code}</strong><span className="course-state">{selectedId === course.id ? 'Selected ✓' : 'View classmates'}</span>
+        <strong>{course.code}</strong>{!!course.sections?.length && <span className="course-state">Section {course.sections.join(', ')}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : 'View classmates'}</span>
       </button>)}</div>
     </section>
     <section className="classmates" aria-labelledby="classmates-heading">
@@ -25,7 +29,7 @@ export default function CourseBrowser({ selectedId, onSelect, students, currentU
         <div className="student-identity"><Avatar name={student.name} /><div><h3>{student.name}</h3><p className="muted">{student.year}</p></div></div>
         <p className="student-major">{student.major}</p><h4>Interests</h4><Interests interests={student.interests} />
       </li>)}</ul> : <div className="panel empty-state"><h3>No classmates yet</h3><p className="muted">There are no other sample students in this course. Try another course.</p></div>}
-      <p className="roster-note">All profiles and enrollments shown here are fictional.</p>
+      <p className="roster-note">Classmates are fictional sample profiles. Imported classes reset on reload.</p>
     </section>
   </div>
 }

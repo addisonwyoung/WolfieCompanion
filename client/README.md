@@ -45,3 +45,11 @@ In two terminals, start the backend with `cd server && npm ci && npm run dev` an
 Select any of the six locations, choose Empty/Low/Moderate/Busy/Full, optionally enter a note up to 200 trimmed characters, then submit. The newest accepted report sets the summary; the latest ten reports are shown. Times include relative age and exact local date/time. Reports are student observations, not measured occupancy.
 
 For a two-user demo, open a second independent browser session against the same app/backend. Submit in the first and wait up to the next 15-second refresh in the second (or return it to the foreground). Reports survive page reload and server restart with the same storage. See server/README.md for the persistent path and single-process restriction. Profile/course sample data still works when the server is stopped; crowd requests show retry errors and retain unsent notes.
+
+## Schedule upload preview
+
+Run `npm ci`, then `npm run dev -- --host localhost --port 5173 --strictPort`. In a second terminal, start the API from `server` with `ENABLE_SCHEDULE_PREVIEW=1 npm run dev` and configured Google ADC credentials. Open http://localhost:5173 and select Import schedule beside Your courses.
+
+Choose one PNG/JPEG up to 10 MiB, pick SOLAR class list or weekly calendar, and press Extract classes. Selection alone stays local; extraction sends the image to Google. Edit Course code and Section, add/remove rows, or Clear/Close. Review the unverified results and click Add to Your courses to merge course codes and sections into the dashboard for this session. Existing courses stay, duplicate course/section pairs are merged, and reload restores the sample courses. No database is required. If preview is disabled, restart the API with the flag; for another frontend port, configure the server's exact `SCHEDULE_PREVIEW_ORIGIN` to match.
+
+`npm test` runs offline component tests; `npm run build` and `npm run lint` check the app. Real extraction needs Google access and uses OCR units only when explicitly requested.

@@ -1,8 +1,11 @@
 import express from 'express';
 import type { ErrorRequestHandler } from 'express';
+import { schedulePreviewRouter } from './ocr/preview.js';
+import type { PreviewOptions } from './ocr/preview.js';
 import { levels, ReportStore } from './crowd.js';
-export function createApp(store: ReportStore) {
+export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   const app = express();
+  app.use('/api/schedule-preview', schedulePreviewRouter(preview));
   app.use(express.json({ limit: '8kb' }));
   app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
   app.get('/api/locations', (_req, res) => { res.json({ locations: store.list() }); });
