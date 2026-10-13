@@ -7,6 +7,7 @@ dist/
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # Logs
 *.log
@@ -19,3 +20,6 @@ Thumbs.db
 .vscode/
 # Local crowd reports
 server/data/
+
+# Prisma generated client
+server/src/generated/
