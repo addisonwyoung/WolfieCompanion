@@ -85,3 +85,7 @@ POST `/api/schedule-preview?layout=class-list|weekly-calendar` accepts raw image
 Responses contain only `{ rows: [{ code, section, warnings }], warnings, requiresReview: true }`; raw OCR text and image positions remain outside the browser response. Errors use 400 invalid input, 413 too large, 415 unsupported media, 403 local access checks, 404 disabled, 429 busy, and 502/504 provider failure/timeout. Clear/replacement discards browser results, but cannot guarantee cancellation of an already accepted Google request. No images/results are persisted or logged by this endpoint.
 
 Calendar parsing also associates explicit section labels in separate OCR regions when they are directly below the course in the same column, within a bounded distance and without an intervening course. Associations remain heuristic and require review.
+
+## Account pictures
+
+`POST /api/avatar` accepts an authenticated raw PNG/JPEG up to 5 MiB, verifies the student's Supabase token/eligibility, decodes and bounds the image, and uploads a re-encoded private image with the caller's own Storage permissions. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`; no service-role key is needed. See [account setup and policy tests](../docs/supabase-accounts.md) for startup, Google configuration, migrations, avatar cleanup, and rollback. Unlike schedule OCR, this route supports configured production use and does not call Google Vision.

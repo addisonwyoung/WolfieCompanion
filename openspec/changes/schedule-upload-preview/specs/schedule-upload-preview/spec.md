@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Let students upload a SOLAR class-list or weekly-calendar screenshot and inspect editable course-code and section results without saving or changing enrollment.
+Let students upload a SOLAR class-list or weekly-calendar screenshot and inspect editable course-code and section results as temporary drafts, with explicit account-backed confirmation supplied by user-enrollments.
 
 ## ADDED Requirements
 
@@ -48,7 +48,7 @@ The extraction flow SHALL support course codes with attached sections such as `C
 - **THEN** repeated pairs appear once while distinct sections remain available as separate preview rows
 
 ### Requirement: Editable temporary course preview
-After successful extraction, the interface SHALL show labeled editable Course code and Section fields only, with add-row and remove-row controls and an unverified-review notice. It SHALL accept missing sections for review and SHALL NOT require course titles or semester/year. It SHALL offer Clear preview or Close without a save/enrollment action. Edits SHALL affect only the current preview and SHALL NOT trigger further OCR calls. Missing-section and ambiguous-result messages SHALL be associated with the relevant rows.
+After successful extraction, the interface SHALL show labeled editable Course code and Section fields only, with add-row and remove-row controls and an unverified-review notice. It SHALL accept missing sections for review and SHALL NOT require course titles or semester/year. It SHALL offer Clear preview or Close without saving. When account persistence is connected it SHALL offer a separate explicit Add to Your courses confirmation, await its result, retain drafts on failure, and prevent duplicate submission while saving. Edits SHALL affect only the current preview and SHALL NOT trigger further OCR calls. Missing-section and ambiguous-result messages SHALL be associated with the relevant rows.
 
 #### Scenario: Correct detected rows
 - **WHEN** a student edits a section, removes a false row, or adds a missed class
@@ -70,11 +70,11 @@ The interface SHALL expose loading, successful results, no-text, no-course, disa
 - **THEN** the interface identifies the condition, shows no stale results, and allows correction of input or explicit retry
 
 ### Requirement: Preview does not persist or alter sample courses
-The feature SHALL NOT write screenshots or OCR results to application storage, browser storage, a database, or server logs. The response SHALL contain only preview-relevant course/section rows and warnings, without raw OCR text. Existing sample courses, profile enrollment, classmates, and crowd reports SHALL remain unchanged after extraction and edits. Reloading or clearing the preview SHALL discard its image and results.
+The feature SHALL NOT write screenshots, raw OCR text, or unconfirmed drafts to application storage, browser storage, a database, or server logs. Only explicit confirmation SHALL persist reviewed normalized course/section values under user-enrollments. The response SHALL contain only preview-relevant course/section rows and warnings, without raw OCR text. Saved courses, profile enrollment, classmates, and crowd reports SHALL remain unchanged after extraction and draft edits alone. Reloading or clearing the preview SHALL discard its image and results.
 
 #### Scenario: Preview and reload
 - **WHEN** a student extracts and edits classes then reloads
-- **THEN** the preview is cleared and the original dashboard data remains unchanged
+- **THEN** the preview is cleared and saved account data remains unchanged unless rows were explicitly confirmed
 
 ### Requirement: Responsive and keyboard-accessible preview
 File selection, layout choice, extraction, editing, adding/removing rows, and clearing SHALL work with visible keyboard focus and accessible labels. Loading and result/error messages SHALL be announced programmatically. The image and fields SHALL fit a 375-pixel viewport without page-level horizontal overflow.

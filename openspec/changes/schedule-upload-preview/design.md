@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation. The dashboard uses fixed course and student fixtures, so temporary import results must be separate from `profile.courseIds` and course selection. Vite already proxies `/api` to localhost port 3000. Express has an 8-KB JSON limit and an existing injectable app factory; OCR modules expose an ADC-backed provider, parser, and local command. There is no authenticated upload or enrollment store.
+See proposal.md for motivation. Originally the dashboard used fixed fixtures. The companion add-supabase-accounts-and-enrollments change replaces personal data with Supabase records; temporary import drafts remain separate from saved membership and course selection. Vite already proxies `/api` to localhost port 3000. Express has an 8-KB JSON limit and an existing injectable app factory; OCR modules expose an ADC-backed provider, parser, and local command. The account change supplies enrollment persistence; this OCR endpoint retains its independent development-only boundary.
 
 The preceding OCR change is implemented on the current feature branch with live evaluation still open. User-supplied successful output establishes that Google can return text; its source snippets expose two parser problems: multiline section matching consumes time digits, and the broad department grammar accepts BLDG. This change reuses those modules without rewriting the other change's artifacts or claiming its remaining evaluation complete.
 
@@ -10,7 +10,7 @@ The preceding OCR change is implemented on the current feature branch with live 
 
 **Goals:** Connect the existing OCR capability to a browser preview and correct the observed course/section errors. Keep image selection, request lifecycle, and draft editing independent from enrollment data.
 
-**Non-Goals:** Saved courses, authentication/database installation, official enrollment verification, catalog integration, title/term collection, camera-specific UI, PDF/HEIC support, and public production deployment of paid OCR.
+**Non-Goals:** Owning authentication/database installation (provided by the companion account change), official enrollment verification, catalog integration, title/term collection, camera-specific UI, PDF/HEIC support, and public production deployment of paid OCR.
 
 ## Decisions
 
@@ -18,7 +18,7 @@ The preceding OCR change is implemented on the current feature branch with live 
 
 Mount a new ScheduleImportPreview component beside the existing Your courses controls. An Import schedule button expands a panel with a labeled file input, layout selector, image preview, and Extract classes button. The panel uses existing typography, colors, focus styling, and responsive patterns. Prefer this over a modal for a simple upload/review flow and straightforward keyboard navigation.
 
-After extraction, display editable Course code and Section rows, a review notice, Add class, Remove row, Clear preview, and Close. There is no Confirm/Save action implying enrollment. Rows can be edited freely with nonblocking validation for code grammar and section formatting; blank section is a review state. Display one row per distinct code/section pair, including lecture/lab sections when present. A code with no section gets one blank row. Stable local row IDs keep editing independent from normalized deduplication. Titles and term warnings are omitted from this focused preview.
+After extraction, display editable Course code and Section rows, a review notice, Add class, Remove row, Clear preview, and Close. An optional Add to Your courses callback explicitly confirms reviewed rows and awaits account-backed persistence. It retains the draft on failure and does not save extraction automatically. Rows can be edited freely with nonblocking validation for code grammar and section formatting; blank section is a review state. Display one row per distinct code/section pair, including lecture/lab sections when present. A code with no section gets one blank row. Stable local row IDs keep editing independent from normalized deduplication. Titles and term warnings are omitted from this focused preview.
 
 ### 2. Memory-only raw image transport
 
@@ -30,7 +30,7 @@ Reuse extractDocument and parseSchedule via an injected provider option in creat
 
 Use `ENABLE_SCHEDULE_PREVIEW=1` as explicit opt-in; never enable the endpoint when `NODE_ENV=production`. When opted in, bind the API server to `127.0.0.1` rather than the current all-interface listen default. Validate socket loopback origin and browser Origin against a documented local frontend origin (default `http://localhost:5173`, configurable exact localhost/127.0.0.1 origin for alternate Vite ports). Require the custom request header; do not enable cross-origin CORS. Account for Vite proxy header behavior in tests and documentation. A single in-flight extraction guard avoids duplicate/concurrent cloud requests; release it in finally even on errors. Browser cancellation invalidates results but may not cancel work already accepted by Google.
 
-This supports local testing without an enrollment backend. Production authenticated uploads would require a separate design; an opt-in development flag is not a production authorization mechanism.
+This keeps OCR development-only even when class confirmation is integrated with a Supabase enrollment backend. Production authenticated uploads would require a separate design; an opt-in development flag is not a production authorization mechanism.
 
 ### 4. Correct parser regressions without catalog dependence
 
@@ -46,7 +46,7 @@ Track idle/selected/extracting/results/error states in the component. Send only 
 
 ### 6. Verification and documentation
 
-Add parser regression and mocked endpoint tests with no Google calls. Add focused component tests using the project's existing test tooling if present; otherwise add Vitest, jsdom, and React Testing Library as client development dependencies. Test file selection/extraction, projected rows, edits, errors/empty results, stale responses, and resource cleanup. Verify keyboard use and 375-pixel layout in a browser. Document two-terminal development startup, explicit endpoint opt-in, expected Origin, cloud credentials, and preview-only behavior. Optional live screenshot checks consume OCR units and must not run in the default test suite.
+Add parser regression and mocked endpoint tests with no Google calls. Add focused component tests using the project's existing test tooling if present; otherwise add Vitest, jsdom, and React Testing Library as client development dependencies. Test file selection/extraction, projected rows, edits, errors/empty results, stale responses, and resource cleanup. Verify keyboard use and 375-pixel layout in a browser. Document two-terminal development startup, explicit endpoint opt-in, expected Origin, cloud credentials, and temporary extraction versus explicit account-backed confirmation. Optional live screenshot checks consume OCR units and must not run in the default test suite.
 
 ## Risks / Trade-offs
 
@@ -58,4 +58,4 @@ Add parser regression and mocked endpoint tests with no Google calls. Add focuse
 
 ## Migration Plan
 
-Build on the existing OCR feature branch or a branch containing its implementation. Add parser corrections first, then disabled-by-default route, then UI and tests. No data migrations are needed. Document `ENABLE_SCHEDULE_PREVIEW=1 npm run dev` in server and `npm run dev` in client, with the exact configured local origin. Keep route disabled outside local development. Rollback removes the import component/route or disables the flag; original dashboard data stays intact.
+Build on the existing OCR feature branch or a branch containing its implementation. Add parser corrections first, then disabled-by-default route, then UI and tests. This OCR change needs no migrations; account migrations belong to the companion account change. Document `ENABLE_SCHEDULE_PREVIEW=1 npm run dev` in server and `npm run dev` in client, with the exact configured local origin. Keep route disabled outside local development. Rollback removes the import component/route or disables the flag; saved account data stays intact.

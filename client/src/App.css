@@ -143,3 +143,19 @@ footer > span:first-child { font-weight: 600; }
   .import-row > button { grid-column: 1 / -1; justify-self: start; }
   .schedule-import section { padding: 12px; }
 }
+
+.auth-panel { max-width: 600px; padding: 32px; margin: 48px auto; }
+.auth-panel h1 { margin: 12px 0 20px; }
+.auth-panel > p, .auth-panel > button { margin-top: 16px; }
+.account-actions { display: flex; justify-content: flex-end; padding-top: 16px; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+fieldset:disabled { opacity: .7; }
+.avatar { object-fit: cover; }
+.picture-preview { width: 96px; height: 96px; object-fit: cover; border-radius: 50%; margin: 12px 0; }
+.manual-classes { margin-top: 18px; }
+.manual-classes form { padding: 14px; border: 1px solid #e4d9dc; border-radius: 10px; }
+.manual-classes p { margin-block: 10px; }
+.cleanup-notice { padding: 16px; border: 1px solid #d6bb80; margin-top: 16px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+button:disabled { cursor: not-allowed; }
+@media (max-width: 700px) { .auth-panel { padding: 22px; margin-block: 28px; } }

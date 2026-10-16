@@ -1,7 +1,17 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ScheduleImportPreview from '../src/ScheduleImportPreview'
-import App from '../src/App'
+import { useState } from 'react'
+import CourseBrowser from '../src/CourseBrowser'
+import { courses, students } from '../src/sampleData'
+import type { Course } from '../src/sampleData'
+function App() {
+ const [list,setList]=useState<Course[]>(courses)
+ const [selected,setSelected]=useState<string|null>('cse-416')
+ return <CourseBrowser enrolledCourses={list} selectedId={selected} onSelect={setSelected} students={students} currentUserId="alex" onAddClasses={async rows=>{
+ setList(previous=>{ const next=previous.map(c=>({...c,sections:[...(c.sections??[])]})); for(const row of rows){const code=row.code.toUpperCase().replace(/\s/g,'').replace(/([A-Z]+)([0-9]+)/,'$1 $2'); const id=code.toLowerCase().replace(' ','-'); let course=next.find(c=>c.id===id);if(!course){course={id,code,sections:[]};next.push(course)} if(row.section&&!course.sections?.includes(row.section))course.sections?.push(row.section)}return next});setSelected(rows[0].code.toLowerCase().replace(/\s/g,'').replace(/([a-z]+)([0-9]+)/,'$1-$2'));
+ }} />
+}
 const response = (rows = [{code:'CSE 310',section:'01',warnings:[]}]) => ({ok:true,json:async()=>({rows,warnings:[]})})
 beforeEach(()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue(response()))
@@ -88,7 +98,7 @@ test('reviewed imports update the course list once, retain sections and survive 
   fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
   const add=await screen.findByRole('button',{name:'Add to Your courses'})
   fireEvent.click(add);fireEvent.click(add)
-  expect(screen.getByText('5 courses')).toBeInTheDocument()
+  await waitFor(()=>expect(screen.getByText('5 courses')).toBeInTheDocument())
   expect(screen.getByText('Section 30')).toBeInTheDocument()
   expect(screen.getByText('Section 01')).toBeInTheDocument()
   expect(screen.getByRole('heading',{name:'Classmates in COM 120'})).toBeInTheDocument()
@@ -97,7 +107,17 @@ test('reviewed imports update the course list once, retain sections and survive 
   fireEvent.click(screen.getByRole('button',{name:'Add class',exact:true}))
   expect(add).toBeDisabled()
   fireEvent.click(screen.getByRole('button',{name:'Clear preview'}))
-  expect(screen.getByText('5 courses')).toBeInTheDocument()
+  await waitFor(()=>expect(screen.getByText('5 courses')).toBeInTheDocument())
   const {cleanup}=await import('@testing-library/react');cleanup();render(<App />)
   expect(screen.getByText('4 courses')).toBeInTheDocument()
+})
+test('confirmed save waits, prevents duplicates, and retains draft on failure for retry',async()=>{
+ let reject!:(reason:Error)=>void
+ const save=vi.fn().mockImplementationOnce(()=>new Promise<void>((_resolve,fail)=>{reject=fail})).mockResolvedValue(undefined)
+ render(<ScheduleImportPreview onAddClasses={save}/>);fireEvent.click(screen.getByRole('button',{name:'Import schedule'}));choose();fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
+ fireEvent.click(await screen.findByRole('button',{name:'Add to Your courses'}));expect(screen.getByRole('button',{name:'Saving classes…'})).toBeDisabled()
+ expect(save).toHaveBeenCalledTimes(1);reject(new Error('Offline; retry'))
+ await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('Offline'));expect(screen.getByLabelText('Course code 1')).toHaveValue('CSE 310')
+ fireEvent.click(screen.getByRole('button',{name:'Add to Your courses'}));await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('Classes saved'))
+ expect(save).toHaveBeenCalledTimes(2)
 })

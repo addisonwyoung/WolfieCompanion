@@ -1,8 +1,9 @@
+import { validateRows } from './account'
 import { useEffect, useRef, useState } from 'react'
 interface Warning { code: string; message: string }
 interface Row { id: number; code: string; section: string; warnings: Warning[] }
 const maxBytes = 10 * 1024 * 1024
-export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?: (rows: { code: string; section: string }[]) => void }) {
+export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?: (rows: { code: string; section: string }[]) => Promise<void> | void }) {
   const [expanded, setExpanded] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [url, setUrl] = useState('')
@@ -10,6 +11,8 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
   const [rows, setRows] = useState<Row[]>([])
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savePending = useRef(false)
   const [ready, setReady] = useState(false)
   const [hasResults, setHasResults] = useState(false)
   const requestId = useRef(0)
@@ -64,18 +67,18 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
   function edit(id: number, key: 'code' | 'section', value: string) {
     setRows(previous => previous.map(row => row.id === id ? { ...row, [key]: value, warnings: key === 'section' ? [] : row.warnings } : row))
   }
-  const validRows = rows.length > 0 && rows.every(row => /^[A-Za-z]{2,4}\s*\d{3}$/.test(row.code.trim()) && (!row.section.trim() || /^[A-Za-z]?\d{1,3}$/.test(row.section.trim())))
+  const validRows = validateRows(rows)
   return <div className="schedule-import">
-    <button ref={trigger} aria-expanded={expanded} aria-controls="schedule-import-panel" onClick={() => { if (expanded) clear(); setExpanded(!expanded) }}>Import schedule</button>
-    {expanded && <section id="schedule-import-panel" aria-labelledby="schedule-import-heading">
+    <button ref={trigger} disabled={saving} aria-expanded={expanded} aria-controls="schedule-import-panel" onClick={() => { if (expanded) clear(); setExpanded(!expanded) }}>Import schedule</button>
+    {expanded && <section id="schedule-import-panel" aria-labelledby="schedule-import-heading"><fieldset disabled={saving}><legend className="sr-only">Schedule import</legend>
       <div className="section-top"><h3 id="schedule-import-heading">Preview your classes</h3><button onClick={() => { clear(); setExpanded(false); trigger.current?.focus() }}>Close</button></div>
-      <p className="muted">Upload a SOLAR class list or weekly calendar. Extracting sends the image to Google to read it. Review the results, then add them to Your courses for this session. Changes reset on reload.</p>
+      <p className="muted">Upload a SOLAR class list or weekly calendar. Extracting sends the image to Google to read it. Review the results, then explicitly save them to Your courses. Extraction and edits alone do not save classes. The screenshot is not saved.</p>
       <div className="import-inputs">
         <label>Schedule image<input ref={input} type="file" accept="image/png,image/jpeg" onChange={event => select(event.target.files?.[0])} /></label>
         <label>Screenshot layout<select value={layout} onChange={event => { invalidate(); setLayout(event.target.value) }}><option value="class-list">SOLAR class list</option><option value="weekly-calendar">Weekly calendar</option></select></label>
       </div>
       {url && <img key={url} className="schedule-image" src={url} alt="Selected schedule screenshot" onLoad={() => setReady(true)} onError={() => { clear(); setMessage('This image could not be opened. Choose a readable PNG or JPEG.') }} />}
-      <div className="import-actions"><button disabled={!file || !ready || busy} onClick={extract}>{busy ? 'Reading schedule…' : 'Extract classes'}</button><button onClick={() => clear()}>Clear preview</button></div>
+      <div className="import-actions"><button disabled={!file || !ready || busy || saving} onClick={extract}>{busy ? 'Reading schedule…' : 'Extract classes'}</button><button onClick={() => clear()}>Clear preview</button></div>
       <p role="status" aria-live="polite">{busy ? 'Reading your schedule. Please wait.' : message}</p>
       {hasResults && <div className="import-results">
         <p className="muted">Unverified preview: check each course and section against your screenshot.</p>
@@ -83,7 +86,7 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
           const issues = [...row.warnings.map(w => w.message)]
           if (!row.section.trim()) issues.push('Enter the section if you can read it.')
           if (!/^[A-Za-z]{2,4}\s?\d{3}$/.test(row.code.trim())) issues.push('Use a course code such as CSE 310.')
-          if (row.section && !/^[A-Za-z]?\d{1,3}$/.test(row.section.trim())) issues.push('Check the section label, such as 01 or L02.')
+          if (!/^[A-Za-z0-9-]{0,20}$/.test(row.section.trim())) issues.push('Use up to 20 letters, digits, or hyphens for the section.')
           return <div className="import-row" key={row.id}>
             <label>Course code {index + 1}<input value={row.code} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'code', e.target.value)} /></label>
             <label>Section {index + 1}<input value={row.section} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'section', e.target.value)} /></label>
@@ -91,13 +94,19 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
             <p id={`row-warning-${row.id}`} className="import-warning">{[...new Set(issues)].join(' ')}</p>
           </div>
         })}
-        {onAddClasses && <div className="import-actions"><button disabled={!validRows || busy} onClick={() => {
-          if (!validRows) return
-          onAddClasses(rows.map(({ code, section }) => ({ code, section })))
-          setMessage('Classes added to Your courses for this session. Changes reset on reload.')
-        }}>Add to Your courses</button></div>}
+        {onAddClasses && <div className="import-actions"><button disabled={!validRows || busy || saving} onClick={async () => {
+          if (!validRows || savePending.current) return
+          savePending.current = true; setSaving(true)
+          const id = requestId.current
+          try {
+            await onAddClasses(rows.map(({ code, section }) => ({ code, section })))
+            if (id === requestId.current) setMessage('Classes saved to Your courses. They will load after your next login.')
+          } catch (error) {
+            if (id === requestId.current) setMessage(error instanceof Error ? error.message : 'Unable to save classes. Your draft is still here; please retry.')
+          } finally { savePending.current = false; setSaving(false) }
+        }}>{saving ? 'Saving classes…' : 'Add to Your courses'}</button></div>}
         <button onClick={() => setRows(previous => [...previous, { id: ++rowId.current, code: '', section: '', warnings: [] }])}>Add class</button>
       </div>}
-    </section>}
+    </fieldset></section>}
   </div>
 }

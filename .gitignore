@@ -19,3 +19,6 @@ Thumbs.db
 .vscode/
 # Local crowd reports
 server/data/
+
+# Share placeholders, never local credentials
+!.env.example

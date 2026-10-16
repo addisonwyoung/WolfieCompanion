@@ -17,9 +17,9 @@
 ## 3. Browser upload and editable preview
 
 - [x] 3.1 Add the expandable Import schedule component beside Your courses with labeled image/layout inputs, local preview, explicit extraction, and temporary-processing notice; verify component tests cover valid selection, undecodable/invalid/oversized rejection, and no request until Extract classes is pressed. Add client test tooling if needed and verify it runs offline.
-- [x] 3.2 Implement code/section-only editable rows, add/remove controls, row warnings, and Clear/Close without enrollment actions; verify tests show edits remain local, missing titles/terms do not block preview, and sample courses/classmates are unchanged.
+- [x] 3.2 Implement code/section-only editable rows, add/remove controls, row warnings, and Clear/Close without automatic enrollment writes; the companion account change supplies explicit confirmation; verify tests show edits remain local, missing titles/terms do not block preview, and sample courses/classmates are unchanged.
 - [x] 3.3 Implement loading/error/empty/retry states, duplicate-submit prevention, request invalidation on image/layout changes, and object-URL cleanup; verify asynchronous tests cover stale successes/failures after replacement/clear/close and no automatic retries or retained browser storage.
-- [x] 3.4 Add responsive styling and keyboard/accessibility behavior using existing dashboard patterns; verify labeled controls, live status announcements, focus visibility, keyboard operations, and no overflow at 375 pixels. Document client startup and preview-only usage in client/README.md.
+- [x] 3.4 Add responsive styling and keyboard/accessibility behavior using existing dashboard patterns; verify labeled controls, live status announcements, focus visibility, keyboard operations, and no overflow at 375 pixels. Document client startup and temporary-preview versus explicit-confirmation usage in client/README.md.
 
 ## 4. Integration verification
 
