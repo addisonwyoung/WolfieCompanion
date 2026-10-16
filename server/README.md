@@ -12,7 +12,7 @@ Use one server process and persistent writable disk. This anonymous student prot
 
 IDs are lowercase hyphenated names, e.g. north-reading-room. Every submission appends history; the last accepted report determines the current summary. No report means unknown, never Empty.
 
-`npm test` runs isolated API/storage tests; `npm run build` compiles the server. Back up the JSON file before manually resetting demo data. Do not run multiple processes against the same file.
+`npm test` runs isolated API/storage tests; `npm run build` generates Prisma Client before compiling the server. The `prisma-client` generator writes to `src/generated/prisma` (relative to `prisma/schema.prisma`), matching the import in `src/lib/prisma.ts`. Generated files stay gitignored. The current checked-in schema is a scaffold without models; the installed Prisma 7 CLI supports generating that client without adding database models. Generation does not connect to a database and works without local env files or database credentials; runtime Prisma access still requires its configured connection URL. CI uses the same build command after `npm ci`. Back up the JSON file before manually resetting demo data. Do not run multiple processes against the same file.
 
 ## Schedule OCR experiment: cloud setup
 
