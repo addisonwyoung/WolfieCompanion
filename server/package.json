@@ -6,8 +6,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "test": "node --import tsx --test test/*.test.ts"
+    "build": "prisma generate && tsc",
+    "test": "node --import tsx --test test/*.test.ts",
+    "ocr:schedule": "tsx src/ocr/cli.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,7 +18,10 @@
     "@prisma/client": "^7.10.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "@google-cloud/vision": "^6.1.1",
+    "@supabase/supabase-js": "^2.118.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 config({
   path: process.env.PRISMA_ENV_FILE || ".env",
@@ -7,9 +7,10 @@ config({
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
+  // Generation needs only the schema; database commands require a configured URL.
   datasource: {
     url: process.env.PRISMA_ENV_FILE === ".env.supabase"
-      ? env("DIRECT_URL")
-      : env("DATABASE_URL"),
+      ? process.env.DIRECT_URL
+      : process.env.DATABASE_URL,
   },
 });

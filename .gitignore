@@ -21,5 +21,7 @@ Thumbs.db
 # Local crowd reports
 server/data/
 
+# Share placeholders, never local credentials
+!.env.example
 # Prisma generated client
 server/src/generated/

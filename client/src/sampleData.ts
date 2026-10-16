@@ -1,8 +1,8 @@
 ﻿// All people and enrollments in this module are fictional demo data.
 export const years = ['First year', 'Second year', 'Third year', 'Fourth year', 'Graduate'] as const
 export type Year = typeof years[number]
-export type CourseId = 'cse-416' | 'cse-310' | 'ams-210' | 'ams-261'
-export interface Course { id: CourseId; code: string }
+export type CourseId = string
+export interface Course { id: CourseId; code: string; sections?: string[] }
 export interface Student {
   id: string
   name: string

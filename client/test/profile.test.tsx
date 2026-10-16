@@ -1,0 +1,40 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { expect, test, vi } from 'vitest'
+import Profile from '../src/Profile'
+import { normalizeProfile } from '../src/account'
+import type { StudentProfile } from '../src/account'
+const profile:StudentProfile={id:'a',name:'Student',major:null,year:null,interests:[],residence_status:null,avatar_path:null}
+test('profile validates, normalizes all fields and retains draft on failure then saves',async()=>{
+ const save=vi.fn().mockRejectedValueOnce(new Error('Offline; retry')).mockResolvedValue(undefined)
+ render(<Profile profile={profile} onSave={save}/>);fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
+ fireEvent.change(screen.getByLabelText('Name'),{target:{value:' '}});fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ expect(screen.getByRole('alert')).toHaveTextContent('Enter a name');expect(save).not.toHaveBeenCalled()
+ fireEvent.change(screen.getByLabelText('Name'),{target:{value:' Ada '}})
+ fireEvent.change(screen.getByLabelText('Major (optional)'),{target:{value:' Math '}})
+ fireEvent.change(screen.getByLabelText('Year of study (optional)'),{target:{value:'Graduate'}})
+ fireEvent.change(screen.getByLabelText('Residence status (optional)'),{target:{value:'commuter'}})
+ fireEvent.change(screen.getByLabelText('Interests (optional)'),{target:{value:' Hiking, hiking, Music, '}})
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Offline'))
+ expect(screen.getByLabelText('Name')).toHaveValue(' Ada ')
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Edit profile'})).toBeInTheDocument())
+ expect(save).toHaveBeenLastCalledWith(expect.objectContaining({name:'Ada',major:'Math',year:'Graduate',residence_status:'commuter',interests:['hiking','Music']}),expect.anything())
+})
+test('cancel preserves profile and invalid pictures never save',()=>{
+ render(<Profile profile={profile} onSave={vi.fn()}/>);fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
+ fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Different'}})
+ fireEvent.change(screen.getByLabelText('Profile picture (optional)'),{target:{files:[new File(['bad'],'bad.gif',{type:'image/gif'})]}})
+ expect(screen.getByRole('alert')).toHaveTextContent('PNG or JPEG')
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}));fireEvent.click(screen.getByRole('button',{name:'Edit profile'}));expect(screen.getByLabelText('Name')).toHaveValue('Student')
+})
+test('profile bounds optional values and interests are authoritative client validation',()=>{
+ expect(normalizeProfile({...profile,major:' '}).major).toBeNull()
+ for(const next of [{...profile,year:'Unknown'},{...profile,major:'a'.repeat(121)},{...profile,interests:Array.from({length:21},(_,i)=>String(i))}]) expect(()=>normalizeProfile(next)).toThrow()
+})
+test('pending profile save disables editing and duplicate submission',async()=>{
+ let resolve!:()=>void;const save=vi.fn(()=>new Promise<void>(r=>{resolve=r}))
+ render(<Profile profile={profile} onSave={save}/>);fireEvent.click(screen.getByRole('button',{name:'Edit profile'}));fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ expect(screen.getByRole('button',{name:'Saving…'})).toBeDisabled();expect(screen.getByLabelText('Name')).toBeDisabled();expect(save).toHaveBeenCalledTimes(1)
+ resolve();await screen.findByRole('button',{name:'Edit profile'})
+})

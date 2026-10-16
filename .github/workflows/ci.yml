@@ -55,7 +55,7 @@ jobs:
       - name: Install server dependencies
         run: npm ci
 
-      - name: Build server
+      - name: Generate Prisma Client and build server
         run: npm run build
 
       - name: Test server

@@ -1,0 +1,206 @@
+[
+  {
+    "image": "class-list-clear.png",
+    "layout": "class-list",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210",
+      "BIO 201"
+    ],
+    "kind": "synthetic",
+    "variant": "clear",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "02",
+          "component": "lecture"
+        }
+      ],
+      "BIO 201": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ]
+    }
+  },
+  {
+    "image": "class-list-components.png",
+    "layout": "class-list",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210",
+      "BIO 201"
+    ],
+    "kind": "synthetic",
+    "variant": "components",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        },
+        {
+          "label": "L02",
+          "component": "lab"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "02",
+          "component": "lecture"
+        }
+      ],
+      "BIO 201": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ]
+    }
+  },
+  {
+    "image": "class-list-cropped.png",
+    "layout": "class-list",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210"
+    ],
+    "kind": "synthetic",
+    "variant": "cropped",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "02",
+          "component": "lecture"
+        }
+      ]
+    }
+  },
+  {
+    "image": "weekly-calendar-clear.png",
+    "layout": "weekly-calendar",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210",
+      "BIO 201"
+    ],
+    "kind": "synthetic",
+    "variant": "clear",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "BIO 201": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ]
+    }
+  },
+  {
+    "image": "weekly-calendar-components.png",
+    "layout": "weekly-calendar",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210",
+      "BIO 201"
+    ],
+    "kind": "synthetic",
+    "variant": "components",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        },
+        {
+          "label": "L02",
+          "component": "lab"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "BIO 201": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ]
+    }
+  },
+  {
+    "image": "weekly-calendar-cropped.png",
+    "layout": "weekly-calendar",
+    "expectedCodes": [
+      "CSE 416",
+      "AMS 210"
+    ],
+    "kind": "synthetic",
+    "variant": "cropped",
+    "expectedTerm": {
+      "semester": "Fall",
+      "year": 2026
+    },
+    "expectedSections": {
+      "CSE 416": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ],
+      "AMS 210": [
+        {
+          "label": "01",
+          "component": "lecture"
+        }
+      ]
+    }
+  }
+]
