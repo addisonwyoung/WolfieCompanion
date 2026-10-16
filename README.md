@@ -122,3 +122,7 @@ This application is specifically designed for students who want to improve their
 
 
 
+
+## Teammate local setup
+
+To pull the account feature branch and run the shared Google/Supabase experience, follow [the teammate setup guide](docs/teammate-setup.md). It includes environment files, two-terminal startup, account checks, optional screenshot extraction, and troubleshooting.
