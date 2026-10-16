@@ -4,7 +4,7 @@ Google sign-in creates an account on first use. Only a verified Google identity 
 
 ## Configure a test project
 
-1. Create/select a Supabase test project. Apply `supabase/migrations/202610160001_accounts.sql` in its SQL editor, or run `psql "$WOLFIE_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/202610160001_accounts.sql` with its database connection URL. This is an initial migration for a fresh application schema; use the migration history to avoid applying it twice. Do not run the test bootstrap on Supabase.
+1. Create/select a Supabase test project. Apply `supabase/migrations/202610160001_accounts.sql` in its SQL editor, or run `psql "$WOLFIE_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/202610160001_accounts.sql` with its database connection URL. This migration supports a fresh schema or rerunning against the same account schema: functions are replaced, named triggers/policies are recreated transactionally, and the private bucket settings are reconciled without deleting rows or files. Existing tables are retained; this is not a migration from unrelated or older table layouts. Use migration history for normal deployments. If the SQL editor reports an aborted transaction after an earlier failed attempt, run `ROLLBACK;` first, then run the entire file from `begin;` through `commit;`. Do not run the test bootstrap on Supabase.
 2. In Google Cloud create a Web OAuth client, enable the consent screen for the intended test users, and add the Supabase Google callback shown in the Supabase Auth provider settings as a Google authorized redirect URI. For a hosted project it has the form `https://PROJECT_REF.supabase.co/auth/v1/callback`. Configure the Google client ID and secret **only in Supabase Auth's Google provider settings**. Enable Google and disable other sign-in providers for this app.
 3. In Supabase Auth URL configuration, set the site's canonical URL and allow exact frontend callback URLs: `http://localhost:5173/auth/callback` for development and `https://YOUR_APP_HOST/auth/callback` for production. If using `127.0.0.1` or another port, add its exact callback too. Production hosting must serve the SPA for `/auth/callback`. Avoid wildcard production redirects. The browser SDK handles the PKCE callback and session refresh.
 4. Copy `client/.env.example` to `client/.env.local`; fill the project URL and publishable key. Only these public values belong in Vite variables. Never add a service-role key or Google secret.
@@ -42,7 +42,7 @@ For isolated Postgres verification (PostgreSQL 15+):
 ```sh
 initdb -D /tmp/wolfie-accounts-test -A trust --no-locale -E UTF8
 pg_ctl -D /tmp/wolfie-accounts-test -l /tmp/wolfie-accounts-test.log -o '-k /tmp -p 55439 -h 127.0.0.1' start
-psql -h /tmp -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql -f supabase/migrations/202610160001_accounts.sql -f supabase/tests/accounts.sql
+psql -h /tmp -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql -f supabase/migrations/202610160001_accounts.sql -f supabase/tests/accounts.sql -f supabase/tests/rerun.sql
 pg_ctl -D /tmp/wolfie-accounts-test stop
 ```
 

@@ -24,3 +24,7 @@ The following tasks remain unchecked because their full verification requires co
 - 5.2: two eligible accounts and one ineligible Google account, cross-device restoration, and the live managed-service smoke test remain pending.
 
 Use docs/supabase-accounts.md to configure a dedicated test project, apply the migration, and perform these checks. Keep the change unarchived until acceptance is completed. Stored classes are current self-reported memberships without semester history; real classmate data remains outside scope.
+
+## SQL editor rerun fix — 2026-10-15
+
+The initial script used CREATE FUNCTION and failed when a helper already existed. The migration now replaces functions, retains existing same-schema tables, recreates its named triggers/policies within the transaction, and reconciles private avatar bucket settings. The isolated-Postgres rerun regression applies the migration twice with existing profile/course/section/object fixtures and confirms no data loss or duplication. The full ownership-policy suite also passes after reruns. This does not claim compatibility with unrelated preexisting table layouts or live Supabase verification.
