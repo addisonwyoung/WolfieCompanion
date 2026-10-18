@@ -33,6 +33,22 @@ Enter classes manually without enabling OCR, or use the development-only schedul
 
 Existing crowd and evaluation demonstrations remain separate from this account model. Production OCR remains disabled; refer to server/README.md for its local opt-in and Google Vision requirements.
 
+## Course evaluations
+
+Course-review persistence is defined by `supabase/migrations/202610170001_course_reviews.sql`. It additively creates `course_offerings` with class, professor, semester, and academic-year metadata, plus `course_reviews` with exactly seven columns: generated ID, offering ID, session-derived user ID, weekly hours, individual difficulty, review text, and generated creation time. The catalog offering ID is the review foreign key and uniquely identifies the full offering. A unique `(user_id, offering_id)` constraint allows one review per student per offering.
+
+The migration file is prepared for owner review only. **Do not execute or apply it from the application setup or deploy workflow.** The project owner must inspect the SQL and run it manually in the Supabase SQL Editor. It does not change existing authentication, account, profile, or enrollment tables/policies. Review reads use an explicit projection that omits reviewer identity; insert ownership is set from the authenticated Supabase session.
+
+For local database checks only, run the existing test bootstrap and account migration, then the course-review migration and `supabase/tests/course_reviews.sql` against an isolated local Postgres database. Never run the bootstrap or SQL tests against Supabase. The project owner separately reviews and applies the migration in the SQL Editor when ready.
+
+## Course evaluations
+
+Course-review persistence is defined by `supabase/migrations/202610170001_course_reviews.sql`. It additively creates `course_offerings` with class, professor, semester, and academic-year metadata, plus `course_reviews` with exactly seven columns: generated ID, offering ID, session-derived user ID, weekly hours, individual difficulty, review text, and generated creation time. The catalog offering ID is the review foreign key and uniquely identifies the full offering. A unique `(user_id, offering_id)` constraint allows one review per student per offering.
+
+The migration file is prepared for review only. **Do not execute it from the application setup or test workflow.** The project owner must inspect the SQL and run it manually in the Supabase SQL Editor. It does not change the existing authentication, account, profile, or enrollment tables/policies. Review reads are available to eligible authenticated students through an allowlisted projection that omits reviewer identity; insert ownership is set from the authenticated Supabase session.
+
+For local database checks only, run the existing test bootstrap and account migration, then apply the course-review migration and run `supabase/tests/course_reviews.sql` against that isolated local Postgres database. Never run the bootstrap or test script against the shared Supabase project. The owner separately reviews and applies the migration in the SQL Editor when ready.
+
 ## Repeatable checks
 
 Run `npm test`, `npm run build`, and `npm run lint` in `client/`; run `npm test` and `npm run build` in `server/`. Endpoint tests bind temporary local ports but make no paid OCR or Google Auth calls.

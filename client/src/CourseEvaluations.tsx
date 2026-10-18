@@ -1,34 +1,66 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { courseOfferings, sampleEvaluations } from './evaluationData'
+import { useEffect, useState, type FormEvent } from 'react'
+import { courseOfferings, sampleEvaluations, summarizeEvaluations } from './evaluationData'
 import type { CourseEvaluation } from './evaluationData'
+import { DuplicateCourseReviewError } from './courseReviews'
+import type { CourseReviewApi } from './courseReviews'
 
-export default function CourseEvaluations() {
+export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState(courseOfferings[0].id)
-  const [evaluations, setEvaluations] = useState(sampleEvaluations)
+  const offerings = courseOfferings.filter(offering => offering.published)
+  const [selectedId, setSelectedId] = useState(offerings[0].id)
+  const [persistedByOffering, setPersistedByOffering] = useState<Record<string, CourseEvaluation[]>>({})
   const [submittedIds, setSubmittedIds] = useState<string[]>([])
+  const [loadErrors, setLoadErrors] = useState<Record<string, boolean>>({})
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [submissionStatusError, setSubmissionStatusError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [hours, setHours] = useState('')
   const [difficulty, setDifficulty] = useState('')
   const [review, setReview] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState('')
 
-  const offerings = courseOfferings.filter(offering => offering.published)
   const visibleOfferings = offerings.filter(offering =>
     `${offering.code} ${offering.title}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   )
-  const selected = offerings.find(offering => offering.id === selectedId)!
-  const currentEvaluations = evaluations.filter(evaluation => evaluation.offeringId === selected.id)
-  const averages = useMemo(() => currentEvaluations.length ? {
-    hours: currentEvaluations.reduce((sum, item) => sum + item.weeklyHours, 0) / currentEvaluations.length,
-    difficulty: currentEvaluations.reduce((sum, item) => sum + item.difficulty, 0) / currentEvaluations.length,
-  } : null, [currentEvaluations])
-  const alreadySubmitted = submittedIds.includes(selected.id)
+  const selected = offerings.find(offering => offering.id === selectedId) ?? courseOfferings[0]
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!selected) return
+    let active = true
+    void api.loadOffering(selected.id).then(data => {
+      if (!active) return
+      setPersistedByOffering(current => ({ ...current, [selected.id]: data }))
+      setLoadErrors(current => ({ ...current, [selected.id]: false }))
+    }).catch(() => {
+      if (active) setLoadErrors(current => ({ ...current, [selected.id]: true }))
+    })
+    return () => { active = false }
+  }, [api, selected, loadAttempt])
+
+  useEffect(() => {
+    let active = true
+    void api.myOfferingIds().then(ids => {
+      if (active) setSubmittedIds(ids)
+    }).catch(error => {
+      if (active) setSubmissionStatusError(error instanceof Error ? error.message : 'Unable to check previous reviews.')
+    })
+    return () => { active = false }
+  }, [api])
+
+  const currentEvaluations = selected ? [
+    ...sampleEvaluations.filter(evaluation => evaluation.offeringId === selected.id),
+    ...(persistedByOffering[selected.id] ?? []),
+  ] : []
+  const averages = summarizeEvaluations(currentEvaluations)
+  const alreadySubmitted = selected ? submittedIds.includes(selected.id) : false
+  const loadState = selected ? (loadErrors[selected.id] ? 'error' : Object.hasOwn(persistedByOffering, selected.id) ? 'ready' : 'loading') : 'loading'
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (alreadySubmitted) {
-      setNotice('You can publish only one review for this offering during this session.')
+    if (!selected) return
+    if (alreadySubmitted || isSubmitting) {
+      setNotice('You can publish only one review for this offering.')
       return
     }
     const nextErrors: Record<string, string> = {}
@@ -40,24 +72,31 @@ export default function CourseEvaluations() {
     setErrors(nextErrors)
     setNotice('')
     if (Object.keys(nextErrors).length) return
-    const newEvaluation: CourseEvaluation = {
-      id: `session-${evaluations.length + 1}`,
-      offeringId: selected.id,
-      weeklyHours: parsedHours,
-      difficulty: parsedDifficulty,
-      review: review.trim(),
+
+    setIsSubmitting(true)
+    try {
+      const saved = await api.submit(selected.id, { weeklyHours: parsedHours, difficulty: parsedDifficulty, review: review.trim() })
+      setPersistedByOffering(current => ({ ...current, [selected.id]: saved }))
+      setSubmittedIds(current => [...new Set([...current, selected.id])])
+      setHours('')
+      setDifficulty('')
+      setReview('')
+      setErrors({})
+      setNotice('Your anonymous review is saved and published for this offering.')
+    } catch (error) {
+      if (error instanceof DuplicateCourseReviewError) {
+        setSubmittedIds(current => [...new Set([...current, selected.id])])
+        setNotice('You have already published a review for this offering.')
+      } else {
+        setNotice(error instanceof Error ? error.message : 'Your review could not be saved. Your draft is still here; please retry.')
+      }
+    } finally {
+      setIsSubmitting(false)
     }
-    setEvaluations(current => [...current, newEvaluation])
-    setSubmittedIds(current => [...current, selected.id])
-    setHours('')
-    setDifficulty('')
-    setReview('')
-    setErrors({})
-    setNotice('Your anonymous review is published for this session.')
   }
 
   return <section className="evaluation-view" aria-labelledby="evaluation-heading">
-    <div className="evaluation-intro"><p className="eyebrow">COURSE EXPERIENCES</p><h1 id="evaluation-heading">Compare course offerings.</h1><p>Browse anonymous sample reviews and share one review per offering. </p></div>
+    <div className="evaluation-intro"><p className="eyebrow">COURSE EXPERIENCES</p><h1 id="evaluation-heading">Compare course offerings.</h1><p>Browse anonymous course reviews and share one review per offering.</p></div>
     <div className="evaluation-layout">
       <section className="panel offering-panel" aria-labelledby="offerings-heading">
         <h2 id="offerings-heading">Published offerings</h2>
@@ -75,14 +114,19 @@ export default function CourseEvaluations() {
         <section className="panel summary-panel" aria-labelledby="selected-offering-heading">
           <p className="eyebrow">SELECTED OFFERING</p><h2 id="selected-offering-heading">{selected.code}: {selected.title}</h2>
           <p className="muted">{selected.professor} · {selected.semester} {selected.year}</p>
-          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div><div><strong>{currentEvaluations.length}</strong><span>{currentEvaluations.length === 1 ? 'review' : 'reviews'}</span></div></div> : <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div>}
-          <h3 className="review-heading">Anonymous reviews</h3>
-          {currentEvaluations.length ? <ul className="review-list">{currentEvaluations.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5</span></li>)}</ul> : <p className="muted review-empty-note">No written reviews to display yet.</p>}
+          {loadState === 'loading' && <p role="status">Loading course reviews…</p>}
+          {loadState === 'error' && <div className="error" role="alert"><p>Saved course reviews could not be loaded. Existing sample reviews remain available.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry reviews</button></div>}
+          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div><div><strong>{currentEvaluations.length}</strong><span>{currentEvaluations.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
+          {(currentEvaluations.length > 0 || loadState === 'ready') && <>
+            <h3 className="review-heading">Anonymous reviews</h3>
+            {currentEvaluations.length ? <ul className="review-list">{currentEvaluations.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5{item.id.startsWith('eval-') ? ' · Sample review' : ''}</span></li>)}</ul> : <p className="muted review-empty-note">No written reviews to display yet.</p>}
+          </>}
         </section>
 
         <section className="panel submission-panel" aria-labelledby="submission-heading">
           <p className="eyebrow">YOUR EXPERIENCE</p><h2 id="submission-heading">Write an anonymous review</h2>
-          {alreadySubmitted ? <p className="submitted-note" role="status">You’ve already published a review for this offering this session. Reading reviews remains available.</p> : <form onSubmit={submit} noValidate>
+          {submissionStatusError && <p className="field-help" role="status">{submissionStatusError}</p>}
+          {alreadySubmitted ? <p className="submitted-note" role="status">You’ve already published a review for this offering. Reading reviews remains available.</p> : <form onSubmit={submit} noValidate>
             <label htmlFor="review-offering">Course offering</label><select id="review-offering" value={selected.id} onChange={event => { setSelectedId(event.target.value); setNotice(''); setErrors({}) }}>{offerings.map(offering => <option key={offering.id} value={offering.id}>{offering.code} · {offering.professor} · {offering.semester} {offering.year}</option>)}</select>
             <label htmlFor="review-hours">Weekly hours</label><input id="review-hours" type="number" min="0" max="40" step="any" value={hours} onChange={event => setHours(event.target.value)} aria-invalid={Boolean(errors.hours)} aria-describedby={errors.hours ? 'hours-error' : 'hours-help'} />
             {errors.hours ? <p id="hours-error" className="error">{errors.hours}</p> : <p id="hours-help" className="field-help">Enter a value from 0 to 40.</p>}
@@ -90,10 +134,10 @@ export default function CourseEvaluations() {
             {errors.difficulty && <p id="difficulty-error" className="error">{errors.difficulty}</p>}
             <label htmlFor="review-text">Written review</label><textarea id="review-text" rows={5} maxLength={1000} value={review} onChange={event => setReview(event.target.value)} aria-invalid={Boolean(errors.review)} aria-describedby={errors.review ? 'review-error' : 'review-count'} />
             {errors.review ? <p id="review-error" className="error">{errors.review}</p> : <p id="review-count" className="field-help">{review.length}/1,000 characters. Written review is optional.</p>}
-            <button className="primary publish-button" type="submit">Publish review</button>
+            <button className="primary publish-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Publishing…' : 'Publish review'}</button>
           </form>}
           {notice && <p className="submission-notice" role="status">{notice}</p>}
-          <p className="session-note">Demo data only: reviews are anonymous.</p>
+          <p className="session-note">New reviews are saved to Supabase. Reviewer identity is never shown.</p>
         </section>
       </div>
     </div>

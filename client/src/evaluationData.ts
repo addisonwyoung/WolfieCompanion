@@ -16,6 +16,15 @@ export interface CourseEvaluation {
   review: string
 }
 
+export function summarizeEvaluations(evaluations: CourseEvaluation[]) {
+  if (evaluations.length === 0) return null
+  return evaluations.reduce((summary, evaluation) => ({
+    hours: summary.hours + evaluation.weeklyHours / evaluations.length,
+    difficulty: summary.difficulty + evaluation.difficulty / evaluations.length,
+    count: summary.count + 1,
+  }), { hours: 0, difficulty: 0, count: 0 })
+}
+
 export const courseOfferings: CourseOffering[] = [
   { id: 'cse-416-fall-2025-lee', code: 'CSE 416', title: 'Software Engineering', professor: 'Dr. Lee', semester: 'Fall', year: 2025, published: true },
   { id: 'cse-416-spring-2026-patel', code: 'CSE 416', title: 'Software Engineering', professor: 'Prof. Patel', semester: 'Spring', year: 2026, published: true },
