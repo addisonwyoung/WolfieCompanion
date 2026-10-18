@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { supabase, configurationError } from './account'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useAccount } from './useAccount'
@@ -7,10 +7,12 @@ import Profile from './Profile'
 import CourseBrowser from './CourseBrowser'
 import CrowdMeter from './CrowdMeter'
 import CourseEvaluations from './CourseEvaluations'
+import { courseReviewApi } from './courseReviews'
 import './App.css'
 
 function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
+  const reviews = useMemo(() => courseReviewApi(client), [client])
   const [view, setView] = useState('dashboard')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -43,7 +45,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
         <div className="dashboard"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} /><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={setSelectedId} students={students} currentUserId={account.profile.id} /></div>
       </div>
-      {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations />}
+      {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
     </div>}
   </>
 }
