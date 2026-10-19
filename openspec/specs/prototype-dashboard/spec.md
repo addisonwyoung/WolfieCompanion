@@ -7,62 +7,77 @@ Provide an interactive Wolfie Companion prototype where students can edit a samp
 ## Requirements
 
 ### Requirement: Branded sample application shell
-The application SHALL show a Wolfie Companion dashboard at its root URL, with a sample profile, enrolled courses, and classmates area. It SHALL identify the displayed people and enrollments as demo data and use Wolfie Companion as the document title. Vite starter content SHALL no longer appear.
+The application SHALL use Wolfie Companion branding and document title at its root URL. It SHALL show sign-in to unauthenticated visitors and the authenticated student's profile, enrolled courses, and classmates area after session resolution. Personal data SHALL come from the authenticated workspace. Any remaining fictional classmates SHALL be explicitly labeled as demo data; the personal profile and classes SHALL NOT be labeled sample data. Missing Supabase configuration SHALL show an actionable setup error without silently reverting to a sample identity.
 
 #### Scenario: Open the prototype
-- **WHEN** a visitor opens the root page
-- **THEN** they see Wolfie Companion branding, a visible demo-data label, profile, courses, and classmates instead of the starter counter and framework links
-- **AND** the page works without authentication or a running backend
+- **WHEN** an unauthenticated visitor opens the root page
+- **THEN** they see the branded Google sign-in flow without a fictional personal identity
+
+#### Scenario: Open an authenticated workspace
+- **WHEN** an eligible student's session and saved data resolve
+- **THEN** their profile and courses are displayed and any fictional classmates are separately labeled
 
 ### Requirement: Editable sample profile
-The application SHALL initially display a fictional student's name, major, interests, and year of study. It SHALL allow editing major, interests, and year of study with explicit Save and Cancel actions. Name and enrollment SHALL remain fixed. Major SHALL be nonblank after trimming, year SHALL be selected from First year, Second year, Third year, Fourth year, or Graduate, and interests SHALL accept an optional comma-separated list with surrounding whitespace and empty entries removed.
+The dashboard SHALL display the authenticated student's saved profile and provide editable name, major, year, interests, residence status, and picture as specified by student-profile. Save SHALL persist valid changes and Cancel SHALL discard draft changes. Selecting courses SHALL NOT discard saved edits. Reloading SHALL restore Supabase data rather than the original fictional profile.
 
 #### Scenario: Save profile changes
-- **WHEN** the visitor edits the three editable fields and saves valid values
-- **THEN** the profile displays the saved values and leaves editing mode
-- **AND** selecting a different course does not discard those saved values
+- **WHEN** a student saves profile changes, selects another course, and reloads
+- **THEN** the saved profile values remain available
 
 #### Scenario: Cancel profile changes
-- **WHEN** the visitor edits profile fields and cancels
-- **THEN** the previously saved profile remains unchanged
-- **AND** reopening the editor starts with those saved values
+- **WHEN** a student cancels an edit
+- **THEN** the previous saved values remain displayed
 
 #### Scenario: Reject blank major
-- **WHEN** the visitor attempts to save a major containing only whitespace
-- **THEN** an associated validation message is shown and the saved profile remains unchanged
+- **WHEN** a student saves a blank major with a valid name
+- **THEN** the optional major is cleared rather than rejected, superseding the prototype's required-major restriction
 
 #### Scenario: Clear optional interests
-- **WHEN** the visitor saves an empty interests field with otherwise valid values
-- **THEN** the profile indicates that no interests have been added
+- **WHEN** a student saves an empty interests field with otherwise valid values
+- **THEN** the saved profile indicates that no interests have been added
 
 #### Scenario: Reload demo state
-- **WHEN** the visitor reloads after editing the profile
-- **THEN** the original sample profile is restored
-- **AND** the interface explains that profile edits reset on reload
+- **WHEN** a student reloads after saving profile edits
+- **THEN** the saved Supabase profile is restored rather than the original sample identity
 
 ### Requirement: Fixed sample course selection
-The application SHALL list exactly CSE 416, CSE 310, AMS 210, and AMS 261 as the sample student's courses, using consistently spaced course codes. CSE 416 SHALL be initially selected. Selecting a course SHALL visibly identify that selection and update the classmates heading and results.
+The dashboard SHALL list the authenticated student's saved courses using consistently spaced course codes and retain distinct sections. Initial selection SHALL reference a loaded course, and changing selection SHALL update the heading and results. An empty course list SHALL show an add-classes prompt without a selected-course heading or stale roster. No fixed set of courses SHALL be assigned to new accounts.
 
 #### Scenario: Select another course
-- **WHEN** the visitor selects AMS 210
-- **THEN** AMS 210 is indicated as selected and the classmates area identifies AMS 210
-- **AND** all four course controls remain available
+- **WHEN** a student selects a different loaded course
+- **THEN** that selection is visibly and programmatically indicated and the corresponding heading and results update
+
+#### Scenario: No saved classes
+- **WHEN** a student's course list is empty
+- **THEN** the dashboard offers class entry and does not attempt to render an undefined selected course
 
 ### Requirement: Course-specific sample classmates
-The application SHALL display only fictional students enrolled in the selected course, excluding the current sample user and duplicates. Each classmate SHALL show their name, major, year, and interests. Each of the four courses SHALL have at least two sample classmates, with differing rosters so switching courses demonstrates filtering. The displayed classmate count SHALL match the visible roster.
+The authenticated dashboard SHALL show live classmates for the selected saved course using the classmate-discovery contract. It SHALL display only name and major, exclude the current user and duplicates, and derive the displayed count from successful results. Fictional or seeded demonstration profiles SHALL remain separate from live results and SHALL NOT be merged into, substituted for, or used as fallback for an empty or failed lookup. No minimum roster size SHALL be assumed. Course changes SHALL clear old results immediately and expose an accessible loading state; errors SHALL offer retry and remain distinct from successful empty results. Account changes, sign-out, and superseded requests SHALL NOT leave or restore stale classmate data. With no saved course selected, the system SHALL show the existing add-classes prompt without issuing discovery requests.
 
 #### Scenario: View matching classmates
-- **WHEN** a visitor selects any of the four sample courses
-- **THEN** the visible classmates and count match that course's sample enrollments
-- **AND** classmates enrolled only in other courses are excluded
+- **WHEN** a student selects a saved course and the lookup succeeds
+- **THEN** only matching real classmates appear once with name and major and an accurate count, without fictional-data labeling
 
 #### Scenario: Student enrolled in multiple courses
-- **WHEN** a classmate belongs to two sample courses and the visitor selects each in turn
-- **THEN** that classmate appears once in each relevant course's results
+- **WHEN** a real classmate shares two saved courses with the viewer and the viewer selects each in turn
+- **THEN** that classmate appears once in each appropriate roster
 
 #### Scenario: No matching classmates
-- **WHEN** the selected course has no other enrolled students in the supplied data
-- **THEN** the area shows a zero count and a clear empty-state message rather than stale results
+- **WHEN** a successful lookup returns no other students
+- **THEN** the dashboard shows zero classmates and a real-data empty state without seeded substitutions
+
+#### Scenario: Loading, failure, and retry
+- **WHEN** a course lookup is pending or fails
+- **THEN** the dashboard shows loading or a retryable error respectively, without presenting an empty success count or the previous roster
+- **AND** retry requests the currently selected course
+
+#### Scenario: Stale responses and session changes
+- **WHEN** a request completes after the selection or authenticated account changes or the student signs out
+- **THEN** it does not populate the current roster
+
+#### Scenario: No saved classes
+- **WHEN** no saved course is available
+- **THEN** the dashboard shows the add-classes prompt without a selected-course roster or discovery request
 
 ### Requirement: Responsive and keyboard-usable interactions
 The application SHALL keep profile editing, course selection, and classmates usable at narrow mobile and desktop viewport widths without page-level horizontal overflow. Form controls SHALL have visible labels, keyboard focus SHALL be visible, and course selection SHALL be exposed programmatically as well as visually.

@@ -1,5 +1,7 @@
 # Student accounts and saved classes
 
+For restricted real classmate visibility, the manual discovery migration, and MVP limitations, see [classmate discovery](classmate-discovery.md). Name and major are visible to eligible peers sharing a saved course; other profile data and direct access remain owner-only.
+
 Google sign-in creates an account on first use. Only a verified Google identity with an email whose domain is exactly `stonybrook.edu` can access personal data. A domain hint in the Google picker is convenience; SQL policies verify trusted Auth records independently of the browser. Display-name/profile edits cannot change eligibility.
 
 ## Configure a test project
@@ -21,7 +23,7 @@ Official setup references: [Google sign-in](https://supabase.com/docs/guides/aut
 - `user_courses`: unique owner/course code, e.g. `CSE 310`.
 - `user_course_sections`: distinct string sections per course. `01` remains `01`. A course with no section rows has an unknown section; later saves add known sections without erasing existing ones.
 - `ensure_profile()` initializes a missing profile without resetting saved details. `save_enrollments(rows)` validates and commits 1–100 rows atomically. Duplicate and concurrent saves use database uniqueness; all saved memberships are returned in course-code order.
-- RLS protects all direct reads/writes. Child-section access checks parent ownership. Eligibility reads trusted Auth users/Google identities via a restricted helper. Editable metadata is never authority. Real profiles are owner-only; fictional classmates remain explicitly labeled fixtures.
+- RLS protects all direct reads/writes. Child-section access checks parent ownership. Eligibility reads trusted Auth users/Google identities via a restricted helper. Editable metadata is never authority. Direct profile access remains owner-only; the restricted discovery RPC exposes only name and major to eligible peers sharing a saved course. Fictional fixtures remain separate from live results.
 
 ## Profile and classes
 
