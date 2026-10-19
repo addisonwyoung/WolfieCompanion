@@ -1,5 +1,7 @@
 # Proposal
 
+Compatibility: this proposal records the account change's original fictional-roster baseline. The subsequent `real-classmate-discovery` change supersedes that baseline with limited name/major discovery through a restricted RPC, preserving owner-only table RLS and separate fixtures. Sync/archive accounts before discovery.
+
 ## Why
 
 Wolfie Companion currently resets profile edits and imported classes on reload. Students need a personal account that restores their information and courses across visits and devices before these features can support real usage.

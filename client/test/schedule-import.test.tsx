@@ -3,12 +3,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ScheduleImportPreview from '../src/ScheduleImportPreview'
 import { useState } from 'react'
 import CourseBrowser from '../src/CourseBrowser'
-import { courses, students } from '../src/sampleData'
+import { courses } from '../src/sampleData'
 import type { Course } from '../src/sampleData'
 function App() {
  const [list,setList]=useState<Course[]>(courses)
  const [selected,setSelected]=useState<string|null>('cse-416')
- return <CourseBrowser enrolledCourses={list} selectedId={selected} onSelect={setSelected} students={students} currentUserId="alex" onAddClasses={async rows=>{
+ return <CourseBrowser enrolledCourses={list} selectedId={selected} onSelect={setSelected} roster={{status:'success',classmates:[]}} onRetry={()=>{}} onAddClasses={async rows=>{
  setList(previous=>{ const next=previous.map(c=>({...c,sections:[...(c.sections??[])]})); for(const row of rows){const code=row.code.toUpperCase().replace(/\s/g,'').replace(/([A-Z]+)([0-9]+)/,'$1 $2'); const id=code.toLowerCase().replace(' ','-'); let course=next.find(c=>c.id===id);if(!course){course={id,code,sections:[]};next.push(course)} if(row.section&&!course.sections?.includes(row.section))course.sections?.push(row.section)}return next});setSelected(rows[0].code.toLowerCase().replace(/\s/g,'').replace(/([a-z]+)([0-9]+)/,'$1-$2'));
  }} />
 }

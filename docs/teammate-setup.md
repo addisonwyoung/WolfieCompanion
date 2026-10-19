@@ -114,7 +114,7 @@ The frontend forwards `/api` requests to the local API on port 3000. `--strictPo
 5. Optionally edit your profile to upload a PNG/JPEG picture up to 5 MiB. Save and refresh to check it. Picture upload requires terminal 1 to stay running.
 6. Sign out and back in. Your saved profile and classes should return automatically.
 
-Classmates are labeled fictional demo profiles. Real classmates' private data is not exposed. Course evaluations remain a sample feature. Study-space reports are stored in each local API's `server/data/crowd-reports.json`, so teammates running separate APIs will not share those reports. Account profiles/classes/pictures do share the Supabase project, while access remains private to the signed-in owner.
+Classmates now come from the restricted discovery RPC: eligible students sharing a saved course see each other's name and major only. Public/private and opt-out controls are deferred MVP limitations. Courses are self-reported without semester or official registration verification. Other personal fields and direct table/Storage access remain owner-only. Fictional fixtures never fill empty or failed live results. See [classmate setup and limitations](classmate-discovery.md) for owner-reviewed manual migration requirements. Study-space reports are stored in each local API's `server/data/crowd-reports.json`, so teammates running separate APIs will not share those reports.
 
 ## 7. Optional screenshot extraction
 

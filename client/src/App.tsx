@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { supabase, configurationError } from './account'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useAccount } from './useAccount'
-import { students } from './sampleData'
+import { classmateApi } from './classmates'
+import { useClassmates } from './useClassmates'
 import Profile from './Profile'
 import CourseBrowser from './CourseBrowser'
 import CrowdMeter from './CrowdMeter'
@@ -13,6 +14,7 @@ import './App.css'
 function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
   const reviews = useMemo(() => courseReviewApi(client), [client])
+  const discover = useMemo(() => classmateApi(client), [client])
   const [view, setView] = useState('dashboard')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
@@ -23,6 +25,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     try { await account.signOut() } catch (error) { setActionError((error as Error).message); setSignOutFailed(true) }
   }
   const selected = account.courses.some(c => c.id === selectedId) ? selectedId : account.courses[0]?.id ?? null
+  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, account.courses.find(c => c.id === selected)?.code ?? null)
   async function signIn() {
     if (signingIn) return
     setSigningIn(true); setActionError('')
@@ -43,7 +46,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
-        <div className="dashboard"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} /><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={setSelectedId} students={students} currentUserId={account.profile.id} /></div>
+        <div className="dashboard"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} /><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={setSelectedId} roster={roster} onRetry={roster.retry} /></div>
       </div>
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
     </div>}

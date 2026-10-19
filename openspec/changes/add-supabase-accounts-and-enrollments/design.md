@@ -2,6 +2,8 @@
 
 ## Context
 
+Compatibility update for `real-classmate-discovery`: fictional-roster descriptions below record this account change's original baseline. The later discovery change supersedes that roster through one restricted RPC exposing only name/major to eligible peers sharing a saved course, with an internal rendering identifier. Direct table/Storage access remains owner-only. Sync/archive this account change before the discovery change; do not restore fictional-only behavior afterward.
+
 See proposal.md for motivation. The React/Vite client initializes `App.tsx` from `sampleData.ts`; profile saves and schedule confirmation currently mutate React state. `CourseBrowser.tsx` assumes a selected course always exists. `ScheduleImportPreview.tsx` already exposes an Add to Your courses callback, but its completed, unarchived change still describes a nonpersistent preview. The Express server provides crowd and development-only OCR endpoints. Neither package currently declares a Supabase dependency; generated Prisma files are untracked and no checked-in Prisma schema/migrations were found. These files are not an established database contract and must remain untouched.
 
 ## Goals / Non-Goals
