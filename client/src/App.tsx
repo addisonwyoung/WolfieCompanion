@@ -9,10 +9,14 @@ import CourseBrowser from './CourseBrowser'
 import CrowdMeter from './CrowdMeter'
 import CourseEvaluations from './CourseEvaluations'
 import { courseReviewApi } from './courseReviews'
+import AcademicItems from './AcademicPlanner'
+import { academicItemsApi } from './academicItems'
 import './App.css'
 
 function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
+  const items = useMemo(() => academicItemsApi(client), [client])
+  const [plannerOpened, setPlannerOpened] = useState(false)
   const reviews = useMemo(() => courseReviewApi(client), [client])
   const discover = useMemo(() => classmateApi(client), [client])
   const [view, setView] = useState('dashboard')
@@ -42,12 +46,13 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
     {account.status === 'ready' && account.profile && <div key={account.userId}>
-      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => setView('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => setView('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => setView('evaluations')}>Course evaluations</button></nav>
+      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => setView('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => setView('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => setView('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); setView('academic') }}>Assignments &amp; Exams</button></nav>
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
         <div className="dashboard"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} /><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={setSelectedId} roster={roster} onRetry={roster.retry} /></div>
       </div>
+      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.courses} onAddCourses={() => setView('dashboard')} /></div>}
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
     </div>}
   </>

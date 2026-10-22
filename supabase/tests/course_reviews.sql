@@ -74,7 +74,7 @@ select pg_temp.assert((select count(*) = 0 from information_schema.columns where
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000012',true);
 select pg_temp.assert(public.account_is_eligible(), 'reviewer B eligible');
 select pg_temp.assert((select count(*) = 2 from public.course_reviews_public where course_code='CSE 416' and semester='Fall' and academic_year=2025), 'eligible peer can read anonymous reviews');
-select pg_temp.assert((select count(*) = 0 from public.my_course_review_offerings()), 'peer cannot see another student's submission state');
+select pg_temp.assert((select count(*) = 0 from public.my_course_review_offerings()), 'peer cannot see another student''s submission state');
 
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000013',true);
 select pg_temp.assert(not public.account_is_eligible(), 'gmail reviewer ineligible');
