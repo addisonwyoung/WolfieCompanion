@@ -18,10 +18,10 @@ test('invalid picture or failed upload never changes profile',async()=>{
  const f=fake();await expect(f.api.saveProfile(profile,{file:new File(['gif'],'x.gif',{type:'image/gif'})})).rejects.toThrow('PNG or JPEG');vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false,json:async()=>({error:'Upload unavailable'})}));await expect(f.api.saveProfile(profile,{file:new File(['png'],'pic.png',{type:'image/png'})})).rejects.toThrow('Upload unavailable');expect(f.update).not.toHaveBeenCalled()
 })
 test('validate rows before RPC and return canonical classes and sections',async()=>{
- const f=fake();await expect(f.api.saveClasses([{code:'bad',section:'01'}])).rejects.toThrow('Check each');expect(f.rpc).not.toHaveBeenCalled();f.rpc.mockResolvedValueOnce({data:[{id:'db-id',code:'CSE 310',sections:['01','02']}],error:null});expect(await f.api.saveClasses([{code:'cse310',section:'01'}])).toEqual([{id:'cse-310',code:'CSE 310',sections:['01','02']}])
+ const f=fake();await expect(f.api.saveClasses([{code:'bad',section:'01'}])).rejects.toThrow('Check each');expect(f.rpc).not.toHaveBeenCalled();f.rpc.mockResolvedValueOnce({data:[{id:'db-id',code:'CSE 310',sections:['01','02']}],error:null});expect(await f.api.saveClasses([{code:'cse310',section:'01'}])).toEqual([{id:'cse-310',databaseId:'db-id',code:'CSE 310',sections:['01','02']}])
 })
 test('load restores profile and all sections without a duplicate enrollment field',async()=>{
  const p={...profile,avatar_path:null}
  const client={storage:{from:()=>({})},rpc:vi.fn(()=>({single:async()=>({data:p,error:null})})),from:()=>({select:()=>({order:async()=>({data:[{id:'uuid',course_code:'CSE 310',user_course_sections:[{section:'02'},{section:'01'}]}],error:null})})})} as unknown as SupabaseClient
- const loaded=await accountApi(client).load();expect(loaded).toEqual({profile:p,courses:[{id:'cse-310',code:'CSE 310',sections:['01','02']}]});expect(loaded.profile).not.toHaveProperty('courseIds')
+ const loaded=await accountApi(client).load();expect(loaded).toEqual({profile:p,courses:[{id:'cse-310',databaseId:'uuid',code:'CSE 310',sections:['01','02']}]});expect(loaded.profile).not.toHaveProperty('courseIds')
 })

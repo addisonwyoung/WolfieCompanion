@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import { accountApi } from './account'
-import type { StudentProfile, ClassRow, PictureChange } from './account'
-import type { Course } from './sampleData'
+import type { StudentProfile, ClassRow, PictureChange, SavedCourse } from './account'
 
-type State = { status: 'loading' | 'signed-out' | 'ineligible' | 'error' | 'ready'; userId: string | null; profile: StudentProfile | null; courses: Course[]; message: string }
+type State = { status: 'loading' | 'signed-out' | 'ineligible' | 'error' | 'ready'; userId: string | null; profile: StudentProfile | null; courses: SavedCourse[]; message: string }
 const empty: State = { status: 'loading', userId: null, profile: null, courses: [], message: '' }
 export function useAccount(client: SupabaseClient) {
   const api = useMemo(() => accountApi(client), [client])

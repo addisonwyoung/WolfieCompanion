@@ -8,6 +8,8 @@ export interface StudentProfile {
   interests: string[]; residence_status: 'commuter' | 'dormer' | null; avatar_path: string | null
 }
 export interface ClassRow { code: string; section: string }
+// id remains the code-derived UI identifier; databaseId is the saved membership UUID.
+export interface SavedCourse extends Course { databaseId: string }
 export interface PictureChange { file?: File; remove?: boolean }
 export function validateRows(rows: ClassRow[]) {
   return rows.length > 0 && rows.length <= 100 && rows.every(r => /^[a-z]{2,4}\s*\d{3}$/i.test(r.code.trim()) && /^[a-z0-9-]{0,20}$/i.test(r.section.trim()))
@@ -38,19 +40,19 @@ export function accountApi(client: SupabaseClient) {
       if (error) throw new Error('Unable to verify your student account. Please retry.')
       return data === true
     },
-    async load(): Promise<{ profile: StudentProfile; courses: Course[] }> {
+    async load(): Promise<{ profile: StudentProfile; courses: SavedCourse[] }> {
       const [p, c] = await Promise.all([
         client.rpc('ensure_profile').single(),
         client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code'),
       ])
       if (p.error || c.error || !p.data) throw new Error('Unable to load your profile and classes. Please retry.')
-      return { profile: p.data as StudentProfile, courses: (c.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
+      return { profile: p.data as StudentProfile, courses: (c.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
     },
-    async saveClasses(rows: ClassRow[]): Promise<Course[]> {
+    async saveClasses(rows: ClassRow[]): Promise<SavedCourse[]> {
       if (!validateRows(rows)) throw new Error('Check each course code and section. Save 1 to 100 rows at a time.')
       const { data, error } = await client.rpc('save_enrollments', { rows })
       if (error) throw new Error('Classes could not be saved. Your draft is still here; please retry.')
-      return (data as Course[]).map(c => ({ ...c, id: c.code.toLowerCase().replace(' ', '-') }))
+      return (data as Course[]).map(c => ({ ...c, databaseId: c.id, id: c.code.toLowerCase().replace(' ', '-') }))
     },
     async saveProfile(profile: StudentProfile, picture: PictureChange = {}) {
       const next = normalizeProfile(profile)

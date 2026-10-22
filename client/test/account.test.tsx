@@ -1,10 +1,13 @@
+import './academicDialogSupport'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import App from '../src/App'
 import type { AccountApi, StudentProfile } from '../src/account'
-const mock=vi.hoisted(()=>({api:{} as AccountApi}))
+import type { AcademicApi } from '../src/academicItems'
+const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi}))
 vi.mock('../src/account',async original=>({...await original<typeof import('../src/account')>(),accountApi:()=>mock.api}))
+vi.mock('../src/academicItems',async original=>({...await original<typeof import('../src/academicItems')>(),academicItemsApi:()=>mock.items}))
 const profile=(id='a'):StudentProfile=>({id,name:`Student ${id}`,major:null,year:null,interests:[],residence_status:null,avatar_path:null})
 const session=(id:string)=>({user:{id},access_token:`token-${id}`}) as Session
 function fake(initial:Session|null=null){
@@ -32,6 +35,44 @@ test('ineligible signs out, failed load retries',async()=>{
 test('late A cannot populate B and refresh does not discard workspace',async()=>{
  let resolveA!:(data:Awaited<ReturnType<AccountApi['load']>>)=>void
  vi.mocked(mock.api.load).mockImplementationOnce(()=>new Promise(r=>{resolveA=r})).mockResolvedValueOnce({profile:profile('b'),courses:[]});const f=fake(session('a'));render(<App client={f.client}/>);await waitFor(()=>expect(mock.api.load).toHaveBeenCalledTimes(1));act(()=>{f.emit(null);f.emit('b')});await screen.findByText('Student b')
- await act(async()=>resolveA({profile:profile('a'),courses:[{id:'bad',code:'AAA 100'}]}));expect(screen.queryByText('Student a')).not.toBeInTheDocument();act(()=>f.emit('b','TOKEN_REFRESHED'));expect(screen.getByText('Student b')).toBeInTheDocument();expect(mock.api.load).toHaveBeenCalledTimes(2);act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'})
+ await act(async()=>resolveA({profile:profile('a'),courses:[{id:'bad',databaseId:'old-course',code:'AAA 100'}]}));expect(screen.queryByText('Student a')).not.toBeInTheDocument();act(()=>f.emit('b','TOKEN_REFRESHED'));expect(screen.getByText('Student b')).toBeInTheDocument();expect(mock.api.load).toHaveBeenCalledTimes(2);act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'})
 })
 test('missing config is actionable',()=>{render(<App client={null}/>);expect(screen.getByRole('alert')).toHaveTextContent('VITE_SUPABASE_URL')})
+
+test('planner failures stay isolated and private drafts survive navigation but clear on signout',async()=>{
+ mock.items={load:vi.fn().mockRejectedValueOnce(new Error('Academic storage unavailable')).mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}]})
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByText('Academic storage unavailable')
+ fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));expect(screen.getByText('Student a')).toBeVisible()
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));fireEvent.click(screen.getByRole('button',{name:'Retry academic items'}));await screen.findByText(/Nothing planned/)
+ fireEvent.click(screen.getByRole('button',{name:'Add item'}));fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Private draft'}})
+ // Native background blocking is verified in Chrome. External auth events must
+ // tear down the account even while its modal has an unsaved draft.
+ act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByDisplayValue('Private draft')).not.toBeInTheDocument();expect(document.querySelector('dialog[open]')).toBeNull();expect(document.body.style.overflow).not.toBe('hidden')
+})
+
+test.each(['editor','discard','save','delete','deleting'] as const)('external account replacement tears down %s and ignores old results',async mode=>{
+ const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
+ const item={id:'private-item',user_course_id:course.databaseId,title:'Private old item',type:'assignment' as const,due_date:'2026-10-23',due_time:null,notes:null,location:null,completed_at:null}
+ let resolveWrite!:(value:unknown)=>void
+ mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn(()=>new Promise(resolve=>{resolveWrite=resolve}))}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course]})
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:'Private old item'})
+ if(mode==='delete'||mode==='deleting'){
+   fireEvent.click(screen.getByRole('button',{name:'Actions for Private old item'}));fireEvent.click(screen.getByRole('menuitem',{name:'Delete'}))
+   if(mode==='deleting')fireEvent.click(screen.getByRole('button',{name:'Delete',exact:true}))
+ }else{
+   fireEvent.click(screen.getByRole('button',{name:'Add item'}));fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Private unsaved draft'}})
+   if(mode==='discard')fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
+   if(mode==='save'){fireEvent.change(screen.getByLabelText('Due date'),{target:{value:'2026-10-23'}});fireEvent.click(screen.getByRole('button',{name:'Save item'}))}
+ }
+ expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
+ vi.mocked(mock.items.load).mockResolvedValue([]);vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[course]})
+ act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(mode==='save'||mode==='deleting')await act(async()=>resolveWrite(mode==='save'?{...item,title:'Private unsaved draft'}:undefined))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(document.body.style.overflow).not.toBe('hidden')
+ expect(screen.queryByText('Private old item')).not.toBeInTheDocument();expect(screen.queryByDisplayValue('Private unsaved draft')).not.toBeInTheDocument()
+ expect(window.confirm).not.toHaveBeenCalled();expect(window.alert).not.toHaveBeenCalled()
+})
