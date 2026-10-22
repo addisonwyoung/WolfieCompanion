@@ -3,12 +3,13 @@ import ScheduleImportPreview from './ScheduleImportPreview'
 import type { CourseId, Course } from './sampleData'
 import type { ClassmateState } from './useClassmates'
 
-export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedId, onSelect, roster, onRetry }: {
+export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedId, onSelect, roster, onRetry, onViewProfile }: {
   enrolledCourses: Course[]
   onAddClasses: (rows: { code: string; section: string }[]) => Promise<void>
   selectedId: CourseId | null
   onSelect: (id: CourseId) => void
   roster: ClassmateState
+  onViewProfile?: (id: string) => void
   onRetry: () => void
 }) {
   const selected = enrolledCourses.find(course => course.id === selectedId)
@@ -30,9 +31,9 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
       {roster.status === 'loading' && <p role="status">Loading classmates…</p>}
       {roster.status === 'error' && <div className="panel empty-state"><p role="alert">Unable to load classmates. Please retry.</p><button onClick={onRetry}>Retry classmates</button></div>}
       {roster.status === 'success' && (classmates.length ? <ul className="roster">{classmates.map(student => <li key={student.student_id} className="panel student-card">
-        <h3>{student.name}</h3><p className="student-major">{student.major ?? 'Major not added'}</p>
+        <h3>{student.name}</h3>{onViewProfile && <button onClick={() => onViewProfile(student.student_id)} aria-label={`View profile of ${student.name}`}>View profile</button>}<p className="student-major">{student.major ?? 'Major not added'}</p>
       </li>)}</ul> : <div className="panel empty-state"><h3>No classmates yet</h3><p className="muted">No other students have saved this course yet.</p></div>)}
-      <p className="roster-note">Your name and major are visible to eligible students sharing a saved course. Public/private settings and opt-out controls are not available in this MVP. Courses are self-reported; matching does not verify semesters or official enrollment.</p>
+      <p className="roster-note">Your name and major are visible to eligible students sharing a saved course. You choose whether to share your year, interests, residence status, and picture in Edit profile. Optional details stay private until shared. Courses are self-reported; matching does not verify semesters or official enrollment.</p>
     </section>}
   </div>
 }

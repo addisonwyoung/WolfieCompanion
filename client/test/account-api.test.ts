@@ -25,3 +25,10 @@ test('load restores profile and all sections without a duplicate enrollment fiel
  const client={storage:{from:()=>({})},rpc:vi.fn(()=>({single:async()=>({data:p,error:null})})),from:()=>({select:()=>({order:async()=>({data:[{id:'uuid',course_code:'CSE 310',user_course_sections:[{section:'02'},{section:'01'}]}],error:null})})})} as unknown as SupabaseClient
  const loaded=await accountApi(client).load();expect(loaded).toEqual({profile:p,courses:[{id:'cse-310',databaseId:'uuid',code:'CSE 310',sections:['01','02']}]});expect(loaded.profile).not.toHaveProperty('courseIds')
 })
+
+test('profile sharing flags are explicit and saved atomically without deleting private values',async()=>{
+ const f=fake();await f.api.saveProfile({...profile,avatar_path:null,year:'Graduate',interests:['Music'],share_year:true,share_interests:false})
+ expect(f.update).toHaveBeenCalledWith(expect.objectContaining({year:'Graduate',interests:['Music'],share_year:true,share_interests:false,share_avatar:false,share_residence_status:false}))
+ f.single.mockResolvedValueOnce({data:null,error:new Error('offline')} as never)
+ await expect(f.api.saveProfile({...profile,share_year:false})).rejects.toThrow('Profile could not be saved')
+})

@@ -1,4 +1,5 @@
 import express from 'express';
+import { classmatePictureRouter } from './classmatePicture.js';
 import { avatarRouter } from './avatar.js';
 import type { ErrorRequestHandler } from 'express';
 import { schedulePreviewRouter } from './ocr/preview.js';
@@ -6,6 +7,7 @@ import type { PreviewOptions } from './ocr/preview.js';
 import { levels, ReportStore } from './crowd.js';
 export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   const app = express();
+  app.use('/api/classmate-picture', classmatePictureRouter());
   app.use('/api/avatar', avatarRouter());
   app.use('/api/schedule-preview', schedulePreviewRouter(preview));
   app.use(express.json({ limit: '8kb' }));

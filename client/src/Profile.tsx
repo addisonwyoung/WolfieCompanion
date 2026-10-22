@@ -64,12 +64,14 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
         <label htmlFor="residence">Residence status (optional)</label><select id="residence" aria-describedby="profile-error" value={draft.residence_status ?? ''} onChange={e => setDraft({ ...draft, residence_status: (e.target.value || null) as StudentProfile['residence_status'] })}><option value="">Not set</option><option value="commuter">Commuter</option><option value="dormer">Dormer</option></select>
         <label htmlFor="interests">Interests (optional)</label><textarea id="interests" value={interests} onChange={e => setInterests(e.target.value)} aria-describedby="interests-help profile-error" rows={3} />
         <p id="interests-help" className="field-help">Separate up to 20 interests with commas. Each can have up to 50 characters.</p>
+        <p className="field-help">Your name and major are always shared with eligible students who saved the same course. Choose which other details to share. Courses are self-reported.</p>
+        {([['share_year', 'year of study'], ['share_interests', 'interests'], ['share_residence_status', 'residence status'], ['share_avatar', 'profile picture']] as const).map(([key, label]) => <label className="sharing-choice" key={key}><input type="checkbox" checked={draft[key] === true} onChange={e => setDraft({ ...draft, [key]: e.target.checked })} /> Share my {label} with classmates</label>)}
         <label htmlFor="picture">Profile picture (optional)</label><input id="picture" type="file" accept="image/png,image/jpeg" aria-describedby="picture-help profile-error" onChange={e => {
           const next = e.target.files?.[0]; if (!next) return
           if (!['image/png','image/jpeg'].includes(next.type) || !next.size || next.size > 5 * 1024 * 1024) { setError('Choose a nonempty PNG or JPEG up to 5 MiB.'); e.target.value = ''; return }
           setFile(next); setRemove(false); setError('')
         }} />
-        <p id="picture-help" className="field-help">PNG or JPEG, up to 5 MiB. Pictures stay private to your account.</p>
+        <p id="picture-help" className="field-help">PNG or JPEG, up to 5 MiB. Pictures stay private unless you choose to share them with classmates.</p>
         {file && preview && <img className="picture-preview" src={preview} alt="New profile picture preview" onError={() => { setFile(null); setError('This picture could not be opened. Choose a readable PNG or JPEG.') }} />}
         {(file || profile.avatar_path) && <button type="button" onClick={() => { setFile(null); setRemove(true) }}>Remove picture</button>}
         {remove && <p className="field-help">Your picture will be removed when you save.</p>}

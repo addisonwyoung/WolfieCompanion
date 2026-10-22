@@ -88,7 +88,7 @@ test('cards display name and major only, with separate accessible states and vis
   expect(screen.getByText('1 classmate')).toBeInTheDocument()
   expect(screen.queryByText('Interests')).not.toBeInTheDocument()
   expect(screen.queryByText(/fictional/i)).not.toBeInTheDocument()
-  expect(screen.getByText(/Your name and major are visible/)).toHaveTextContent('Public/private settings and opt-out controls are not available')
+  expect(screen.getByText(/Your name and major are visible/)).toHaveTextContent('You choose whether to share')
   expect(screen.getByText(/Your name and major are visible/)).toHaveTextContent('self-reported')
   rerender(<CourseBrowser {...props} roster={{ status: 'loading', classmates: [] }} />)
   expect(screen.getByRole('status')).toHaveTextContent('Loading classmates')

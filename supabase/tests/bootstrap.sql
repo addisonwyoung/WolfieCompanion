@@ -1,5 +1,6 @@
 -- Test-only stand-ins for the Supabase-managed schemas. NEVER run on a Supabase project.
 create role anon nologin;
+create role service_role nologin;
 create role authenticated nologin;
 create schema auth;
 create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}');
