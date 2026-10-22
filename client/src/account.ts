@@ -22,7 +22,8 @@ export function normalizeProfile(profile: StudentProfile): StudentProfile {
   if ((next.major?.length ?? 0) > 120) throw new Error('Major must be at most 120 characters.')
   if (next.year !== null && !years.includes(next.year as typeof years[number])) throw new Error('Choose a listed year or leave it unset.')
   if (next.residence_status !== null && !['commuter', 'dormer'].includes(next.residence_status)) throw new Error('Choose commuter, dormer, or leave it unset.')
-  if (interests.length > 20 || interests.some(s => s.length > 50)) throw new Error('Use at most 20 interests, each at most 50 characters.')
+  if (interests.length > 5) throw new Error('Choose no more than five interests.')
+  if (interests.some(s => s.length > 50)) throw new Error('Each interest must be at most 50 characters.')
   return next
 }
 const url = import.meta.env.VITE_SUPABASE_URL
