@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import { divIcon, tooltip } from 'leaflet'
 import type { LeafletEvent, Marker as LeafletMarker } from 'leaflet'
 import type { CampusLocation } from './campusLocations'
@@ -8,6 +8,10 @@ import { campusCategories } from './campusLocations'
 import { categoryLabels, categoryPaths, initialViewport, tilesConfigured } from './campusExplorerConfig'
 import type { CampusViewport, ExplorerConfig } from './campusExplorerConfig'
 import 'leaflet/dist/leaflet.css'
+import '@maptiler/sdk/dist/maptiler-sdk.css'
+
+// Exact attribution added by the pinned plugin; its onRemove does not remove it.
+const vectorAttribution = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
 
 // Five static icon instances; no React root or rich popup per marker.
 const icons = Object.fromEntries(campusCategories.map(category => [category, divIcon({
@@ -42,11 +46,33 @@ function TileStatus({ config }: { config: ExplorerConfig }) {
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const map = useMap()
+  const { key, mapId } = config
+  const configured = tilesConfigured(config)
+  useEffect(() => {
+    if (!configured) return
+    let disposed = false
+    let cleanup: (() => void) | undefined
+    const fail = () => { if (!disposed) setFailed(true) }
+    void import('@maptiler/leaflet-maptilersdk').then(({ MaptilerLayer }) => {
+      if (disposed) return
+      const layer = new MaptilerLayer({ apiKey: key, style: `https://api.maptiler.com/maps/${mapId}/style.json`, geolocate: false })
+      try {
+        layer.addTo(map)
+        const sdk = layer.getMaptilerSDKMap()
+        sdk.on('error', fail)
+        cleanup = () => { sdk.off('error', fail); layer.remove(); map.attributionControl.removeAttribution(vectorAttribution) }
+      } catch {
+        // WebGL/style initialization can fail before a renderer exists.
+        if (map.hasLayer(layer)) {
+          try { map.removeLayer(layer) } catch { /* partially initialized plugin */ }
+        }
+        fail()
+      }
+    }).catch(fail)
+    return () => { disposed = true; cleanup?.() }
+  }, [map, key, mapId, configured, attempt])
   if (!tilesConfigured(config)) return null
   return <>
-    <TileLayer key={attempt} url={`https://api.maptiler.com/maps/${config.mapId}/{z}/{x}/{y}.png?key=${encodeURIComponent(config.key)}`} tileSize={512} zoomOffset={-1} maxNativeZoom={19} maxZoom={20}
-      attribution={'&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}
-      eventHandlers={{ tileerror: () => setFailed(true) }} />
     {failed && <div className="campus-tile-error" role="alert">Map tiles could not load. You can still use the location list. <button onClick={() => { setFailed(false); setAttempt(n => n + 1); map.invalidateSize() }}>Retry map</button></div>}
   </>
 }

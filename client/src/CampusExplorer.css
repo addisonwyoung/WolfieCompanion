@@ -71,3 +71,6 @@
   .campus-return { padding: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .campus-explorer *, .campus-explorer *::before { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+/* The vector canvas stays in Leaflet tilePane, below resource markers/controls. */
+.campus-map .leaflet-gl-layer { pointer-events: none; }

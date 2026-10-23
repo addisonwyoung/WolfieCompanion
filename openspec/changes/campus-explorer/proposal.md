@@ -7,7 +7,7 @@ Students need a clear, dependable way to find useful campus resources without se
 ## What Changes
 
 - Add a standalone Campus Explorer view in the authenticated main navigation, independent of Study spaces and its crowd meter.
-- Use React Leaflet 5, Leaflet 1.9, and MapTiler Cloud raster tiles with solid greens/blues, recognizable buildings, and pedestrian paths; validate actual Stony Brook detail before accepting a style.
+- Use React Leaflet 5, Leaflet 1.9, and MapTiler Cloud vector tiles through the official @maptiler/leaflet-maptilersdk plugin with solid greens/blues, recognizable buildings, and pedestrian paths; validate actual Stony Brook detail before accepting a style.
 - Start on the main academic campus, naturally include surrounding residential areas, and allow future locations anywhere valid geographic coordinates permit.
 - Provide five resource categories, distinct lightweight icons, an interactive filter legend, desktop hover previews, persistent accessible details, and a synchronized location list that resolves overlapping resources.
 - Persist curated resource records in Supabase, with published-only student reads and database-authorized editor CRUD and map-click coordinate capture.
