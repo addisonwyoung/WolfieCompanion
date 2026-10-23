@@ -33,14 +33,13 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
     const nextPeopleOwner = course ? `${userId}:${course}` : ''
     const samePeople = peopleOwnerRef.current === nextPeopleOwner
     inboxOwnerRef.current = userId; peopleOwnerRef.current = nextPeopleOwner
-    setInboxOwner(userId); setPeopleOwner(nextPeopleOwner)
     setInbox(previous => ({ status: 'loading', data: sameInbox ? previous.data : [] }))
-    void api.inbox(controller.signal).then(data => { if (!controller.signal.aborted) setInbox({ status: 'success', data }) }, () => { if (!controller.signal.aborted) setInbox(previous => ({ status: 'error', data: previous.data })) })
+    void api.inbox(controller.signal).then(data => { if (!controller.signal.aborted) { setInbox({ status: 'success', data }); setInboxOwner(userId) } }, () => { if (!controller.signal.aborted) { setInbox(previous => ({ status: 'error', data: previous.data })); setInboxOwner(userId) } })
     if (course) {
       setRelationships(previous => ({ status: 'loading', data: samePeople ? previous.data : [] }))
       setFriends(previous => ({ status: 'loading', data: samePeople ? previous.data : [] }))
-      void api.relationships(course, controller.signal).then(data => { if (!controller.signal.aborted) setRelationships({ status: 'success', data }) }, () => { if (!controller.signal.aborted) setRelationships(previous => ({ status: 'error', data: previous.data })) })
-      void api.friends(course, controller.signal).then(data => { if (!controller.signal.aborted) setFriends({ status: 'success', data }) }, () => { if (!controller.signal.aborted) setFriends(previous => ({ status: 'error', data: previous.data })) })
+      void api.relationships(course, controller.signal).then(data => { if (!controller.signal.aborted) { setRelationships({ status: 'success', data }); setPeopleOwner(nextPeopleOwner) } }, () => { if (!controller.signal.aborted) { setRelationships(previous => ({ status: 'error', data: previous.data })); setPeopleOwner(nextPeopleOwner) } })
+      void api.friends(course, controller.signal).then(data => { if (!controller.signal.aborted) { setFriends({ status: 'success', data }); setPeopleOwner(nextPeopleOwner) } }, () => { if (!controller.signal.aborted) { setFriends(previous => ({ status: 'error', data: previous.data })); setPeopleOwner(nextPeopleOwner) } })
     } else { setRelationships(empty()); setFriends(empty()) }
     return () => controller.abort()
   }, [api, userId, course, attempt])
