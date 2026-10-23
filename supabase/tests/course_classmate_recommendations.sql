@@ -33,7 +33,7 @@ update public.profiles set name='Recommendation Peer',major='Computer Science',y
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
-select pg_temp.assert((select count(*)=1 and min(student_id)='30000000-0000-0000-0000-000000000002'::uuid
+select pg_temp.assert((select count(*)=1 and min(student_id::text)='30000000-0000-0000-0000-000000000002'
   from public.course_recommendation_profiles('cse310')), 'normalized course membership, self/ineligible/unrelated exclusion and section deduplication');
 select pg_temp.assert((select name='Recommendation Peer' and major='Computer Science'
   and year is null and interests is null and residence_status is null

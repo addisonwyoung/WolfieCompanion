@@ -4,10 +4,12 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import App from '../src/App'
 import type { AccountApi, StudentProfile } from '../src/account'
+import type { MessagingApi, Message } from '../src/messaging'
 import type { AcademicApi } from '../src/academicItems'
-const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi}))
+const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi,dm:{} as MessagingApi}))
 vi.mock('../src/account',async original=>({...await original<typeof import('../src/account')>(),accountApi:()=>mock.api}))
 vi.mock('../src/academicItems',async original=>({...await original<typeof import('../src/academicItems')>(),academicItemsApi:()=>mock.items}))
+vi.mock('../src/messaging',async original=>({...await original<typeof import('../src/messaging')>(),messagingApi:()=>mock.dm}))
 const profile=(id='a'):StudentProfile=>({id,name:`Student ${id}`,major:null,year:null,interests:[],residence_status:null,avatar_path:null})
 const session=(id:string)=>({user:{id},access_token:`token-${id}`}) as Session
 function fake(initial:Session|null=null){
@@ -16,7 +18,7 @@ function fake(initial:Session|null=null){
  const auth={getSession:vi.fn(async()=>({data:{session:current},error:null})),onAuthStateChange:vi.fn((fn:typeof listener)=>{listener=fn;return {data:{subscription:{unsubscribe}}}}),signInWithOAuth:vi.fn(async()=>({error:null})),signOut:vi.fn(async()=>{current=null;listener('SIGNED_OUT',null);return {error:null}})}
  return {client:{auth} as unknown as SupabaseClient,auth,unsubscribe,emit:(id:string|null,event='SIGNED_IN')=>{current=id?session(id):null;listener(event,current)}}
 }
-beforeEach(()=>{mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[]}),saveClasses:vi.fn().mockResolvedValue([{id:'cse-310',code:'CSE 310',sections:['01']}]),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
+beforeEach(()=>{mock.dm={contact:vi.fn().mockResolvedValue({student_id:'peer',name:'Message Peer',conversation_id:'thread',can_send:true,reason:null}),inbox:vi.fn().mockResolvedValue([{conversation_id:'thread',student_id:'peer',name:'Message Peer',last_message_at:'2026-10-23T20:00:00Z',preview:'Saved private row'}]),history:vi.fn().mockResolvedValue([{id:'saved',conversation_id:'thread',sequence:1,sender_id:'peer',client_message_id:'request',body:'Saved private row',created_at:'2026-10-23T20:00:00Z'}]),send:vi.fn()};mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[]}),saveClasses:vi.fn().mockResolvedValue([{id:'cse-310',code:'CSE 310',sections:['01']}]),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
 test('Google start failure, cancellation and unsubscribe',async()=>{
  const f=fake();const v=render(<App client={f.client}/>);await screen.findByRole('button',{name:'Continue with Google'})
  f.auth.signInWithOAuth.mockResolvedValueOnce({error:{message:'failed'}} as never);fireEvent.click(screen.getByRole('button',{name:'Continue with Google'}));expect(await screen.findByRole('alert')).toHaveTextContent('could not start')
@@ -113,4 +115,33 @@ test.each(['editor','discard','save'] as const)('calendar %s tears down on exter
  expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByDisplayValue('Private calendar draft')).not.toBeInTheDocument();expect(screen.queryByText('Private calendar work')).not.toBeInTheDocument();expect(document.body.style.overflow).not.toBe('hidden')
  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByText(/Nothing planned/);expect(screen.getByRole('tab',{name:'Agenda'})).toHaveAttribute('aria-selected','true')
  fireEvent.click(screen.getByRole('tab',{name:'Calendar'}));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('table')).not.toBeInTheDocument()
+})
+
+test.each(['draft','load','send','retry','reconnect'] as const)('messaging %s clears on account replacement; late work never enters the new account',async mode=>{
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}));await screen.findByRole('button',{name:/Message Peer/})
+ let resolve!:(rows:Message[])=>void
+ if(mode==='load')vi.mocked(mock.dm.history).mockImplementationOnce(()=>new Promise(r=>{resolve=r}))
+ fireEvent.click(screen.getByRole('button',{name:/Message Peer/}))
+ if(mode!=='load'){
+  const input=await screen.findByRole('textbox',{name:'Message'});fireEvent.change(input,{target:{value:'Private old draft'}})
+  if(mode==='send')vi.mocked(mock.dm.send).mockImplementationOnce(()=>new Promise(r=>{resolve=row=>r(row[0])}))
+  if(mode==='retry')vi.mocked(mock.dm.send).mockRejectedValueOnce(new Error('Private old error'))
+  if(mode==='send'||mode==='retry'){fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}));if(mode==='retry')await screen.findByRole('button',{name:'Retry send'})}
+  if(mode==='reconnect'){vi.mocked(mock.dm.history).mockImplementationOnce(()=>new Promise(r=>{resolve=r}));act(()=>window.dispatchEvent(new Event('online')));await waitFor(()=>expect(resolve).toBeTypeOf('function'))}
+ }
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([])
+ act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(resolve)await act(async()=>resolve([{id:'late',conversation_id:'thread',sequence:2,sender_id:'a',client_message_id:'late',body:'Late private result',created_at:'2026-10-23T20:00:00Z'}]))
+ expect(screen.queryByDisplayValue('Private old draft')).toBeNull();expect(screen.queryByText('Private old error')).toBeNull();expect(screen.queryByText('Saved private row')).toBeNull();expect(screen.queryByText('Late private result')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}));await screen.findByText(/No conversations yet/);expect(screen.queryByRole('textbox')).toBeNull()
+ act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('heading',{name:'Messages'})).toBeNull()
+})
+test('classmate profile Message closes native dialog before focusing account chat; navigation drops draft',async()=>{
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'course1',code:'CSE 310'}]})
+ const f=fake(session('a'));Object.assign(f.client,{rpc:(name:string)=>name==='find_classmates'?Promise.resolve({data:[{student_id:'peer',name:'Peer Name',major:'Math'}],error:null}):{abortSignal:async()=>({data:{student_id:'peer',name:'Peer Name',major:'Math',has_shared_avatar:false},error:null})}})
+ render(<App client={f.client}/>);fireEvent.click(await screen.findByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(screen.getByRole('button',{name:'Message',exact:true})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Message',exact:true}))
+ await waitFor(()=>expect(screen.getByRole('heading',{name:'Message Peer'})).toHaveFocus());expect(document.querySelector('dialog[open]')).toBeNull()
+ expect(mock.dm.contact).toHaveBeenCalledWith({student:'peer',course:'CSE 310'},expect.anything())
+ fireEvent.change(screen.getByRole('textbox'),{target:{value:'Navigation draft'}});fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}));expect(screen.queryByDisplayValue('Navigation draft')).toBeNull()
 })
