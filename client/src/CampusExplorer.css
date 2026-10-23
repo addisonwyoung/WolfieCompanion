@@ -1,0 +1,73 @@
+.campus-explorer { --campus-green: #225e4b; --campus-blue: #285c83; padding-bottom: 18px; }
+.campus-intro { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 36px 0 26px; }
+.campus-intro h1 { font-size: clamp(28px, 4vw, 40px); margin: 7px 0 10px; }
+.campus-intro > div > p:last-child { color: #656e68; }
+.campus-curated { border: 1px solid #c8dcd1; border-radius: 24px; padding: 8px 14px; font-size: 12px; color: #225e4b; background: #edf6ef; }
+.campus-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 0; padding: 0 0 20px; margin: 0; }
+.campus-legend legend { font-size: 12px; font-weight: 650; color: #58635d; padding-bottom: 10px; }
+.campus-legend label { display: flex; align-items: center; gap: 7px; margin: 0; padding: 8px 10px; border: 1px solid #d4dcd6; border-radius: 9px; background: #fff; min-height: 44px; cursor: pointer; }
+.campus-legend label.is-selected { border-color: #47735d; background: #eff6f1; }
+.campus-legend input { width: 16px; height: 16px; min-height: 16px; margin: 0; accent-color: #225e4b; padding: 0; }
+.campus-legend > button { font-size: 12px; background: transparent; }
+.campus-symbol { display: inline-grid; place-items: center; border-radius: 7px; width: 28px; height: 28px; flex: 0 0 28px; color: white; font-size: 18px; }
+.campus-microwave { --pin: #9c4938; }
+.campus-outdoor_lounge { --pin: #28714a; }
+.campus-study_spot { --pin: #665294; }
+.campus-printer { --pin: #345d74; }
+.campus-drinking_water { --pin: #217e9a; }
+.campus-symbol { background: var(--pin); }
+.campus-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; align-items: start; }
+.campus-map-column, .campus-results { min-width: 0; }
+.campus-map { position: relative; border: 1px solid #c4d6ca; border-radius: 16px; overflow: hidden; height: 510px; isolation: isolate; }
+.campus-map .leaflet-container { width: 100%; height: 100%; background: #dfebe0; font-family: inherit; }
+.campus-map .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.campus-map .leaflet-control-attribution { max-width: 100%; font-size: 10px; padding: 2px 5px; }
+.campus-map .leaflet-control-attribution a { color: #214d6a; }
+.campus-return { position: absolute; top: 12px; right: 12px; z-index: 800; box-shadow: 0 2px 8px #1232; font-size: 12px; }
+.campus-maptiler { position: absolute; bottom: 25px; left: 10px; z-index: 800; background: white; border-radius: 3px; line-height: 0; padding: 4px; }
+.campus-pin { background: transparent; border: 0; }
+.campus-pin > span { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid white; border-radius: 10px; background: var(--pin); color: white; font-size: 21px; box-shadow: 0 2px 7px #193b4855; }
+.campus-pin::after { content: ''; position: absolute; left: 12px; top: 29px; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 9px solid var(--pin); }
+.campus-pin:focus-visible { outline: 3px solid #174f93; outline-offset: 3px; }
+.campus-tile-error { position: absolute; bottom: 60px; left: 12px; right: 12px; z-index: 800; background: #fff8eb; padding: 12px; border: 1px solid #d9b876; border-radius: 8px; font-size: 12px; }
+.campus-tile-error button { min-height: 44px; margin-top: 6px; }
+.campus-map-note { font-size: 11px; color: #66716a; margin-top: 8px; }
+.campus-results { background: #fff; border: 1px solid #d9e1db; border-radius: 14px; padding: 16px; }
+.campus-results-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 12px; }
+.campus-results-heading h2 { font-size: 18px; }
+.campus-results-heading span { font-size: 11px; color: #68766c; }
+.campus-results > p { font-size: 13px; padding: 10px 0; color: #637267; }
+.campus-location-list { list-style: none; padding: 0; margin: 0; max-height: 430px; overflow-y: auto; }
+.campus-location-list button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid #e6ece7; border-radius: 6px; padding: 13px 6px; font-size: 13px; }
+.campus-location-list button[aria-pressed='true'] { background: #eaf4ee; box-shadow: inset 3px 0 #34644e; }
+.campus-location-list button > span:nth-child(2) { flex: 1; min-width: 0; }
+.campus-location-list small { display: block; color: #65736b; font-size: 11px; margin-top: 4px; font-weight: 400; }
+.campus-details { background: #fff; border: 1px solid #b5cbbd; border-top: 4px solid #356b52; border-radius: 14px; margin-top: 20px; padding: 24px; scroll-margin-block: 18px; }
+.campus-detail-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.campus-detail-top h2 { margin: 7px 0; }
+.campus-detail-place { color: #617369; }
+.campus-details h3 { font-size: 14px; margin-top: 16px; }
+.campus-details p { margin: 8px 0; font-size: 14px; }
+.campus-details > a, .campus-details > .muted { display: inline-block; margin-top: 16px; font-size: 12px; }
+.campus-source { border-top: 1px solid #e1e9e3; padding-top: 12px; margin-top: 16px; color: #68776c; }
+.campus-source p, .campus-source a { font-size: 12px; }
+.campus-coincident button { margin: 8px 8px 0 0; font-size: 12px; }
+.campus-notice { border: 1px solid #d8cfb6; background: #fffaf0; border-radius: 9px; padding: 12px 16px; margin: 0 0 16px; font-size: 12px; }
+.campus-notice button { margin-left: 8px; font-size: 12px; }
+.campus-footer { max-width: none; display: flex; justify-content: space-between; gap: 14px; padding: 20px 0; margin: 0; color: #68736c; font-size: 11px; }
+.campus-explorer a { color: #285e7d; }
+@media (max-width: 850px) {
+  .campus-layout { grid-template-columns: minmax(0, 1fr); }
+  .campus-map { height: 410px; }
+  .campus-location-list { max-height: 280px; }
+  .campus-intro { align-items: start; flex-direction: column; gap: 12px; padding-top: 26px; }
+  .campus-curated { font-size: 11px; }
+  .campus-footer { flex-direction: column; }
+}
+@media (max-width: 480px) {
+  .campus-map { height: 350px; }
+  .campus-legend label { flex: 1 1 130px; font-size: 11px; padding: 7px; }
+  .campus-details { padding: 18px; }
+  .campus-return { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .campus-explorer *, .campus-explorer *::before { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }

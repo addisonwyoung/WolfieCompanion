@@ -1,6 +1,36 @@
 # Campus Explorer data foundation
 
-Only database authorization and typed data access are implemented in this phase. There is no map, navigation entry or editor interface yet. No map dependencies, provider account, key or style are needed to develop/test this foundation. The crowd meter and its JSON storage remain separate.
+The database/data-access foundation and student-facing Explorer are implemented. Campus Explorer opens from authenticated main navigation and is lazy-loaded. It includes a map, category legend/filters, equivalent resource list, previews and persistent details. There is no admin editor interface yet. The crowd meter and its JSON storage remain separate.
+
+## Dependency license decision and distribution notices
+
+On October 23, 2026 the team explicitly confirmed in this development session that it reviewed and accepted Hippocratic License 2.1 for React Leaflet 5 and its core dependency. Installed exact versions are react-leaflet 5.0.0, @react-leaflet/core 3.0.0 (locked transitively), Leaflet 1.9.4 and development types @types/leaflet 1.9.21. Packaged peer declarations require React/React DOM ^19.0.0 and Leaflet ^1.9.0, matching this application's React 19.
+
+Distribution checklist: the full packaged React Leaflet/core Hippocratic-2.1 and Leaflet BSD-2-Clause license/copyright notices are retained in `client/public/third-party-notices.txt`, copied unchanged as license texts into the production build. Explorer links to these notices. The repository MIT license remains in place and does not relicense dependencies. No third-party package source was modified. Keep these notices synchronized with future dependency updates. MapTiler attribution requirements have been reviewed and the implementation includes MapTiler/OpenStreetMap text and a MapTiler logo; account/plan terms, quotas and final provider acceptance remain owner prerequisites under task 1.2, not implied by the React Leaflet decision.
+
+## Map and feedback setup
+
+`client/.env.example` includes blank placeholders. Supply actual values in your ignored local environment/deployment configuration and restart/rebuild Vite:
+
+```dotenv
+VITE_MAPTILER_API_KEY=
+VITE_MAPTILER_MAP_ID=
+VITE_CAMPUS_FEEDBACK_URL=
+```
+
+The first value is a browser-visible MapTiler key restricted to approved development/production origins. The second is the owner-approved MapTiler map/style ID, not a URL. Use a Streets-derived style with solid greens/blues, useful building outlines/names and pedestrian paths. Custom colors belong in the provider-supported style, not CSS recoloring raster images. No credential or style ID is invented or silently substituted. The feedback value is an HTTPS form URL or mailto destination. Reports append an encoded `location` query parameter for an HTTPS form, or subject/body for email; configure the external form to use that context if desired. No token or student identity is included.
+
+The raster layer uses only `https://api.maptiler.com/maps/{mapId}/{z}/{x}/{y}.png`, with 512px tiles and zoomOffset -1, native zoom capped at 19 and displayed zoom capped at 20. It does not request a high-DPI variant automatically. Confirm the chosen style's native zoom/resolution and visual alignment before release; these settings and the initial academic-campus viewport are provisional acceptance values, not geofences. Return to campus resets the view; no maxBounds restrict residential expansion. No routing, clustering or live availability was added.
+
+Blank/placeholder map configuration shows a setup message and an explicitly untextured map with working coordinates/markers and the usable list. Tile errors show Retry map without exposing the key in user messages; the list remains usable. Missing feedback configuration shows discreet setup text instead of a fake link. Required provider credits and the free-plan-compatible logo remain visible on configured maps; do not cover or remove them when changing layout. Provider terms, request-based billing/limits and the exact style still need owner review. Credentialed campus detail and real-provider attribution acceptance remain pending until configuration exists; do not treat the synthetic fixture as campus-data validation.
+
+The student view explicitly displays published resources even when an editor account can read drafts. All five filters start selected, operate in memory, and update the list and marker set without refetching. Each category uses one cached SVG/Leaflet icon; markers are memoized, and map movement persists only the viewport on move-end. The map unmounts when the view is inactive while filters/viewport are retained in the current account subtree. Account teardown removes Explorer state. Hover/focus previews are dismissible; click/tap/keyboard details remain open, with a coincident-record chooser and a full filtered list for near-overlap at any zoom.
+
+For local manual review without Supabase/provider access, run the existing Vite dev command and open `/test/campus-preview.html`. This test-only fixture has 100 synthetic locations and blank provider configuration; it never populates live results or contacts external services. Focus/touch/keyboard and marker alignment can be inspected there, but real campus buildings, paths, labels and provider acceptance still require actual configured tiles. The production app never imports this fixture.
+
+Run `node client/test/campus-browser.mjs` from the repository root to repeat the focused check with installed Chrome, following the existing project's CDP browser-test approach (no new framework). It starts loopback Vite, blocks hosted Supabase/MapTiler requests, checks 375px and 1280px layouts with 100 fixture records and reduced motion, exercises focus/hover previews, Escape, keyboard details and touch coincident selection, verifies synchronized filters, and confirms pan/Return to campus preserve marker DOM without refetching. Screenshots go to the printed temporary browser-profile directory; child processes are stopped afterward. The source fixture remains separate from production and supports no editing.
+
+Student-phase verification: focused component tests cover filters/list/details, feedback/configuration validation and tile-error retry; the account test covers lazy navigation, retained filters and sign-out cleanup. The offline browser walkthrough passed at 375px/1280px and screenshots were inspected. Client lint and production build passed; the map code/CSS are emitted as a separate lazy chunk and license notices are present in dist. The full regression suite has one existing failure in `profile.test.tsx` expecting comma-separated interests despite the categorized-interest UI; it is unrelated to Explorer and remains outside this phase. Real-provider campus quality and plan-specific attribution review remain pending under 4.3-4.4. A feedback destination and owner-approved published records are also still required for release. No hosted database changes, account provisioning or admin editor implementation occurred.
 
 ## Owner review and hosted setup (not performed)
 

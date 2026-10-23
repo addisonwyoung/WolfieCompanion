@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { supabase, configurationError } from './account'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useAccount } from './useAccount'
@@ -14,9 +14,13 @@ import { courseReviewApi } from './courseReviews'
 import AcademicItems from './AcademicPlanner'
 import { academicItemsApi } from './academicItems'
 import './App.css'
+import { campusLocationsApi } from './campusLocations'
+const CampusExplorer = lazy(() => import('./CampusExplorer'))
 
 function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
+  const campus = useMemo(() => campusLocationsApi(client), [client])
+  const [explorerOpened, setExplorerOpened] = useState(false)
   const items = useMemo(() => academicItemsApi(client), [client])
   const [plannerOpened, setPlannerOpened] = useState(false)
   const reviews = useMemo(() => courseReviewApi(client), [client])
@@ -53,7 +57,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
     {account.status === 'ready' && account.profile && <div key={account.userId}>
-      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
+      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
@@ -62,6 +66,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selected && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} api={peers} course={account.courses.find(course => course.id === selected)!.code} student={peer.id} onClose={() => setPeer(null)} />}
       {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
+      {explorerOpened && <div hidden={view !== 'explorer'}><Suspense fallback={<p role="status">Loading Campus Explorer…</p>}><CampusExplorer api={campus} userId={account.userId!} active={view === 'explorer'} /></Suspense></div>}
     </div>}
   </>
 }

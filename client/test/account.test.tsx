@@ -17,6 +17,24 @@ function fake(initial:Session|null=null){
  return {client:{auth} as unknown as SupabaseClient,auth,unsubscribe,emit:(id:string|null,event='SIGNED_IN')=>{current=id?session(id):null;listener(event,current)}}
 }
 beforeEach(()=>{mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[]}),saveClasses:vi.fn().mockResolvedValue([{id:'cse-310',code:'CSE 310',sections:['01']}]),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
+
+test('Campus Explorer opens lazily, preserves filters across navigation and clears on account teardown', async () => {
+ const f=fake(session('a'))
+ const order=vi.fn(); order.mockReturnValueOnce({order}).mockResolvedValue({data:[],error:null})
+ Object.assign(f.client,{from:vi.fn(()=>({select:()=>({order})})),rpc:vi.fn(async()=>({data:false,error:null}))})
+ render(<App client={f.client}/>); await screen.findByText('Student a')
+ expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Campus Explorer'}))
+ await screen.findByRole('heading',{name:'Campus Explorer'})
+ expect(screen.getByRole('button',{name:'Campus Explorer'})).toHaveAttribute('aria-pressed','true')
+ const printers=screen.getByRole('checkbox',{name:'Printers'}); fireEvent.click(printers)
+ fireEvent.click(screen.getByRole('button',{name:'My dashboard'}))
+ expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Campus Explorer'}))
+ expect(screen.getByRole('checkbox',{name:'Printers'})).not.toBeChecked()
+ act(()=>f.emit(null)); await screen.findByRole('button',{name:'Continue with Google'})
+ expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
+})
 test('Google start failure, cancellation and unsubscribe',async()=>{
  const f=fake();const v=render(<App client={f.client}/>);await screen.findByRole('button',{name:'Continue with Google'})
  f.auth.signInWithOAuth.mockResolvedValueOnce({error:{message:'failed'}} as never);fireEvent.click(screen.getByRole('button',{name:'Continue with Google'}));expect(await screen.findByRole('alert')).toHaveTextContent('could not start')
