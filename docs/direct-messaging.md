@@ -7,7 +7,7 @@ Students can open a classmate, friend, or pending-request participant's authoriz
 ## Chat behavior
 
 - Saved messages are database-backed and remain after Back to conversations, navigation, reload, or sign-out. Close/navigation discards only memory-only drafts and retry attempts; it cannot cancel a send already committed by the database. No drafts or retry payloads are stored in browser storage by the production app.
-- Type literal text of 1–2000 Unicode code points, including line breaks. Enter sends; Shift+Enter adds a newline. A compact send icon also sends. Markup is displayed as text. Whitespace-only, NUL, and oversized text are rejected. No attachments, formatting, editing/deleting messages, read receipts, presence, search, group chat, blocking, or notifications are provided.
+- Type literal text of 1–2000 Unicode code points, including line breaks. Enter sends; Shift+Enter adds a newline. A compact send icon also sends. Markup is displayed as text. Whitespace-only, NUL, and oversized text are rejected. No attachments, formatting, editing/deleting messages, read receipts, presence, search, group chat, blocking, or push/email notifications are provided.
 - Inbox Load more and history Load older messages use pages of at most 50. History orders by database sequence; timestamps are displayed in the viewer's locale. Reading older text preserves scroll position. New messages exposes a jump-to-latest action; reading near the bottom follows incoming messages.
 - Sending disables duplicate submission. A failed send retains its exact request UUID/body in a read-only composer. It may already have arrived if its response was lost. Retry sends the same attempt idempotently; Discard draft abandons only the local attempt. A confirmed refresh reconciles the matching sender/request/body. Only a confirmed result clears a draft.
 - The visible Messages view subscribes to protected message INSERT and conversation UPDATE events and rereads authenticated RPCs. It also polls every 10 seconds and catches up on open, focus, online, and subscription/reconnect. Hidden/unmounted views stop subscriptions and polling. Account changes/sign-out remove private rows/drafts/errors and abandon late work. Managed Realtime may delay events; polling is the fallback.
@@ -65,11 +65,11 @@ PostgreSQL 18, Node 22, and installed client/server dependencies were used. Run 
 In separate `psql` sessions (each invocation below starts one), apply migrations then tests. Classmate profiles intentionally shares the discovery suite's temporary assertion helper; the other suites start separate sessions to avoid helper collisions.
 
 ```sh
-for migration in supabase/migrations/2026101[78]*.sql supabase/migrations/20261022*.sql supabase/migrations/202610230001_direct_messaging.sql; do
+for migration in supabase/migrations/2026101[78]*.sql supabase/migrations/20261022*.sql supabase/migrations/20261023*.sql; do
   /opt/homebrew/opt/postgresql@18/bin/psql -h 127.0.0.1 -p 55449 -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$migration" || break
 done
 /opt/homebrew/opt/postgresql@18/bin/psql -h 127.0.0.1 -p 55449 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/tests/classmate_discovery.sql -f supabase/tests/classmate_profiles.sql
-for suite in course_classmate_recommendations friend_requests direct_messaging; do
+for suite in course_classmate_recommendations friend_requests direct_messaging message_unread; do
   /opt/homebrew/opt/postgresql@18/bin/psql -h 127.0.0.1 -p 55449 -U postgres -d postgres -v ON_ERROR_STOP=1 -f "supabase/tests/$suite.sql" || break
 done
 python3 supabase/tests/direct_messaging_concurrency.py
@@ -103,3 +103,12 @@ Use two eligible participants A/B and an unrelated third account C in the owner'
 Roll back the client first. If messaging access must be disabled, the owner should review SQL revoking authenticated execute on the four exact RPC signatures above, revoke SELECT on the two messaging tables, and remove only their publication entries. Retain tables, rows, preference values, and all existing profile/Storage policies for recovery; do not drop chat data as routine rollback.
 
 Before archiving/syncing specifications, reconcile prerequisite completed classmate-profile and friendship changes first. The older classmate-profile change's no-messaging scope is superseded by this new direct-messaging capability; it is not a restriction on this implementation. Archive/sync remains a separate explicit workflow.
+
+
+## Unread highlights
+
+The owner must additionally review and manually apply `supabase/migrations/202610230002_message_unread.sql` after the initial messaging migration. It adds private `dm_read_positions`, `dm_unread()` (participant-owned conversation IDs and incoming unread counts), and `dm_mark_read(p_conversation_id uuid,p_sequence bigint)` (monotonic, validated sequence advancement for the caller). Direct read/write access to read positions is denied. No sender-visible read receipts are exposed. No new configuration keys are required.
+
+Messages navigation displays a burgundy unread badge across the signed-in workspace; unread conversation rows have matching highlighting and counts. Existing incoming history initially counts as unread until viewed. Your own sent messages do not count. Opening a visible conversation at its latest loaded message marks it read; incoming messages while reading older history remain unread until you scroll or jump to the latest. Read positions survive refresh/sign-out and synchronize through authenticated polling. Counts refresh on Realtime events, focus/reconnect, and every 10 seconds while visible, including outside the Messages view. Hidden pages do not mark chats read. Failed read acknowledgements retain the highlight and can retry on later visible updates. Missing migration affects only unread status, not saved messaging functionality.
+
+Local acceptance: `supabase/tests/message_unread.sql` checks independent counts, outgoing-message exclusion, stale/future cursors, third-party/ineligible/anonymous denial, and private read-position access. Native fixture checks confirm badges outside chat, highlighted inbox rows, and clearing after visible chat loads at desktop and 375px. Managed Supabase verification remains owner-run: apply the migration, receive messages while on the dashboard, view/reload the conversation, and verify another account cannot inspect read positions.

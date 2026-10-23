@@ -1,14 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MessagingApi, Target } from './messaging'
+import { useMessageNotifications } from './messagingUnread'
 import { useDirectChat, useMessageInbox, useMessagingRefresh } from './useMessaging'
 
 function Chat({api,target,userId,epoch,onSent,onClose}:{api:MessagingApi;target:Target;userId:string;epoch:number;onSent:()=>void;onClose:()=>void}){
  const chat=useDirectChat(api,target,userId,epoch,onSent)
+ const {markRead}=useMessageNotifications()
  const heading=useRef<HTMLHeadingElement>(null),history=useRef<HTMLDivElement>(null),nearBottom=useRef(true),oldHeight=useRef<{height:number;top:number}|null>(null),lastSequence=useRef(0)
  const [newMessages,setNewMessages]=useState(false)
  useEffect(()=>{const timer=setTimeout(()=>heading.current?.focus(),0);return()=>clearTimeout(timer)},[])
- function bottom(){const node=history.current;if(node){node.scrollTop=node.scrollHeight;nearBottom.current=true;setNewMessages(false)}}
+ const markVisible=useCallback(()=>{const last=chat.messages.at(-1);if(last&&nearBottom.current&&document.visibilityState!=='hidden')markRead(last.conversation_id,last.sequence)},[chat.messages,markRead])
+ useEffect(()=>{const read=()=>markVisible();read();window.addEventListener('focus',read);document.addEventListener('visibilitychange',read);return()=>{window.removeEventListener('focus',read);document.removeEventListener('visibilitychange',read)}} , [markVisible])
+ function bottom(){const node=history.current;if(node){node.scrollTop=node.scrollHeight;nearBottom.current=true;setNewMessages(false);markVisible()}}
  useLayoutEffect(()=>{const node=history.current;if(!node)return;const sequence=chat.messages.at(-1)?.sequence??0
   if(oldHeight.current){node.scrollTop=oldHeight.current.top+node.scrollHeight-oldHeight.current.height;oldHeight.current=null}
   else if(nearBottom.current){node.scrollTop=node.scrollHeight;setNewMessages(false)}else if(sequence>lastSequence.current)setNewMessages(true)
@@ -18,7 +22,7 @@ function Chat({api,target,userId,epoch,onSent,onClose}:{api:MessagingApi;target:
   {chat.loading&&<p role="status">Loading chat…</p>}
   {chat.contact===null&&<p role="status">This contact is unavailable.</p>}
   {chat.error&&<div role="alert"><p>{chat.error}</p>{chat.attempt?.status!=='failed'&&<button onClick={chat.retry}>Retry chat</button>}</div>}
-  <div ref={history} className="dm-history" role="region" aria-label="Message history" tabIndex={0} onScroll={()=>{const node=history.current!;nearBottom.current=node.scrollHeight-node.scrollTop-node.clientHeight<60;if(nearBottom.current)setNewMessages(false)}}>
+  <div ref={history} className="dm-history" role="region" aria-label="Message history" tabIndex={0} onScroll={()=>{const node=history.current!;nearBottom.current=node.scrollHeight-node.scrollTop-node.clientHeight<60;if(nearBottom.current){setNewMessages(false);markVisible()}}}>
    {chat.more&&<button disabled={chat.paging} onClick={()=>{const node=history.current!;oldHeight.current={height:node.scrollHeight,top:node.scrollTop};void chat.loadOlder().then(loaded=>{if(!loaded)oldHeight.current=null})}}>{chat.paging?'Loading older…':'Load older messages'}</button>}
    {!chat.loading&&chat.contact&&chat.messages.length===0&&<p>No messages yet.</p>}
    <ol className="dm-message-list">{chat.messages.map(row=><li key={row.id} className={`dm-message ${row.sender_id===userId?'dm-sent':'dm-received'}`}><span className="dm-author">{row.sender_id===userId?'You':chat.contact?.name??'Other participant'}</span><p>{row.body}</p><time dateTime={row.created_at}>{new Date(row.created_at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</time></li>)}</ol>
@@ -37,13 +41,14 @@ function Chat({api,target,userId,epoch,onSent,onClose}:{api:MessagingApi;target:
 }
 export default function Messages({api,client,userId,initialTarget}:{api:MessagingApi;client?:SupabaseClient;userId:string;initialTarget:Target|null}){
  const [target,setTarget]=useState(initialTarget)
+ const {counts}=useMessageNotifications()
  const {epoch,refresh}=useMessagingRefresh(client),inbox=useMessageInbox(api,epoch)
  const title=useRef<HTMLHeadingElement>(null)
  function close(){setTarget(null);setTimeout(()=>title.current?.focus(),0)}
  return <section className={`dm-workspace ${target?'dm-has-chat':''}`} aria-labelledby="dm-title"><h1 id="dm-title" tabIndex={-1} ref={title}>Messages</h1><div className="dm-layout"><aside className="dm-inbox" aria-label="Saved conversations"><h2>Conversations</h2>
   {inbox.loading&&<p role="status">Loading conversations…</p>}{inbox.error&&<div role="alert"><p>{inbox.error}</p><button onClick={inbox.retry}>Retry conversations</button></div>}
   {!inbox.loading&&!inbox.error&&!inbox.rows.length&&<p>No conversations yet. Open a student's profile to send a message.</p>}
-  <ul>{inbox.rows.map(row=><li key={row.conversation_id}><button aria-pressed={target?.student===row.student_id} onClick={()=>setTarget({student:row.student_id})}><strong>{row.name}</strong><span>{row.preview}</span><time dateTime={row.last_message_at}>{new Date(row.last_message_at).toLocaleString()}</time></button></li>)}</ul>
+  <ul>{inbox.rows.map(row=><li key={row.conversation_id}><button className={counts[row.conversation_id]?'dm-conversation-unread':undefined} aria-pressed={target?.student===row.student_id} onClick={()=>setTarget({student:row.student_id})}><strong>{row.name}{counts[row.conversation_id]>0&&<span className="dm-unread-badge" aria-label={`${counts[row.conversation_id]} unread messages`}>{counts[row.conversation_id]>99?'99+':counts[row.conversation_id]}</span>}</strong><span>{row.preview}</span><time dateTime={row.last_message_at}>{new Date(row.last_message_at).toLocaleString()}</time></button></li>)}</ul>
   {inbox.more&&<button disabled={inbox.paging} onClick={()=>void inbox.loadMore()}>{inbox.paging?'Loading…':'Load more conversations'}</button>}
  </aside>{target?<Chat key={`${userId}:${target.student}:${target.course??''}`} api={api} target={target} userId={userId} epoch={epoch} onSent={refresh} onClose={close}/>:<p className="dm-no-selection">Choose a conversation, or open a profile to start a new one.</p>}</div></section>
 }

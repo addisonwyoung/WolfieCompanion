@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import Messages from '../src/Messages'
+import { MessagingNotifications, MessagesNavigation } from '../src/MessagingNotifications'
+import type { UnreadApi } from '../src/messagingUnread'
 import PeerProfileDialog from '../src/PeerProfileDialog'
 import FriendProfileDialog from '../src/FriendProfileDialog'
 import Profile from '../src/Profile'
@@ -38,15 +40,16 @@ export function Fixture(){
  state.incoming=()=>{incoming('Incoming saved text '+Date.now());window.dispatchEvent(new Event('focus'))}
  state.seed=()=>{const length=JSON.parse(localStorage.getItem(key)??'[]').length;for(let n=length+1;n<=65;n++)incoming(`Long history message ${n}`);window.dispatchEvent(new Event('focus'))}
  },[account])
+ const unread=useMemo<UnreadApi>(()=>({load:async()=>{const counts:Record<string,number>={};for(const student of [peer,other]){const rows:Message[]=JSON.parse(localStorage.getItem(`dm-fixture:${account}:${student}`)??'[]');const seen=Number(localStorage.getItem(`dm-fixture-read:${account}:${student}`)??0);const count=rows.filter(row=>row.sender_id!==account&&row.sequence>seen).length;if(count)counts[student]=count}return counts},read:async(student,sequence)=>{const key=`dm-fixture-read:${account}:${student}`;localStorage.setItem(key,String(Math.max(Number(localStorage.getItem(key)??0),sequence)))}}),[account])
  const open=(value:Target)=>{setDialog(null);setTarget(value);setView('messages')}
  const detail={student_id:peer,name:name(peer),major:'Computer Science',has_shared_avatar:false}
  const friendApi={profile:async()=>({...detail,student_id:other,name:name(other)}),picture:async()=>{throw Error('No picture')}} as unknown as FriendApi
- return <div style={{maxWidth:1100,margin:'auto',padding:12}}><h1>Messaging fixture — synthetic data</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8}}><button onClick={()=>{setView('profiles');setTarget(null)}}>Profiles</button><button onClick={()=>{setView('messages');setTarget(null)}}>Inbox</button><button onClick={()=>setView('settings')}>Recipient settings</button></nav>
+ return <MessagingNotifications key={account} userId={account} api={unread}><div style={{maxWidth:1100,margin:'auto',padding:12}}><h1>Messaging fixture — synthetic data</h1><nav style={{display:'flex',flexWrap:'wrap',gap:8}}><button onClick={()=>{setView('profiles');setTarget(null)}}>Profiles</button><MessagesNavigation active={view==='messages'} onClick={()=>{setView('messages');setTarget(null)}}/><button onClick={()=>{setView('messages');setTarget(null)}}>Inbox</button><button onClick={()=>setView('settings')}>Recipient settings</button></nav>
  {view==='profiles'&&<section><h2>Students in your class</h2><button onClick={()=>setDialog('classmate')}>View classmate profile</button><button onClick={()=>setDialog('friend')}>View friend profile</button></section>}
  {view==='settings'&&<Profile profile={profile} onSave={async next=>{setProfile(next);localStorage.setItem('dm-fixture-open',String(next.allow_new_dms))}}/>}
  {view==='messages'&&<Messages key={account} api={api} userId={account} initialTarget={target}/>}
  {dialog==='classmate'&&<PeerProfileDialog api={{detail:async()=>detail,picture:async()=>{throw Error('No picture')}}} course="CSE 310" student={peer} onClose={()=>setDialog(null)} messaging={api} onMessage={open}/>}
  {dialog==='friend'&&<FriendProfileDialog api={friendApi} student={other} onClose={()=>setDialog(null)} messaging={api} onMessage={open}/>}
- </div>
+ </div></MessagingNotifications>
 }
 createRoot(document.getElementById('root')!).render(<Fixture/> )

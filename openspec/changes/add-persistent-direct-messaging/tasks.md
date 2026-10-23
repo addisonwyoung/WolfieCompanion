@@ -30,3 +30,7 @@
 - [x] 4.1 Run isolated database suites including messaging concurrency plus existing accounts/classmate/profile/friend regressions; run client tests/lint/build and relevant server regressions for profile launches. Record actual commands/results and distinguish fixture authorization from managed Supabase Auth/Realtime checks.
 - [x] 4.2 Run synthetic native-browser flows at desktop and 375px: profile-to-chat focus, friend/non-friend initial sends, incoming updates, close/reopen/reload persistence, availability toggle with existing versus new pairs, long histories, Unicode/newlines/markup, send failure/retry, scroll preservation, and external account teardown. Record screenshots and outcomes.
 - [x] 4.3 Provide an owner-run deployed checklist using two eligible participants and an unrelated third account, including another device/reload, participant event privacy, actual Realtime reconnect, failed-first-send closure race, and existing-chat continuation when new DMs are off. Mark live verification pending unless performed; verify deployment notes require reviewed SQL but no new keys or messaging service.
+
+## 5. Requested unread highlights
+
+- [x] 5.1 Add private persistent per-participant read positions, authenticated unread counts and monotonic mark-read RPCs, workspace-wide Messages badges and unread chat highlights. Verify incoming-only counts, viewing/hidden-history behavior, account isolation, retry acknowledgement, authorization, desktop/mobile flows, and owner migration instructions.

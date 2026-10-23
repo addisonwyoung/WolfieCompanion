@@ -20,6 +20,7 @@ import { courseReviewApi } from './courseReviews'
 import AcademicItems from './AcademicPlanner'
 import { academicItemsApi } from './academicItems'
 import Messages from './Messages'
+import { MessagingNotifications, MessagesNavigation } from './MessagingNotifications'
 import { messagingApi } from './messaging'
 import type { Target } from './messaging'
 import './App.css'
@@ -69,8 +70,8 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {account.message && <p role="alert">{account.message}</p>}<p className="field-help">Use your verified @stonybrook.edu email.</p>
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
-    {account.status === 'ready' && account.profile && <div key={account.userId}>
-      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'messages'} onClick={() => navigate('messages')}>Messages</button><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
+    {account.status === 'ready' && account.profile && <MessagingNotifications key={account.userId} client={client} userId={account.userId!}><div>
+      <nav className="app-nav" aria-label="Main navigation"><MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')} /><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
@@ -86,7 +87,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
       {view === 'messages' && <Messages key={account.userId} api={messaging} client={client} userId={account.userId!} initialTarget={dmTarget} />}
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
-    </div>}
+    </div></MessagingNotifications>}
   </>
 }
 export default function App({ client = supabase }: { client?: SupabaseClient | null }) {

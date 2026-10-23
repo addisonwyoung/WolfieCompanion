@@ -90,3 +90,12 @@ The inbox and active chat SHALL identify the other person, distinguish sent/rece
 #### Scenario: Phone and keyboard operation
 - **WHEN** a student opens a chat from a profile or inbox at 375 pixels or using only the keyboard
 - **THEN** focus enters the Messages view, history and controls are accessible, text wraps, and Send/line-break behavior matches its visible instructions
+
+
+### Requirement: Private unread highlights
+The system SHALL highlight Messages navigation and unread conversation rows with incoming unread counts while the eligible participant is signed in. Read positions SHALL persist per participant and conversation, advance monotonically only to valid loaded message sequences, and remain private to the viewer. Own outgoing messages SHALL NOT count as unread. Visible latest-history viewing SHALL clear the corresponding unread position; hidden views and reading older history SHALL NOT clear unseen newer messages. Unread refresh SHALL work outside the active Messages view through protected events and visible polling. Account replacement SHALL clear obsolete private badge state.
+
+#### Scenario: Receive and view a message
+- **WHEN** a participant receives a message while viewing their dashboard
+- **THEN** Messages navigation and that conversation SHALL highlight until the participant views its latest history
+- **AND** reload SHALL preserve the saved read position without exposing read receipts to the sender
