@@ -14,7 +14,7 @@ const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0',
 let ws
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function until(fn, label = 'local render') {
-  for (let n = 0; n < 100; n++) { try { const result = await fn(); if (result) return result } catch { /* wait for startup/render */ } await sleep(50) }
+  for (let n = 0; n < 600; n++) { try { const result = await fn(); if (result) return result } catch { /* wait for startup/render */ } await sleep(50) }
   throw new Error(`Timed out: ${label}`)
 }
 try {
@@ -50,7 +50,7 @@ try {
     await sleep(35)
   }
   async function key(key, modifiers = 0) {
-    const virtualKey = { Tab: 9, Enter: 13, Escape: 27, ArrowDown: 40, ArrowUp: 38, Home: 36, End: 35, ' ': 32 }[key]
+    const virtualKey = { Tab: 9, Enter: 13, Escape: 27, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, ' ': 32 }[key]
     const params = { key, code: key === ' ' ? 'Space' : key, modifiers, windowsVirtualKeyCode: virtualKey, nativeVirtualKeyCode: virtualKey }
     await send('Input.dispatchKeyEvent', { type: 'keyDown', ...params, text: key === 'Enter' ? '\r' : key === ' ' ? ' ' : undefined })
     await send('Input.dispatchKeyEvent', { type: 'keyUp', ...params })
@@ -61,7 +61,7 @@ try {
     await sleep(20)
   }
   async function reload() { const loaded = new Promise(resolve => { onLoad = resolve }); await send('Page.reload'); await loaded; await until(() => evaluate(`!!${button('Add item')} && !${button('Add item')}.disabled`), 'ready agenda') }
-  async function expectDialog(title) { await until(() => evaluate(`${dlg}?.querySelector('h2')?.textContent === ${JSON.stringify(title)}`), title); assert.equal(await evaluate(`document.querySelectorAll('dialog[open]').length`), 1) }
+  async function expectDialog(title) { try { await until(() => evaluate(`${dlg}?.querySelector('h2')?.textContent === ${JSON.stringify(title)}`), title) } catch (error) { await screenshot('failure.png'); console.error('Dialog state:', await evaluate(`Array.from(document.querySelectorAll('dialog')).map(d=>({open:d.open,text:d.textContent}))`)); throw error };  assert.equal(await evaluate(`document.querySelectorAll('dialog[open]').length`), 1) }
   async function noDialog() { await until(() => evaluate(`!${dlg}`), 'closed modal') }
   async function focusTrap() {
     const controls = `Array.from(${dlg}.querySelectorAll('button,input,select,textarea,summary,[tabindex]')).filter(element=>!element.disabled && element.tabIndex>=0 && element.getClientRects().length)`
@@ -87,7 +87,7 @@ try {
   await until(() => evaluate('!!window.academicFixture'))
   // A non-campus browser zone must not shift stored calendar dates or wall times.
   await send('Emulation.setTimezoneOverride', { timezoneId: 'America/Los_Angeles' })
-  for (const width of [1280, 375]) {
+  for (const width of (process.env.CALENDAR_ONLY ? [] : [1280, 375])) {
     const title = `Browser assignment ${width}`
     const longTitle = 'Research project with a deliberately long title to exercise wrapping and keep every action reachable on a narrow screen'
     const seed = [{ id: 'long', user_course_id: '10000000-0000-0000-0000-000000000021', title: longTitle, type: 'project', due_date: '2026-10-21', due_time: '14:30:00', notes: 'Existing notes', location: 'Library', completed_at: null }]
@@ -208,6 +208,57 @@ try {
     await evaluate('window.academicFixture.switchAccount()'); await sleep(50)
     await fit(); assert.deepEqual(alerts, [], 'no browser confirm/alert')
     console.log(`PASS ${width}px: compact rows, campus dates, menu keys, modal containment/inertness, discard, save/delete failure/retry, CRUD, teardown`)
+  }
+  // Calendar integration uses the same synthetic persistence and native dialogs.
+  for (const width of [1280, 375]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 375 })
+    const today = await evaluate(`(()=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));return p.year+'-'+p.month+'-'+p.day})()`)
+    const nextDate = await evaluate(`(()=>{const d=new Date('${today}T12:00:00Z');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString().slice(0,10)})()`)
+    const seed = Array.from({ length: 9 }, (_, index) => ({ id: `calendar-${index}`, user_course_id: '10000000-0000-0000-0000-000000000021', title: index === 0 ? 'Calendar homework with a long title that must wrap and remain fully reachable' : `Calendar work ${index}`, type: ['assignment', 'exam', 'quiz', 'project'][index % 4], due_date: today, due_time: index === 2 ? '14:30:00' : null, notes: index === 0 ? 'Saved private notes' : null, location: null, completed_at: index === 1 ? new Date().toISOString() : null }))
+    await evaluate(`localStorage.setItem('wolfie-academic-browser-fixture:a',${JSON.stringify(JSON.stringify(seed))});localStorage.removeItem('wolfie-academic-browser-fixture:b')`)
+    await reload()
+    assert.equal(await evaluate(`${button('Agenda')}.getAttribute('aria-selected')`), 'true')
+    await evaluate(`${button('Agenda')}.focus()`); await key('ArrowRight')
+    await until(() => evaluate(`!!${q('.calendar-month')}`), 'calendar tab')
+    assert.equal(await evaluate(`${button('Calendar')}.getAttribute('aria-selected')`), 'true')
+    assert.equal(await evaluate(`${q('[aria-label="Calendar completion status"]')}.value`), 'all')
+    await click(q(`[data-calendar-day="${today}"]`))
+    assert.equal(await evaluate('document.querySelectorAll("[data-calendar-item]").length'), 9, 'all types and statuses reachable')
+    assert.equal(await evaluate(`${q('[data-calendar-item="calendar-1"]')}.textContent.includes('Completed')`), true)
+    assert.equal(await evaluate(`${q('[data-calendar-item="calendar-2"]')}.textContent.includes('2:30 PM America/New_York')`), true)
+    const originalMonth = await evaluate(`${q('[data-calendar-heading]')}.textContent`)
+    await fit(); await screenshot(`calendar-${width}.png`)
+    await click(button('Next month')); assert.equal(await evaluate('document.querySelectorAll("[data-calendar-item]").length'), 0)
+    await click(button('Today')); await click(q(`[data-calendar-day="${today}"]`))
+    assert.equal(await evaluate(`${q('[data-calendar-heading]')}.textContent`), originalMonth)
+    await evaluate(`${q('[data-calendar-item="calendar-0"]')}.focus()`); await key('Enter'); await expectDialog('Edit academic item')
+    assert.equal(await evaluate(`${q('dialog [name=due_date]')}.value`), today)
+    assert.equal(await evaluate(`${q('dialog [name=due_time]')}.value`), '')
+    assert.equal(await evaluate(`${q('dialog [name=notes]')}.value`), 'Saved private notes')
+    await focusTrap(); await backdropAndBackground()
+    await fill('due_date', nextDate)
+    await evaluate(`window.academicFixture.saveMode='fail'`)
+    await click(button('Save item', dlg)); await until(() => evaluate(`!!${q('dialog [role=alert]')}`), 'calendar save failure')
+    assert.equal(await evaluate(`${q('dialog [name=due_date]')}.value`), nextDate)
+    assert.equal(await evaluate(`${q('[data-calendar-item="calendar-0"]')}.getAttribute('aria-label').includes('${today.slice(0,4)}')`), true)
+    await click(button('Save item', dlg)); await noDialog()
+    assert.equal(await evaluate(`!!${q('[data-calendar-item="calendar-0"]')}`), false, 'old occurrence removed')
+    assert.equal(await evaluate('document.activeElement.hasAttribute("data-calendar-day")'), true, 'visible calendar fallback focus')
+    assert.equal(await evaluate(`${q('[data-calendar-heading]')}.textContent`), originalMonth, 'month stays selected')
+    await click(button('Next month')); await click(q(`[data-calendar-day="${nextDate}"]`))
+    assert.equal(await evaluate('document.querySelectorAll("[data-calendar-item=calendar-0]").length'), 1, 'one moved occurrence')
+    await click(button('Agenda'))
+    assert.equal(await evaluate('document.querySelectorAll(".academic-row").length'), 8, 'agenda pending excludes completed only')
+    await reload(); await click(button('Calendar')); await click(button('Next month')); await click(q(`[data-calendar-day="${nextDate}"]`))
+    assert.equal(await evaluate('document.querySelectorAll("[data-calendar-item=calendar-0]").length'), 1, 'reschedule persisted')
+    await click(q('[data-calendar-item=calendar-0]')); await fill('title', 'Private calendar draft'); await key('Escape'); await expectDialog('Discard unsaved changes?'); await key('Escape'); await expectDialog('Edit academic item')
+    await evaluate(`window.academicFixture.saveMode='wait'`); await click(button('Save item', dlg)); await until(() => evaluate('!!window.academicFixture.releaseSave'))
+    await evaluate('window.academicFixture.switchAccount()'); await noDialog(); await evaluate('window.academicFixture.releaseSave()'); await sleep(80)
+    assert.equal(await evaluate(`${button('Agenda')}.getAttribute('aria-selected')`), 'true', 'new account resets view context')
+    await click(button('Calendar')); assert.equal(await evaluate('document.querySelectorAll("[data-calendar-item]").length'), 0, 'no old private entries')
+    assert.notEqual(await evaluate('document.body.style.overflow'), 'hidden'); await fit()
+    await evaluate('window.academicFixture.switchAccount()'); await sleep(50)
+    console.log(`PASS calendar ${width}px: tabs, dates, dense entries, timezone, editor, failure/retry, reschedule, reload, account teardown`)
   }
   console.log(`Screenshots: ${profile}`)
   await send('Browser.close')

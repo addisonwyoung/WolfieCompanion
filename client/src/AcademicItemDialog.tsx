@@ -25,6 +25,7 @@ export default function AcademicItemDialog({ initial, editing, courses, busy, sa
   const dirty = comparable(initial) !== comparable(draft)
   const fieldId = (field: string) => `${id}-${field}`
   function dismiss() { if (!busy && !submitting.current) { if (dirty) setConfirming(true); else onClose() } }
+  function escape() { if (busy || submitting.current) return; if (confirming) setConfirming(false); else dismiss() }
   function change(patch: Partial<AcademicInput>) { setDraft(previous => ({ ...previous, ...patch })); setValidation(null) }
   useLayoutEffect(() => {
     const node = dialog.current
@@ -37,7 +38,12 @@ export default function AcademicItemDialog({ initial, editing, courses, busy, sa
   const description = (field: Field) => [invalid(field) ? `${id}-error` : '', field === 'due_time' ? `${id}-time-help` : ''].filter(Boolean).join(' ') || undefined
   return <dialog ref={dialog} className={`academic-dialog ${confirming ? 'academic-confirmation' : 'academic-editor-dialog'}`} role={confirming ? 'alertdialog' : 'dialog'}
     aria-labelledby={`${id}-heading`} aria-describedby={confirming ? `${id}-discard-description` : undefined}
-    onCancel={event => { event.preventDefault(); if (busy || submitting.current) return; if (confirming) setConfirming(false); else dismiss() }}>
+    onCancel={event => { event.preventDefault(); escape() }}
+    onKeyDown={event => {
+      // Handle Escape before the native close request: repeated native requests
+      // can become non-cancelable after entering the same-dialog confirmation.
+      if (event.key === 'Escape') { event.preventDefault(); escape() }
+    }}>
     {confirming ? <>
       <header className="academic-dialog-header"><p className="eyebrow">UNSAVED CHANGES</p><h2 id={`${id}-heading`}>Discard unsaved changes?</h2></header>
       <div className="academic-dialog-body"><p id={`${id}-discard-description`}>Your changes have not been saved. Keep editing to continue, or discard them to close this editor.</p></div>

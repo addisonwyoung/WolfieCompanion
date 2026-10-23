@@ -13,13 +13,16 @@ test('profile validates, normalizes all fields and retains draft on failure then
  fireEvent.change(screen.getByLabelText('Major (optional)'),{target:{value:' Math '}})
  fireEvent.change(screen.getByLabelText('Year of study (optional)'),{target:{value:'Graduate'}})
  fireEvent.change(screen.getByLabelText('Residence status (optional)'),{target:{value:'commuter'}})
- fireEvent.change(screen.getByLabelText('Interests (optional)'),{target:{value:' Hiking, hiking, Music, '}})
+ fireEvent.change(screen.getByLabelText('Interests (optional)'),{target:{value:'hiking'}})
+ fireEvent.click(screen.getByRole('button',{name:'Hiking',exact:true}))
+ fireEvent.change(screen.getByLabelText('Interests (optional)'),{target:{value:'music'}})
+ fireEvent.click(screen.getByRole('button',{name:'Listening to Music',exact:true}))
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Offline'))
  expect(screen.getByLabelText('Name')).toHaveValue(' Ada ')
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await waitFor(()=>expect(screen.getByRole('button',{name:'Edit profile'})).toBeInTheDocument())
- expect(save).toHaveBeenLastCalledWith(expect.objectContaining({name:'Ada',major:'Math',year:'Graduate',residence_status:'commuter',interests:['hiking','Music']}),expect.anything())
+ expect(save).toHaveBeenLastCalledWith(expect.objectContaining({name:'Ada',major:'Math',year:'Graduate',residence_status:'commuter',interests:['Hiking','Listening to Music']}),expect.anything())
 })
 test('cancel preserves profile and invalid pictures never save',()=>{
  render(<Profile profile={profile} onSave={vi.fn()}/>);fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
@@ -30,6 +33,7 @@ test('cancel preserves profile and invalid pictures never save',()=>{
 })
 test('profile bounds optional values and interests are authoritative client validation',()=>{
  expect(normalizeProfile({...profile,major:' '}).major).toBeNull()
+ expect(normalizeProfile({...profile,interests:[' Hiking ','hiking','Music']}).interests).toEqual(['hiking','Music'])
  for(const next of [{...profile,year:'Unknown'},{...profile,major:'a'.repeat(121)},{...profile,interests:Array.from({length:21},(_,i)=>String(i))}]) expect(()=>normalizeProfile(next)).toThrow()
 })
 test('pending profile save disables editing and duplicate submission',async()=>{
