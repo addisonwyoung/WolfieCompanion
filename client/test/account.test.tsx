@@ -94,3 +94,23 @@ test('classmate dialog clears across course, navigation and auth changes and ign
  fireEvent.click(screen.getByRole('button',{name:'View profile of Peer Name'}));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
  await act(async()=>resolve({data:{student_id:'peer',name:'Stale Secret',major:null,has_shared_avatar:false},error:null}));expect(screen.queryByText('Stale Secret')).not.toBeInTheDocument()
 })
+
+test.each(['editor','discard','save'] as const)('calendar %s tears down on external account replacement and ignores stale results',async mode=>{
+ const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
+ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+ const item={id:'private-calendar-item',user_course_id:course.databaseId,title:'Private calendar work',type:'assignment' as const,due_date:date,due_time:null,notes:'Private notes',location:null,completed_at:null}
+ let resolveWrite!:(value:typeof item)=>void
+ mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn()}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course]})
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:item.title});fireEvent.click(screen.getByRole('tab',{name:'Calendar'}))
+ fireEvent.click(screen.getByRole('button',{name:/^Edit Private calendar work,/}));fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Private calendar draft'}})
+ if(mode==='discard')fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
+ if(mode==='save')fireEvent.click(screen.getByRole('button',{name:'Save item'}))
+ vi.mocked(mock.items.load).mockResolvedValue([]);vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[course]})
+ act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(mode==='save')await act(async()=>resolveWrite({...item,title:'Private calendar draft'}))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByDisplayValue('Private calendar draft')).not.toBeInTheDocument();expect(screen.queryByText('Private calendar work')).not.toBeInTheDocument();expect(document.body.style.overflow).not.toBe('hidden')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByText(/Nothing planned/);expect(screen.getByRole('tab',{name:'Agenda'})).toHaveAttribute('aria-selected','true')
+ fireEvent.click(screen.getByRole('tab',{name:'Calendar'}));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('table')).not.toBeInTheDocument()
+})
