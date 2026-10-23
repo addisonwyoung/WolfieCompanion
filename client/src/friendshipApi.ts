@@ -4,7 +4,7 @@ import type { ClassmateProfile } from './classmateProfile'
 
 export interface FriendRequest { request_id: string; sender_id: string; sender_name: string; sender_major: string | null; created_at: string }
 export interface FriendRelationship { student_id: string; relationship: 'none' | 'declined' | 'outgoing_pending' | 'incoming_pending' | 'accepted'; request_id: string | null }
-export interface FriendStudent extends ClassmateProfile {}
+export type FriendStudent = ClassmateProfile
 export interface FriendApi {
   inbox(signal: AbortSignal): Promise<FriendRequest[]>
   relationships(course: string, signal: AbortSignal): Promise<FriendRelationship[]>

@@ -4,10 +4,11 @@ import type { FriendApi, FriendStudent } from './friendshipApi'
 
 export default function FriendProfileDialog({ api, student, onClose }: { api: FriendApi; student: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const [profile, setProfile] = useState<FriendStudent | null | undefined>()
-  const [error, setError] = useState(false)
-  const [picture, setPicture] = useState('')
+  const [loadedProfile, setLoadedProfile] = useState<{ key: string; value: FriendStudent | null } | null>(null)
+  const [failedKey, setFailedKey] = useState<string | null>(null)
+  const [loadedPicture, setLoadedPicture] = useState<{ key: string; url: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const loadKey = `${student}:${attempt}`
   useEffect(() => {
     const element = dialog.current!
     const origin = document.activeElement as HTMLElement | null
@@ -16,14 +17,16 @@ export default function FriendProfileDialog({ api, student, onClose }: { api: Fr
   }, [])
   useEffect(() => {
     const controller = new AbortController(); let active = true; let objectUrl = ''
-    setProfile(undefined); setError(false); setPicture('')
     void api.profile(student, controller.signal).then(value => {
       if (!active) return
-      setProfile(value)
-      if (value?.has_shared_avatar) void api.picture(student, controller.signal).then(blob => { if (active) { objectUrl = URL.createObjectURL(blob); setPicture(objectUrl) } }).catch(() => {})
-    }).catch(() => { if (active) setError(true) })
+      setLoadedProfile({ key: loadKey, value })
+      if (value?.has_shared_avatar) void api.picture(student, controller.signal).then(blob => { if (active) { objectUrl = URL.createObjectURL(blob); setLoadedPicture({ key: loadKey, url: objectUrl }) } }).catch(() => {})
+    }).catch(() => { if (active) setFailedKey(loadKey) })
     return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [api, student, attempt])
+  }, [api, student, attempt, loadKey])
+  const profile = loadedProfile?.key === loadKey ? loadedProfile.value : undefined
+  const error = failedKey === loadKey
+  const picture = loadedPicture?.key === loadKey ? loadedPicture.url : ''
   return <dialog className="peer-dialog" ref={dialog} aria-labelledby="friend-profile-heading" onCancel={event => { event.preventDefault(); onClose() }} onKeyDown={event => {
     if (event.key !== 'Tab') return
     const buttons = dialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')

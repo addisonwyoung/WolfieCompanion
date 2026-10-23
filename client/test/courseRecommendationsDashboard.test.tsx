@@ -49,7 +49,7 @@ describe('course recommendation dashboard', () => {
 
   it('loads by course and ignores a late response from the previous selection', async () => {
     const pending: Array<(rows: typeof candidate[]) => void> = []
-    const api: RecommendationApi = vi.fn((_course, _signal) => new Promise(resolve => pending.push(resolve)))
+    const api: RecommendationApi = vi.fn(() => new Promise(resolve => pending.push(resolve)))
     const { result, rerender } = renderHook(({ code }) => useCourseRecommendations(api, 'caller', code), { initialProps: { code: 'CSE 310' } })
     await waitFor(() => expect(api).toHaveBeenCalledTimes(1))
     rerender({ code: 'AMS 210' })

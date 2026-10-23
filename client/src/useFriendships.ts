@@ -21,16 +21,13 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
   const currentUserRef = useRef(userId)
   currentUserRef.current = userId
   const refresh = useCallback(() => setAttempt(value => value + 1), [])
-  useEffect(() => {
-    setBusyIds(new Set()); setBusyOwner(userId ?? ''); setActionError(''); setActionOwner(userId ?? ''); setRetryAction(null)
-  }, [userId])
   const inboxKey = userId ?? ''
   const peopleKey = userId && course ? `${userId}:${course}` : ''
   const visibleInbox = inboxOwner === inboxKey ? inbox : userId ? { status: 'loading' as const, data: [] } : empty<FriendRequest>()
   const visibleRelationships = peopleOwner === peopleKey ? relationships : peopleKey ? { status: 'loading' as const, data: [] } : empty<FriendRelationship>()
   const visibleFriends = peopleOwner === peopleKey ? friends : peopleKey ? { status: 'loading' as const, data: [] } : empty<FriendStudent>()
   useEffect(() => {
-    if (!userId) { inboxOwnerRef.current = ''; peopleOwnerRef.current = ''; setInbox(empty()); setRelationships(empty()); setFriends(empty()); setInboxOwner(''); setPeopleOwner(''); setBusyIds(new Set()); setBusyOwner(''); setActionError(''); setActionOwner(''); setRetryAction(null); return }
+    if (!userId) { inboxOwnerRef.current = ''; peopleOwnerRef.current = ''; return }
     const controller = new AbortController()
     const sameInbox = inboxOwnerRef.current === userId
     const nextPeopleOwner = course ? `${userId}:${course}` : ''

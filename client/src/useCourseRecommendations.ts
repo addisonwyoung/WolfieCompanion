@@ -11,7 +11,6 @@ export function useCourseRecommendations(api: RecommendationApi, userId: string 
   useEffect(() => {
     if (!key || !courseCode) return
     const controller = new AbortController()
-    setResult({ key, api, state: { status: 'loading', candidates: [] } })
     void api(courseCode, controller.signal).then(candidates => {
       if (!controller.signal.aborted) setResult({ key, api, state: { status: 'success', candidates } })
     }, () => {
