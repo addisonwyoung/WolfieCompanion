@@ -64,6 +64,9 @@ button.primary:hover { background: #8d1929; }
 .course-controls button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; box-shadow: inset 0 0 0 1px #b22c3c; }
 .course-controls button[aria-pressed='true'] :is(strong, .course-symbol, .course-state) { color: #9b2030; }
 .classmates { margin-top: 32px; }
+.course-list-switcher { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; padding: 4px; border: 1px solid #e2e2e4; border-radius: 10px; background: #f5f5f5; }
+.course-list-switcher button { min-height: 40px; padding: 8px 14px; border-color: transparent; background: transparent; color: #55555e; font-size: 12px; }
+.course-list-switcher button[aria-pressed='true'] { border-color: #d8d8dd; background: #fff; color: #962333; box-shadow: 0 1px 3px #25252a12; }
 .roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .roster-heading h2 { margin-top: 7px; }
 .roster-heading .eyebrow { font-size: 9px; }
@@ -270,6 +273,30 @@ button.academic-destructive:hover { background: #861a2a; }
 .peer-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid #ddd; border-radius: 20px; padding: 28px; color: inherit; background: #fff; box-shadow: 0 24px 80px #0003; }
 .peer-dialog::backdrop { background: #15251c88; }
 .student-card button { margin: 8px 0; }
+.recommendations { grid-column: 1 / -1; }
+.recommendation-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+.recommendation-card { padding: 18px 20px; }
+.recommendation-title { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.recommendation-title h3 { font-size: 15px; }
+.recommendation-card .student-major { margin: 8px 0; }
+.recommendation-detail { margin-top: 7px; color: #65656e; font-size: 12px; }
+.profile-column { display: grid; gap: 16px; align-content: start; }
+.friend-requests { padding: 14px; }
+.friend-requests-trigger { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; border: 0; text-align: left; font-weight: 650; }
+.friend-request-badge { display: inline-grid; min-width: 26px; height: 26px; place-items: center; padding-inline: 6px; border-radius: 99px; background: #a82032; color: white; font-size: 12px; }
+.friend-dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dedee3; border-radius: 16px; color: inherit; background: white; box-shadow: 0 24px 90px #12121940; overflow-y: auto; }
+.friend-dialog::backdrop { background: #19192080; }
+.friend-request-list, .friend-course-list { display: grid; gap: 10px; padding: 0; list-style: none; }
+.friend-request-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; }
+.friend-request-card h3, .friend-course-list h3 { font-size: 15px; }
+.friend-request-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.friend-request-actions button, .friend-course-list button, .recommendation-card > button { min-height: 40px; }
+.friends-in-course { margin-top: 32px; }
+.friend-course-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.friend-status { margin-top: 12px; color: #315c35; font-size: 13px; font-weight: 650; }
+.friend-action-error { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 10px; max-width: min(600px, calc(100vw - 32px)); padding: 12px 16px; border: 1px solid #e6bdc4; border-radius: 10px; background: #fff3f4; color: #961e30; box-shadow: 0 8px 24px #25252a21; }
+@media (max-width: 700px) { .friend-request-card { align-items: flex-start; flex-direction: column; } .friend-request-actions { justify-content: flex-start; } .friend-course-list { grid-template-columns: 1fr; } .friend-action-error { left: 12px; right: 12px; bottom: 12px; flex-wrap: wrap; } }
+@media (max-width: 700px) { .recommendation-list { grid-template-columns: 1fr; } }
 
 /* A second presentation of the same private academic items. */
 .academic-view-tabs { display: flex; gap: 6px; width: fit-content; padding: 4px; margin: 24px 0 18px; border: 1px solid #e0e0e3; border-radius: 12px; background: #eeeeeC; }
