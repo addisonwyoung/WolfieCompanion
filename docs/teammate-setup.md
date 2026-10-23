@@ -149,3 +149,7 @@ In the app, choose Import schedule, select a PNG/JPEG up to 10 MiB, select the l
 | Different content from Addison | Compare branch/commit with `git branch --show-current` and `git log -1 --oneline`; each real account's personal data will differ. |
 
 For future updates, stop the two app terminals, pull with `git pull --ff-only`, rerun `npm --prefix client ci` and `npm --prefix server ci`, and start both terminals again. Keep your `.env.local` files. If an update adds a database migration, coordinate its application once to the shared project with the team.
+
+## Direct messaging
+
+After the owner reviews and manually applies the [messaging migration and deployment checklist](direct-messaging.md), eligible students can choose Message on an authorized friend, pending-request, or classmate profile and reopen saved chats from Messages. Text history persists in Supabase. Edit profile → Allow new direct messages defaults on for both existing and new users; saving it off prevents new conversations while existing chats continue in both directions. No new keys or messaging service are needed. The owner must communicate this default and complete real-account/Realtime verification separately from local fixtures.

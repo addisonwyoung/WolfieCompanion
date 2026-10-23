@@ -32,3 +32,9 @@ test('profile sharing flags are explicit and saved atomically without deleting p
  f.single.mockResolvedValueOnce({data:null,error:new Error('offline')} as never)
  await expect(f.api.saveProfile({...profile,share_year:false})).rejects.toThrow('Profile could not be saved')
 })
+test('DM preference is allowlisted in owner update and confirmed response restores the saved choice',async()=>{
+ const f=fake();f.single.mockResolvedValueOnce({data:{...profile,allow_new_dms:false},error:null})
+ const saved=await f.api.saveProfile({...profile,allow_new_dms:false});expect(saved.profile.allow_new_dms).toBe(false)
+ expect(f.update).toHaveBeenCalledWith(expect.objectContaining({allow_new_dms:false}))
+ await f.api.saveProfile(profile);expect(f.update).toHaveBeenLastCalledWith(expect.objectContaining({allow_new_dms:true}))
+})

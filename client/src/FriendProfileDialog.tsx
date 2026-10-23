@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import MessageProfileAction from './MessageProfileAction'
+import type { MessagingApi, Target } from './messaging'
 import { Avatar, Interests } from './Profile'
 import type { FriendApi, FriendStudent } from './friendshipApi'
 
-export default function FriendProfileDialog({ api, student, onClose }: { api: FriendApi; student: string; onClose: () => void }) {
+export default function FriendProfileDialog({ api, student, onClose, messaging, onMessage }: { api: FriendApi; student: string; onClose: () => void; messaging?: MessagingApi; onMessage?: (target: Target) => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [loadedProfile, setLoadedProfile] = useState<{ key: string; value: FriendStudent | null } | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
@@ -44,6 +46,7 @@ export default function FriendProfileDialog({ api, student, onClose }: { api: Fr
         {'year' in profile && <><dt>Year of study</dt><dd>{profile.year || 'Not added'}</dd></>}
         {'residence_status' in profile && <><dt>Residence</dt><dd>{profile.residence_status === 'commuter' ? 'Commuter' : profile.residence_status === 'dormer' ? 'Dormer' : 'Not added'}</dd></>}
       </dl>{'interests' in profile && <><h4>Interests</h4><Interests interests={profile.interests ?? []} /></>}
+      {messaging && onMessage && <MessageProfileAction api={messaging} target={{ student }} onMessage={onMessage} />}
       <p className="field-help">Only details this student has chosen to share appear here.</p></>}
   </dialog>
 }
