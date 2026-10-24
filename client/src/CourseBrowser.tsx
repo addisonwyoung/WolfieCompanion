@@ -74,7 +74,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
           const relationship = relationshipById.get(candidate.student_id)?.relationship ?? 'none'
           const busy = friendActionBusy.has(candidate.student_id)
           if (relationship === 'outgoing_pending') return <p role="status" className="friend-status">Friend request sent</p>
-          if (relationship === 'incoming_pending') return <button type="button" onClick={onOpenFriendRequests}>Respond to friend request</button>
+          if (relationship === 'incoming_pending') return <button type="button" className="respond-friend-request-button" onClick={onOpenFriendRequests}>Respond to friend request</button>
           if (relationship === 'accepted') return <p role="status" className="friend-status">Friends</p>
           const label = busy ? 'Sending friend request' : relationship === 'declined' ? 'Send friend request again' : 'Add friend'
           return <div className="recommendation-actions">

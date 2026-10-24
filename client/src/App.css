@@ -283,6 +283,7 @@ button.academic-destructive:hover { background: #861a2a; }
 .recommendation-score-medium { border-color: #e7d27d; background: #fff7d6; color: #755900; }
 .recommendation-score-low { border-color: #e6b9be; background: #fff0f1; color: #9e2635; }
 .recommendation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; }
+.respond-friend-request-button { position: relative; top: 4px; }
 .add-friend-button { display: flex; width: fit-content; min-width: 136px; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border-color: #d8a4aa; border-radius: 9px; background: white; color: #a82032; }
 .add-friend-button:hover:not(:disabled) { border-color: #a82032; background: #fff7f8; }
 .add-friend-button svg { width: 21px; height: 21px; }
