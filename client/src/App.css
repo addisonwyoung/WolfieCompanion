@@ -64,7 +64,7 @@ button.primary:hover { background: #8d1929; }
 .course-controls button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; box-shadow: inset 0 0 0 1px #b22c3c; }
 .course-controls button[aria-pressed='true'] :is(strong, .course-symbol, .course-state) { color: #9b2030; }
 .classmates { margin-top: 32px; }
-.course-list-switcher { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; padding: 4px; border: 1px solid #e2e2e4; border-radius: 10px; background: #f5f5f5; }
+.course-list-switcher { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; gap: 7px; margin-bottom: 18px; padding: 4px; border: 1px solid #e2e2e4; border-radius: 10px; background: #f5f5f5; }
 .course-list-switcher button { min-height: 40px; padding: 8px 14px; border-color: transparent; background: transparent; color: #55555e; font-size: 12px; }
 .course-list-switcher button[aria-pressed='true'] { border-color: #d8d8dd; background: #fff; color: #962333; box-shadow: 0 1px 3px #25252a12; }
 .roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
@@ -278,24 +278,46 @@ button.academic-destructive:hover { background: #861a2a; }
 .recommendation-card { padding: 18px 20px; }
 .recommendation-title { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .recommendation-title h3 { font-size: 15px; }
+.recommendation-score { display: inline-grid; min-width: 54px; min-height: 30px; place-items: center; padding: 4px 9px; border: 1px solid; border-radius: 18px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.recommendation-score-high { border-color: #b8d9bd; background: #eaf5ec; color: #246331; }
+.recommendation-score-medium { border-color: #e7d27d; background: #fff7d6; color: #755900; }
+.recommendation-score-low { border-color: #e6b9be; background: #fff0f1; color: #9e2635; }
+.recommendation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.add-friend-button { display: flex; width: fit-content; min-width: 136px; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border-color: #d8a4aa; border-radius: 9px; background: white; color: #a82032; }
+.add-friend-button:hover:not(:disabled) { border-color: #a82032; background: #fff7f8; }
+.add-friend-button svg { width: 21px; height: 21px; }
+.add-friend-button:disabled { opacity: .55; }
+.recommendation-profile-button { min-height: 42px; padding: 8px 14px; }
 .recommendation-card .student-major { margin: 8px 0; }
 .recommendation-detail { margin-top: 7px; color: #65656e; font-size: 12px; }
+.recommendation-common { margin-top: 10px; }
+.recommendation-common-heading { font-size: 12px; font-weight: 650; }
 .profile-column { display: grid; gap: 16px; align-content: start; }
 .friend-requests { padding: 14px; }
 .friend-requests-trigger { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; border: 0; text-align: left; font-weight: 650; }
 .friend-request-badge { display: inline-grid; min-width: 26px; height: 26px; place-items: center; padding-inline: 6px; border-radius: 99px; background: #a82032; color: white; font-size: 12px; }
+.friend-list-count { display: inline-grid; min-width: 26px; height: 26px; place-items: center; padding-inline: 6px; border-radius: 99px; background: #f0f0f2; color: #55555e; font-size: 12px; }
 .friend-dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #dedee3; border-radius: 16px; color: inherit; background: white; box-shadow: 0 24px 90px #12121940; overflow-y: auto; }
 .friend-dialog::backdrop { background: #19192080; }
-.friend-request-list, .friend-course-list { display: grid; gap: 10px; padding: 0; list-style: none; }
+.friend-request-list { display: grid; gap: 10px; padding: 0; list-style: none; }
 .friend-request-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; }
-.friend-request-card h3, .friend-course-list h3 { font-size: 15px; }
+.friend-request-card h3 { font-size: 15px; }
 .friend-request-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.friend-request-actions button, .friend-course-list button, .recommendation-card > button { min-height: 40px; }
-.friends-in-course { margin-top: 32px; }
-.friend-course-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.friend-request-actions button, .friend-request-card > button, .friend-card-actions button, .recommendation-card > button { min-height: 40px; }
+.friend-card-actions { display: flex; gap: 8px; }
+.friend-directory-actions { display: grid; grid-template-columns: 112px 136px; gap: 10px; flex: 0 0 auto; margin-top: 0; }
+.friend-directory-actions > * { width: 100%; min-width: 0; }
+.friend-directory-actions .add-friend-button { width: 136px; min-width: 136px; }
+.friend-directory-state-button { display: inline-flex; width: 112px; min-width: 112px; min-height: 42px; align-items: center; justify-content: center; padding: 8px 14px; box-sizing: border-box; }
+.friend-directory-request-sent { position: relative; top: -7px; margin-top: 0; color: #315c35; font-size: 13px; font-weight: 650; }
+.friend-dialog-heading-actions { display: flex; align-items: center; gap: 8px; }
+.friend-back-button { margin: 0 0 12px; border: 0; padding: 4px 0; color: #8f2434; background: transparent; text-decoration: underline; }
+.remove-friend-button { border-color: #a82032; background: #a82032; color: white; }
+.remove-friend-button:hover:not(:disabled) { border-color: #861a2a; background: #861a2a; }
+.remove-friend-button:focus-visible { outline: 3px solid #e6a6ae; outline-offset: 2px; }
 .friend-status { margin-top: 12px; color: #315c35; font-size: 13px; font-weight: 650; }
 .friend-action-error { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 10px; max-width: min(600px, calc(100vw - 32px)); padding: 12px 16px; border: 1px solid #e6bdc4; border-radius: 10px; background: #fff3f4; color: #961e30; box-shadow: 0 8px 24px #25252a21; }
-@media (max-width: 700px) { .friend-request-card { align-items: flex-start; flex-direction: column; } .friend-request-actions { justify-content: flex-start; } .friend-course-list { grid-template-columns: 1fr; } .friend-action-error { left: 12px; right: 12px; bottom: 12px; flex-wrap: wrap; } }
+@media (max-width: 700px) { .friend-request-card { align-items: flex-start; flex-direction: column; } .friend-request-actions { justify-content: flex-start; } .friend-action-error { left: 12px; right: 12px; bottom: 12px; flex-wrap: wrap; } }
 @media (max-width: 700px) { .recommendation-list { grid-template-columns: 1fr; } }
 
 /* A second presentation of the same private academic items. */

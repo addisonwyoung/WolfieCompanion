@@ -4,6 +4,9 @@
 create function pg_temp.assert(ok boolean, message text) returns void
 language plpgsql as $$ begin if ok is distinct from true then raise exception 'ASSERT: %', message; end if; end $$;
 \ir ../migrations/202610220003_course_classmate_recommendations.sql
+\ir ../migrations/202610220004_friend_requests.sql
+\ir ../migrations/202610230004_course_recommendation_shared_courses.sql
+\ir ../migrations/202610240001_course_recommendation_friend_exclusion.sql
 begin;
 
 select pg_temp.assert(has_function_privilege('authenticated','public.course_recommendation_profiles(text)','execute')
@@ -21,7 +24,9 @@ insert into auth.identities
 select id,'google',jsonb_build_object('email',email,'email_verified',true) from auth.users where id::text like '30000000-%';
 insert into public.user_courses(user_id,course_code) values
  ('30000000-0000-0000-0000-000000000001','CSE 310'),
+ ('30000000-0000-0000-0000-000000000001','AMS 210'),
  ('30000000-0000-0000-0000-000000000002','CSE 310'),
+ ('30000000-0000-0000-0000-000000000002','AMS 210'),
  ('30000000-0000-0000-0000-000000000003','AMS 210'),
  ('30000000-0000-0000-0000-000000000004','CSE 310');
 insert into public.user_course_sections(user_course_id,section)
@@ -35,6 +40,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select pg_temp.assert((select count(*)=1 and min(student_id::text)='30000000-0000-0000-0000-000000000002'
   from public.course_recommendation_profiles('cse310')), 'normalized course membership, self/ineligible/unrelated exclusion and section deduplication');
+select pg_temp.assert((select shared_courses=array['AMS 210','CSE 310']::text[]
+  from public.course_recommendation_profiles('CSE 310')), 'shared courses include the visible intersection only once and in stable order');
 select pg_temp.assert((select name='Recommendation Peer' and major='Computer Science'
   and year is null and interests is null and residence_status is null
   from public.course_recommendation_profiles('CSE 310')), 'private optional fields omitted');
