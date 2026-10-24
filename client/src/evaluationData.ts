@@ -14,13 +14,15 @@ export interface CourseEvaluation {
   weeklyHours: number
   difficulty: number
   review: string
+  moderationStatus?: 'appropriate' | 'flagged'
 }
 
 export function summarizeEvaluations(evaluations: CourseEvaluation[]) {
-  if (evaluations.length === 0) return null
-  return evaluations.reduce((summary, evaluation) => ({
-    hours: summary.hours + evaluation.weeklyHours / evaluations.length,
-    difficulty: summary.difficulty + evaluation.difficulty / evaluations.length,
+  const visible = evaluations.filter(evaluation => evaluation.moderationStatus !== 'flagged')
+  if (visible.length === 0) return null
+  return visible.reduce((summary, evaluation) => ({
+    hours: summary.hours + evaluation.weeklyHours / visible.length,
+    difficulty: summary.difficulty + evaluation.difficulty / visible.length,
     count: summary.count + 1,
   }), { hours: 0, difficulty: 0, count: 0 })
 }

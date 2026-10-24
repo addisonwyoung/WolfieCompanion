@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { fileURLToPath } from 'node:url';
 import { ReportStore } from './crowd.js';
 import { createApp } from './app.js';

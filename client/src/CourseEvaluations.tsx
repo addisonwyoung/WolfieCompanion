@@ -52,6 +52,8 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
     ...sampleEvaluations.filter(evaluation => evaluation.offeringId === selected.id),
     ...(persistedByOffering[selected.id] ?? []),
   ] : []
+  const ordinaryReviews = currentEvaluations.filter(item => item.moderationStatus !== 'flagged')
+  const flaggedReviews = currentEvaluations.filter(item => item.moderationStatus === 'flagged')
   const averages = summarizeEvaluations(currentEvaluations)
   const alreadySubmitted = selected ? submittedIds.includes(selected.id) : false
   const loadState = selected ? (loadErrors[selected.id] ? 'error' : Object.hasOwn(persistedByOffering, selected.id) ? 'ready' : 'loading') : 'loading'
@@ -76,13 +78,13 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
     setIsSubmitting(true)
     try {
       const saved = await api.submit(selected.id, { weeklyHours: parsedHours, difficulty: parsedDifficulty, review: review.trim() })
-      setPersistedByOffering(current => ({ ...current, [selected.id]: saved }))
+      setPersistedByOffering(current => ({ ...current, [selected.id]: saved.reviews }))
       setSubmittedIds(current => [...new Set([...current, selected.id])])
       setHours('')
       setDifficulty('')
       setReview('')
       setErrors({})
-      setNotice('Your anonymous review is saved and published for this offering.')
+      setNotice(saved.moderationStatus === 'flagged' ? 'Your review was saved in the flagged section for readers to review.' : 'Your anonymous review is saved and published for this offering.')
     } catch (error) {
       if (error instanceof DuplicateCourseReviewError) {
         setSubmittedIds(current => [...new Set([...current, selected.id])])
@@ -116,10 +118,11 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
           <p className="muted">{selected.professor} · {selected.semester} {selected.year}</p>
           {loadState === 'loading' && <p role="status">Loading course reviews…</p>}
           {loadState === 'error' && <div className="error" role="alert"><p>Saved course reviews could not be loaded. Existing sample reviews remain available.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry reviews</button></div>}
-          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div><div><strong>{currentEvaluations.length}</strong><span>{currentEvaluations.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
+          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div><div><strong>{ordinaryReviews.length}</strong><span>{ordinaryReviews.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
           {(currentEvaluations.length > 0 || loadState === 'ready') && <>
             <h3 className="review-heading">Anonymous reviews</h3>
-            {currentEvaluations.length ? <ul className="review-list">{currentEvaluations.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5{item.id.startsWith('eval-') ? ' · Sample review' : ''}</span></li>)}</ul> : <p className="muted review-empty-note">No written reviews to display yet.</p>}
+            {ordinaryReviews.length ? <ul className="review-list">{ordinaryReviews.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5{item.id.startsWith('eval-') ? ' · Sample review' : ''}</span></li>)}</ul> : <p className="muted review-empty-note">No appropriate reviews to display yet.</p>}
+            {flaggedReviews.length > 0 && <details className="flagged-reviews"><summary>Flagged reviews ({flaggedReviews.length})</summary><p className="field-help">These reviews may contain personal or otherwise inappropriate content. Use your judgment when reading them.</p><ul className="review-list">{flaggedReviews.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5</span></li>)}</ul></details>}
           </>}
         </section>
 

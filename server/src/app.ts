@@ -6,6 +6,7 @@ import type { ErrorRequestHandler } from 'express';
 import { schedulePreviewRouter } from './ocr/preview.js';
 import type { PreviewOptions } from './ocr/preview.js';
 import { levels, ReportStore } from './crowd.js';
+import { courseReviewRouter } from './courseReviewModeration.js';
 export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   const app = express();
   app.use('/api/classmate-picture', classmatePictureRouter());
@@ -13,6 +14,7 @@ export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   app.use('/api/avatar', avatarRouter());
   app.use('/api/schedule-preview', schedulePreviewRouter(preview));
   app.use(express.json({ limit: '8kb' }));
+  app.use('/api/course-reviews', courseReviewRouter());
   app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
   app.get('/api/locations', (_req, res) => { res.json({ locations: store.list() }); });
   app.get('/api/locations/:id', (req, res) => {
