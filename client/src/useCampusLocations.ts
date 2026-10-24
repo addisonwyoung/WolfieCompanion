@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CampusLocationError } from './campusLocations'
 import type { CampusLocation, CampusLocationsApi } from './campusLocations'
 
-type State = { userId: string | null; items: CampusLocation[]; status: 'loading' | 'success' | 'error'; stale: boolean; canManage: boolean; message: string; capabilityError: string; busy: boolean }
-const empty = (userId: string | null): State => ({ userId, items: [], status: 'loading', stale: false, canManage: false, message: '', capabilityError: '', busy: false })
+type State = { userId: string | null; items: CampusLocation[]; status: 'loading' | 'success' | 'error'; stale: boolean; canManage: boolean; message: string; mutationError: string; capabilityError: string; busy: boolean }
+const empty = (userId: string | null): State => ({ userId, items: [], status: 'loading', stale: false, canManage: false, message: '', mutationError: '', capabilityError: '', busy: false })
 
-// Future view passes a resolved eligible user ID, null on logout, and active=false
+// The view passes a resolved eligible user ID, null on logout, and active=false
 // while hidden. No map/UI subscription or polling is introduced by this hook.
 export function useCampusLocations(api: CampusLocationsApi, userId: string | null, active = true) {
   const [state, setState] = useState<State>(() => empty(userId))
@@ -33,6 +33,7 @@ export function useCampusLocations(api: CampusLocationsApi, userId: string | nul
         message: locations.status === 'rejected' ? (locations.reason as Error).message : '',
         capabilityError: capability.status === 'rejected' ? (capability.reason as Error).message : '' }
     })
+    return canManage && locations.status === 'fulfilled' ? locations.value : undefined
   }, [api, userId, active])
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export function useCampusLocations(api: CampusLocationsApi, userId: string | nul
     const scope = lifetime.current
     // Invalidate older reads so they cannot overwrite this mutation's result.
     request.current++
-    setState(previous => ({ ...previous, busy: true, message: '' }))
+    setState(previous => ({ ...previous, busy: true, message: '', mutationError: '' }))
     try {
       const item = await operation()
       if (scope !== lifetime.current) return false
@@ -60,7 +61,7 @@ export function useCampusLocations(api: CampusLocationsApi, userId: string | nul
       return true
     } catch (error) {
       if (scope !== lifetime.current) return false
-      setState(previous => ({ ...previous, message: (error as Error).message }))
+      setState(previous => ({ ...previous, message: (error as Error).message, mutationError: (error as Error).message }))
       if (error instanceof CampusLocationError && (error.kind === 'permission' || error.kind === 'conflict')) {
         // Zero-row RLS and stale revisions can look identical. Refresh capability,
         // never retry the write, and leave the caller's draft untouched.
@@ -77,5 +78,6 @@ export function useCampusLocations(api: CampusLocationsApi, userId: string | nul
       if (scope === lifetime.current) { saving.current = false; setState(previous => ({ ...previous, busy: false })) }
     }
   }
-  return { ...(state.userId === userId && userId ? state : empty(userId)), canManage: !!userId && active && state.userId === userId && state.canManage, refresh, mutate }
+  function clearMutationMessage() { setState(previous => ({ ...previous, message: '', mutationError: '' })) }
+  return { ...(state.userId === userId && userId ? state : empty(userId)), canManage: !!userId && active && state.userId === userId && state.canManage, refresh, mutate, clearMutationMessage }
 }

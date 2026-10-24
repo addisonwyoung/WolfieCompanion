@@ -21,6 +21,18 @@ export const explorerConfig: ExplorerConfig = {
 export function tilesConfigured(config: ExplorerConfig) {
   return !!config.key && !/YOUR_|REPLACE|PLACEHOLDER/i.test(config.key) && /^[a-zA-Z0-9_-]+$/.test(config.mapId) && !/YOUR_|REPLACE|PLACEHOLDER/i.test(config.mapId)
 }
+// Add authentication only to MapTiler HTTPS requests (style, TileJSON, glyphs,
+// sprites and tiles). Never forward the key to another style/source host.
+export function maptilerRequest(url: string, key: string) {
+  try {
+    const target = new URL(url)
+    if (target.protocol === 'https:' && target.hostname === 'api.maptiler.com') {
+      target.searchParams.set('key', key)
+      return { url: target.toString() }
+    }
+  } catch { /* MapLibre may supply a relative or non-HTTP resource URL. */ }
+  return { url }
+}
 export function feedbackLink(destination: string, location?: { id: string; name: string }) {
   try {
     const url = new URL(destination)

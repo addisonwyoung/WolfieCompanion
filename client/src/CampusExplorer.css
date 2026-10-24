@@ -74,3 +74,25 @@
 
 /* The vector canvas stays in Leaflet tilePane, below resource markers/controls. */
 .campus-map .leaflet-gl-layer { pointer-events: none; }
+
+.campus-editor-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px; margin-bottom: 18px; border: 1px solid #9ebdac; border-radius: 12px; background: #edf6ef; }
+.campus-editor-bar strong { flex: 1; font-size: 13px; }
+.campus-publication { display: inline-block; font-size: 11px; margin: 4px 0 0 8px; padding: 3px 7px; border-radius: 12px; background: #e7f3eb; color: #225e4b; }
+.campus-publication-draft { background: #fff1d8; color: #79531c; }
+.campus-use-center { position: absolute; top: 64px; right: 12px; z-index: 800; box-shadow: 0 2px 8px #1232; font-size: 12px; min-height: 44px; }
+.campus-editor-dialog { width: min(640px, calc(100vw - 24px)); max-width: calc(100vw - 24px); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; border: 1px solid #a6bfaf; border-top: 5px solid #356b52; border-radius: 16px; padding: 24px; color: #203b2d; background: #fff; }
+.campus-editor-dialog::backdrop { background: #17382b55; }
+.campus-editor-dialog h2 { margin: 0 0 16px; }
+.campus-editor-dialog p { font-size: 13px; margin: 12px 0; line-height: 1.5; overflow-wrap: anywhere; }
+.campus-editor-dialog [role='alert'] { padding: 12px; background: #fff3e8; border: 1px solid #c9956f; border-radius: 8px; }
+.campus-editor-position { font-variant-numeric: tabular-nums; }
+.campus-editor-fields { display: grid; gap: 12px; min-width: 0; border: 0; padding: 18px 0 0; margin: 0; }
+.campus-editor-fields legend { padding-top: 14px; font-size: 14px; font-weight: 650; }
+.campus-editor-fields label { display: grid; gap: 6px; font-size: 13px; }
+.campus-editor-fields input, .campus-editor-fields select, .campus-editor-fields textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #b9ccbf; border-radius: 8px; color: #203b2d; background: #fff; font: inherit; }
+.campus-editor-fields textarea { min-height: 76px; resize: vertical; }
+.campus-editor-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+.campus-editor-dialog button { min-height: 44px; }
+.campus-editor-actions button { flex: 1 1 auto; }
+.campus-editor-dialog :focus-visible, .campus-editor-bar :focus-visible, .campus-use-center:focus-visible { outline: 3px solid #285c83; outline-offset: 3px; }
+@media (max-width: 480px) { .campus-editor-dialog { padding: 16px; } .campus-editor-bar > button { flex: 1 1 auto; } }

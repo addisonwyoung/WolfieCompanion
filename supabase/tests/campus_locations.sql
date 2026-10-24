@@ -1,4 +1,4 @@
--- Disposable local PostgreSQL ONLY, after bootstrap + accounts + campus migrations.
+-- Disposable local PostgreSQL ONLY, after bootstrap + minimal prerequisites + campus migrations.
 \set ON_ERROR_STOP on
 begin;
 create function pg_temp.assert(ok boolean, message text) returns void language plpgsql as $$
