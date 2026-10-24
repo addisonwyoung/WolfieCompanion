@@ -275,14 +275,14 @@ button.academic-destructive:hover { background: #861a2a; }
 .student-card button { margin: 8px 0; }
 .recommendations { grid-column: 1 / -1; }
 .recommendation-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
-.recommendation-card { padding: 18px 20px; }
+.recommendation-card { display: flex; flex-direction: column; padding: 18px 20px; }
 .recommendation-title { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .recommendation-title h3 { font-size: 15px; }
 .recommendation-score { display: inline-grid; min-width: 54px; min-height: 30px; place-items: center; padding: 4px 9px; border: 1px solid; border-radius: 18px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .recommendation-score-high { border-color: #b8d9bd; background: #eaf5ec; color: #246331; }
 .recommendation-score-medium { border-color: #e7d27d; background: #fff7d6; color: #755900; }
 .recommendation-score-low { border-color: #e6b9be; background: #fff0f1; color: #9e2635; }
-.recommendation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.recommendation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; }
 .add-friend-button { display: flex; width: fit-content; min-width: 136px; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border-color: #d8a4aa; border-radius: 9px; background: white; color: #a82032; }
 .add-friend-button:hover:not(:disabled) { border-color: #a82032; background: #fff7f8; }
 .add-friend-button svg { width: 21px; height: 21px; }
@@ -305,7 +305,7 @@ button.academic-destructive:hover { background: #861a2a; }
 .friend-request-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .friend-request-actions button, .friend-request-card > button, .friend-card-actions button, .recommendation-card > button { min-height: 40px; }
 .friend-card-actions { display: flex; gap: 8px; }
-.friend-directory-actions { display: grid; grid-template-columns: 112px 136px; gap: 10px; flex: 0 0 auto; margin-top: 0; }
+.friend-directory-actions { display: grid; grid-template-columns: 112px 136px; gap: 10px; flex: 0 0 auto; margin-top: 0; padding-top: 0; }
 .friend-directory-actions > * { width: 100%; min-width: 0; }
 .friend-directory-actions .add-friend-button { width: 136px; min-width: 136px; }
 .friend-directory-state-button { display: inline-flex; width: 112px; min-width: 112px; min-height: 42px; align-items: center; justify-content: center; padding: 8px 14px; box-sizing: border-box; }
