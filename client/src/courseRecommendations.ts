@@ -8,11 +8,16 @@ export interface CourseRecommendation {
   year: string | null
   interests: string[] | null
   residence_status: 'commuter' | 'dormer' | null
+  shared_courses: string[]
 }
 
 export interface RankedRecommendation extends CourseRecommendation {
   score: number
+  sharedCourses: string[]
+  sharedMajor: string | null
   sharedInterests: string[] | null
+  sharedYear: string | null
+  sharedResidenceStatus: 'commuter' | 'dormer' | null
 }
 
 export type RecommendationApi = (courseCode: string, signal: AbortSignal) => Promise<CourseRecommendation[]>
@@ -25,7 +30,8 @@ function parseRecommendation(value: unknown): CourseRecommendation {
     || !(row.major === null || typeof row.major === 'string')
     || !(row.year === null || typeof row.year === 'string')
     || !(row.interests === null || (Array.isArray(row.interests) && row.interests.every(item => typeof item === 'string' && item.trim().length > 0 && item.length <= 50)))
-    || !(row.residence_status === null || row.residence_status === 'commuter' || row.residence_status === 'dormer')) {
+    || !(row.residence_status === null || row.residence_status === 'commuter' || row.residence_status === 'dormer')
+    || !Array.isArray(row.shared_courses) || row.shared_courses.some(item => typeof item !== 'string' || !/^[A-Z]{2,4} [0-9]{3}$/.test(item))) {
     throw new Error(recommendationError)
   }
   return {
@@ -35,6 +41,7 @@ function parseRecommendation(value: unknown): CourseRecommendation {
     year: row.year,
     interests: row.interests as string[] | null,
     residence_status: row.residence_status,
+    shared_courses: [...new Set(row.shared_courses as string[])],
   }
 }
 
@@ -70,26 +77,30 @@ export function rankRecommendations(profile: StudentProfile, candidates: CourseR
 
   const ranked = candidates.map(candidate => {
     let points = 0
+    let sharedMajor: string | null = null
     let sharedInterests: string[] | null = null
+    let sharedYear: string | null = null
+    let sharedResidenceStatus: 'commuter' | 'dormer' | null = null
 
     if (usable(profile.major) && usable(candidate.major)) {
-      if (normalize(profile.major) === normalize(candidate.major)) points += 30
+      if (normalize(profile.major) === normalize(candidate.major)) { points += 25; sharedMajor = candidate.major }
     }
     if (ownInterests !== null && candidate.interests !== null) {
       const ownByKey = new Map(ownInterests.map(value => [normalize(value), value]))
       const peerByKey = new Map(candidate.interests.map(value => [normalize(value), value]))
       const sharedKeys = [...ownByKey.keys()].filter(key => peerByKey.has(key)).sort()
       sharedInterests = sharedKeys.map(key => ownByKey.get(key)!)
-      points += Math.min(sharedKeys.length * 8, 40)
+      points += Math.min(sharedKeys.length * 6, 30)
     }
+    points += Math.min(candidate.shared_courses.length * 5, 25)
     if (usable(ownYear) && usable(candidate.year)) {
-      if (normalize(ownYear) === normalize(candidate.year)) points += 15
+      if (normalize(ownYear) === normalize(candidate.year)) { points += 10; sharedYear = candidate.year }
     }
     if (usable(ownResidence) && usable(candidate.residence_status)) {
-      if (normalize(ownResidence) === normalize(candidate.residence_status)) points += 15
+      if (normalize(ownResidence) === normalize(candidate.residence_status)) { points += 10; sharedResidenceStatus = candidate.residence_status }
     }
 
-    return { ...candidate, score: points, sharedInterests }
+    return { ...candidate, score: points, sharedCourses: candidate.shared_courses, sharedMajor, sharedInterests, sharedYear, sharedResidenceStatus }
   })
   return ranked.sort((a, b) => {
     if (a.score !== b.score) return b.score - a.score

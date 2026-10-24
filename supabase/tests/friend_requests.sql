@@ -4,6 +4,9 @@
 create function pg_temp.assert(ok boolean, message text) returns void
 language plpgsql as $$ begin if ok is distinct from true then raise exception 'ASSERT: %',message; end if; end $$;
 \ir ../migrations/202610220004_friend_requests.sql
+\ir ../migrations/202610230004_course_recommendation_shared_courses.sql
+\ir ../migrations/202610240001_course_recommendation_friend_exclusion.sql
+\ir ../migrations/202610240002_friend_directory.sql
 begin;
 insert into auth.users(id,email,email_confirmed_at) values
  ('40000000-0000-0000-0000-000000000001','friend-caller@stonybrook.edu',now()),
@@ -24,6 +27,9 @@ update public.profiles set name='Friend Caller',major='Computer Science' where i
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','40000000-0000-0000-0000-000000000001',true);
+select pg_temp.assert((select count(*)=2 and bool_and(student_id<>'40000000-0000-0000-0000-000000000001') from public.friend_directory()),'friend directory includes eligible students outside shared courses but excludes caller and ineligible users');
+select pg_temp.assert((select year is null and interests is null and residence_status is null from public.friend_directory() where student_id='40000000-0000-0000-0000-000000000002'),'friend directory omits private profile fields');
+select pg_temp.assert(public.send_friend_request_to_student('40000000-0000-0000-0000-000000000003') is not null,'friend request can be sent without shared course enrollment');
 select pg_temp.assert(public.send_friend_request('CSE310','40000000-0000-0000-0000-000000000002') is not null,'eligible shared-course request created');
 do $$ begin
   begin perform public.send_friend_request('CSE 310','40000000-0000-0000-0000-000000000002'); raise exception 'duplicate request accepted';
@@ -96,5 +102,13 @@ select pg_temp.assert((select count(*)=1 from public.friends_in_course('CSE 310'
 select pg_temp.assert((select count(*)=0 from public.course_recommendation_profiles('CSE 310')),'accepted friends excluded from recommendations');
 select pg_temp.assert((select count(*)=1 from public.find_classmates('CSE 310')),'classmate discovery retains its original behavior');
 select pg_temp.assert(not (public.get_friend_profile('40000000-0000-0000-0000-000000000001'::uuid) ? 'year') and not (public.get_friend_profile('40000000-0000-0000-0000-000000000001'::uuid) ? 'interests') and not (public.get_friend_profile('40000000-0000-0000-0000-000000000001'::uuid) ? 'residence_status'),'private optional fields omitted from friend profile');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','40000000-0000-0000-0000-000000000001',true);
+select public.unfriend('40000000-0000-0000-0000-000000000002');
+select pg_temp.assert(not exists(select 1 from public.friendships where user_id='40000000-0000-0000-0000-000000000001' and friend_id='40000000-0000-0000-0000-000000000002'),'unfriend removes active canonical relationship');
+select pg_temp.assert((select count(*)=1 from public.friend_requests where sender_id='40000000-0000-0000-0000-000000000001' and recipient_id='40000000-0000-0000-0000-000000000002' and status='accepted'),'unfriend preserves accepted request history');
+select pg_temp.assert(public.send_friend_request('CSE 310','40000000-0000-0000-0000-000000000002') is not null,'unfriended pair can create a new pending request');
+select pg_temp.assert((select relationship='outgoing_pending' from public.course_friend_relationships('CSE 310') where student_id='40000000-0000-0000-0000-000000000002'),'new request is pending after unfriend');
 reset role;
 rollback;

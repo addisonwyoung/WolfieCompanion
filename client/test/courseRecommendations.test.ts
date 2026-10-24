@@ -8,7 +8,7 @@ const profile = (overrides: Partial<StudentProfile> = {}): StudentProfile => ({
   share_year: true, share_interests: true, share_residence_status: true, ...overrides,
 })
 const candidate = (overrides: Record<string, unknown> = {}) => ({
-  student_id: 'peer', name: 'Peer', major: 'Computer Science', year: 'Third year', interests: ['Music', 'Hiking'], residence_status: 'commuter', ...overrides,
+  student_id: 'peer', name: 'Peer', major: 'Computer Science', year: 'Third year', interests: ['Music', 'Hiking'], residence_status: 'commuter', shared_courses: [], ...overrides,
 })
 
 describe('course recommendations', () => {
@@ -29,18 +29,19 @@ describe('course recommendations', () => {
     await expect(courseRecommendationApi(client)('CSE 310', new AbortController().signal)).rejects.not.toThrow('private database detail')
   })
 
-  it('awards 30/8/15/15 points against a fixed 100-point scale', () => {
+  it('awards major, interest, course, year, and residence points on a fixed 100-point scale', () => {
     const result = rankRecommendations(profile(), [candidate()])[0]
-    expect(result.score).toBe(61) // 30 + 16 + 15 of 100 available (residence mismatch)
+    expect(result.score).toBe(47) // 25 major + 12 interests + 10 year; residence mismatch
     expect(result.sharedInterests).toEqual(['Hiking', 'Music'])
-    expect(rankRecommendations(profile({ share_year: false, share_residence_status: false }), [candidate({ interests: ['music'] })])[0].score).toBe(38)
+    expect(rankRecommendations(profile({ share_year: false, share_residence_status: false }), [candidate({ interests: ['music'] })])[0].score).toBe(31)
   })
 
-  it('caps distinct shared interests at 40 and ignores duplicate/case variants', () => {
+  it('caps interests and shared courses and ignores duplicate/case variants', () => {
     const interests = ['A', 'B', 'C', 'D', 'E', 'a', ' B ']
     const result = rankRecommendations(profile({ major: null, year: null, residence_status: null, interests }), [candidate({ major: null, year: null, residence_status: null, interests: ['a', 'b', 'c', 'd', 'e', 'E'] })])[0]
-    expect(result.score).toBe(40)
+    expect(result.score).toBe(30)
     expect(result.sharedInterests).toHaveLength(5)
+    expect(rankRecommendations(profile({ major: null, year: null, residence_status: null, interests: [] }), [candidate({ major: null, year: null, residence_status: null, interests: [], shared_courses: ['CSE 101', 'CSE 102', 'AMS 101', 'MAT 101', 'WRT 101', 'PHY 101'] })])[0].score).toBe(25)
   })
 
   it('awards no points for empty, nonmatching, private, or unavailable factors', () => {

@@ -5,13 +5,17 @@ import type { ClassmateProfile } from './classmateProfile'
 export interface FriendRequest { request_id: string; sender_id: string; sender_name: string; sender_major: string | null; created_at: string }
 export interface FriendRelationship { student_id: string; relationship: 'none' | 'declined' | 'outgoing_pending' | 'incoming_pending' | 'accepted'; request_id: string | null }
 export type FriendStudent = ClassmateProfile
+export type DiscoverableStudent = FriendStudent & { relationship: Exclude<FriendRelationship['relationship'], 'accepted'> }
 export interface FriendApi {
   inbox(signal: AbortSignal): Promise<FriendRequest[]>
   relationships(course: string, signal: AbortSignal): Promise<FriendRelationship[]>
-  friends(course: string, signal: AbortSignal): Promise<FriendStudent[]>
+  friends(courses: string[], signal: AbortSignal): Promise<FriendStudent[]>
+  directory(signal: AbortSignal): Promise<DiscoverableStudent[]>
   profile(student: string, signal: AbortSignal): Promise<FriendStudent | null>
   send(course: string, student: string): Promise<string>
+  sendToStudent(student: string): Promise<string>
   respond(request: string, action: 'accept' | 'decline'): Promise<void>
+  unfriend(student: string): Promise<void>
   picture(student: string, signal: AbortSignal): Promise<Blob>
 }
 
@@ -50,13 +54,26 @@ export function friendApi(client: SupabaseClient): FriendApi {
       if (error) throw new Error('Unable to load friend statuses. Please retry.')
       return rows(data, parseRelationship)
     },
-    async friends(course, signal) {
-      const { data, error } = await client.rpc('friends_in_course', { p_course_code: course }).abortSignal(signal)
-      if (error) throw new Error('Unable to load friends in this class. Please retry.')
-      return rows(data, parseFriend)
+    async friends(courses, signal) {
+      const results = await Promise.all(courses.map(async course => {
+        const { data, error } = await client.rpc('friends_in_course', { p_course_code: course }).abortSignal(signal)
+        if (error) throw new Error('Unable to load your friends. Please retry.')
+        return rows(data, parseFriend)
+      }))
+      return [...new Map(results.flat().map(friend => [friend.student_id, friend])).values()]
+    },
+    async directory(signal) {
+      const { data, error } = await client.rpc('friend_directory').abortSignal(signal)
+      if (error) throw new Error('Unable to load students. Please retry.')
+      return rows(data, value => {
+        const row = value as Record<string, unknown>
+        const profile = parseFriend(row)
+        if (!['none', 'declined', 'outgoing_pending', 'incoming_pending'].includes(String(row.relationship))) throw new Error('Invalid student relationship')
+        return { ...profile, relationship: row.relationship as DiscoverableStudent['relationship'] }
+      })
     },
     async profile(student, signal) {
-      const { data, error } = await client.rpc('get_friend_profile', { p_student_id: student }).abortSignal(signal)
+      const { data, error } = await client.rpc('get_discoverable_profile', { p_student_id: student }).abortSignal(signal)
       if (error) throw new Error('Unable to load profile. Please retry.')
       return data === null ? null : parseFriend(data)
     },
@@ -66,9 +83,19 @@ export function friendApi(client: SupabaseClient): FriendApi {
       if (typeof data !== 'string') throw new Error('Friend request could not be confirmed. Please retry.')
       return data
     },
+    async sendToStudent(student) {
+      const { data, error } = await client.rpc('send_friend_request_to_student', { p_student_id: student })
+      if (error) throw new Error(error.code === '23505' ? 'A request or friendship already exists. Refresh to see its status.' : 'Friend request could not be sent. Please retry.')
+      if (typeof data !== 'string') throw new Error('Friend request could not be confirmed. Please retry.')
+      return data
+    },
     async respond(request, action) {
       const { error } = await client.rpc('respond_to_friend_request', { p_request_id: request, p_action: action })
       if (error) throw new Error('Friend request could not be updated. Please retry.')
+    },
+    async unfriend(student) {
+      const { error } = await client.rpc('unfriend', { p_student_id: student })
+      if (error) throw new Error('Friend could not be removed. Please retry.')
     },
     async picture(student, signal) {
       const { data } = await client.auth.getSession()
