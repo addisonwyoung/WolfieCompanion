@@ -5,16 +5,17 @@ import sharp from 'sharp';
 import { classmatePictureRouter, pictureAccess } from '../src/classmatePicture.js';
 
 const peer='10000000-0000-0000-0000-000000000002';
+const section='01';
 test('picture endpoint authenticates, validates targets and returns private bytes without paths or URLs', async () => {
  const image=await sharp({create:{width:2,height:2,channels:3,background:'red'}}).png().toBuffer();
  const calls:string[][]=[];
  let available=true;
  const app=express();app.use(classmatePictureRouter({
-  caller:async(token,course,student)=>{calls.push([token,course,student]);return token==='eligible' ? 'verified-caller' : null},
-  picture:async(caller,course,student)=>{assert.deepEqual([caller,course,student],['verified-caller','CSE310',peer]);return available?image:null},
+  caller:async(token,course,requestedSection,student)=>{calls.push([token,course,requestedSection,student]);return token==='eligible' ? 'verified-caller' : null},
+  picture:async(caller,course,requestedSection,student)=>{assert.deepEqual([caller,course,requestedSection,student],['verified-caller','CSE310',section,peer]);return available?image:null},
  }));
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
- const url=`http://127.0.0.1:${(server.address() as {port:number}).port}/?course=CSE310&student=${peer}`;
+ const url=`http://127.0.0.1:${(server.address() as {port:number}).port}/?course=CSE310&section=${section}&student=${peer}`;
  try {
   assert.equal((await fetch(url)).status,401);assert.equal(calls.length,0);
   for(const token of ['invalid','ineligible','unrelated']) assert.equal((await fetch(url,{headers:{Authorization:`Bearer ${token}`}})).status,404);
@@ -29,7 +30,7 @@ test('missing picture configuration fails closed with safe response',async()=>{
  const previous=process.env.SUPABASE_SERVICE_ROLE_KEY;delete process.env.SUPABASE_SERVICE_ROLE_KEY;
  const app=express();app.use(classmatePictureRouter({caller:async()=> 'verified',picture:pictureAccess.picture}));
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
- try {const result=await fetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/?course=CSE310&student=${peer}`,{headers:{Authorization:'Bearer eligible'}});assert.equal(result.status,503);assert.deepEqual(await result.json(),{error:'Picture unavailable. Please retry.'});}
+ try {const result=await fetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/?course=CSE310&section=${section}&student=${peer}`,{headers:{Authorization:'Bearer eligible'}});assert.equal(result.status,503);assert.deepEqual(await result.json(),{error:'Picture unavailable. Please retry.'});}
  finally {if(previous!==undefined)process.env.SUPABASE_SERVICE_ROLE_KEY=previous;await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
@@ -42,13 +43,13 @@ test('production access uses verified caller and re-resolves current shared path
   return {auth:{getUser:async(token:string)=>{calls.push(['auth',token]);return {data:{user:signedIn?{id:'verified'}:null},error:null}}},rpc:async(name:string,args:unknown)=>{calls.push([name,args]);return {data:name==='get_classmate_profile'?{has_shared_avatar:shared}:current,error:null}},storage:{from:(bucket:string)=>({download:async(path:string)=>{calls.push(['download',bucket,path]);return {data:new Blob(['pixels']),error:null}}})}};
  }) as unknown as typeof import('@supabase/supabase-js').createClient;
  const access=createPictureAccess(factory,{SUPABASE_URL:'https://test.invalid',SUPABASE_PUBLISHABLE_KEY:'publishable',SUPABASE_SERVICE_ROLE_KEY:'server-only'});
- assert.equal(await access.caller('bearer','CSE310',peer),'verified');assert.ok(calls.some(row=>row[0]==='auth'&&row[1]==='bearer'));
- const authArgs=calls.find(row=>row[0]==='get_classmate_profile')?.[1];assert.deepEqual(authArgs,{p_course_code:'CSE310',p_student_id:peer});
- await access.picture('verified','CSE310',peer);assert.deepEqual(calls.find(row=>row[0]==='resolve_classmate_avatar')?.[1],{p_caller_id:'verified',p_student_id:peer,p_course_code:'CSE310'});
- current=`${peer}/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png`;await access.picture('verified','CSE310',peer);assert.deepEqual(calls.filter(row=>row[0]==='download').at(-1),['download','avatars',current]);
- current=null;assert.equal(await access.picture('verified','CSE310',peer),null);
- current='someone-else/private.png';assert.equal(await access.picture('verified','CSE310',peer),null);
- shared=false;assert.equal(await access.caller('bearer','CSE310',peer),null);
+ assert.equal(await access.caller('bearer','CSE310',section,peer),'verified');assert.ok(calls.some(row=>row[0]==='auth'&&row[1]==='bearer'));
+ const authArgs=calls.find(row=>row[0]==='get_classmate_profile')?.[1];assert.deepEqual(authArgs,{p_course_code:'CSE310',p_section:section,p_student_id:peer});
+ await access.picture('verified','CSE310',section,peer);assert.deepEqual(calls.find(row=>row[0]==='resolve_classmate_avatar')?.[1],{p_caller_id:'verified',p_student_id:peer,p_course_code:'CSE310',p_section:section});
+ current=`${peer}/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png`;await access.picture('verified','CSE310',section,peer);assert.deepEqual(calls.filter(row=>row[0]==='download').at(-1),['download','avatars',current]);
+ current=null;assert.equal(await access.picture('verified','CSE310',section,peer),null);
+ current='someone-else/private.png';assert.equal(await access.picture('verified','CSE310',section,peer),null);
+ shared=false;assert.equal(await access.caller('bearer','CSE310',section,peer),null);
  signedIn=false;assert.equal(await access.caller('invalid','CSE310',peer),null);
  assert.equal(calls.filter(row=>row[0]==='download').length,2);
 });
