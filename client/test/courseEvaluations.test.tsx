@@ -11,6 +11,7 @@ function review(id: string, offeringId = courseOfferings[0].id): CourseEvaluatio
 }
 function api(overrides: Partial<CourseReviewApi> = {}) {
   return {
+    loadOfferings: vi.fn(async () => courseOfferings),
     loadOffering: vi.fn(async () => [review('stored-review')]),
     myOfferingIds: vi.fn(async () => []),
     submit: vi.fn(async () => [review('stored-review')]),
@@ -65,7 +66,7 @@ test('distinguishes review loading failures from no reviews', async () => {
   render(<CourseEvaluations api={reviews} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Saved course reviews could not be loaded')
   expect(screen.getByLabelText('Course offering')).toHaveValue(courseOfferings[0].id)
-  expect(screen.getAllByText(/Sample review/)).toHaveLength(2)
+  expect(screen.queryByText(/Sample review/)).not.toBeInTheDocument()
   expect(screen.getByLabelText('Written review')).toBeInTheDocument()
 })
 

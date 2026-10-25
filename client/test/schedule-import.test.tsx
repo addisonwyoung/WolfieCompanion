@@ -96,6 +96,8 @@ test('reviewed imports update the course list once, retain sections and survive 
   ]) as Response)
   render(<App />);fireEvent.click(screen.getByRole('button',{name:'Import schedule'}));choose()
   fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
+  await screen.findByLabelText('Professor first name 1')
+  for (let index=1; index<=3; index++) { fireEvent.change(screen.getByLabelText(`Professor first name ${index}`),{target:{value:'Ada'}});fireEvent.change(screen.getByLabelText(`Professor last name ${index}`),{target:{value:'Lovelace'}}) }
   const add=await screen.findByRole('button',{name:'Add to Your courses'})
   fireEvent.click(add);fireEvent.click(add)
   await waitFor(()=>expect(screen.getByText('5 courses')).toBeInTheDocument())
@@ -115,6 +117,7 @@ test('confirmed save waits, prevents duplicates, and retains draft on failure fo
  let reject!:(reason:Error)=>void
  const save=vi.fn().mockImplementationOnce(()=>new Promise<void>((_resolve,fail)=>{reject=fail})).mockResolvedValue(undefined)
  render(<ScheduleImportPreview onAddClasses={save}/>);fireEvent.click(screen.getByRole('button',{name:'Import schedule'}));choose();fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
+ fireEvent.change(await screen.findByLabelText('Professor first name 1'),{target:{value:'Ada'}});fireEvent.change(screen.getByLabelText('Professor last name 1'),{target:{value:'Lovelace'}})
  fireEvent.click(await screen.findByRole('button',{name:'Add to Your courses'}));expect(screen.getByRole('button',{name:'Saving classes…'})).toBeDisabled()
  expect(save).toHaveBeenCalledTimes(1);reject(new Error('Offline; retry'))
  await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('Offline'));expect(screen.getByLabelText('Course code 1')).toHaveValue('CSE 310')

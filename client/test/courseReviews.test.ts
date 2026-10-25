@@ -10,6 +10,7 @@ const row = (o: CourseOffering, id: string) => ({ id, offering_id: o.id, difficu
 function fixture() {
   const queryCalls: { table: string; selected?: string; filters: [string, unknown][] }[] = []
   let rows = [row(offering, 'review-1')]
+  let offeringRows: Record<string, unknown>[] = []
   let insertError: { code?: string } | null = null
   let inserted: Record<string, unknown> | null = null
   const client = {
@@ -22,7 +23,7 @@ function fixture() {
         eq(column: string, value: unknown) { call.filters.push([column, value]); return builder },
         order() { return builder },
         then(resolve: (value: unknown) => unknown, reject: (reason?: unknown) => unknown) {
-          const data = rows.filter(item => item.offering_id === call.filters[0]?.[1])
+          const data = call.table === 'course_offerings' ? offeringRows : rows.filter(item => item.offering_id === call.filters[0]?.[1])
           return Promise.resolve({ data, error: null }).then(resolve, reject)
         },
       }
@@ -30,8 +31,18 @@ function fixture() {
     }),
     rpc: vi.fn(async () => ({ data: [{ offering_id: offering.id }], error: null })),
   } as unknown as SupabaseClient
-  return { api: courseReviewApi(client), client, queryCalls, setRows: (next: typeof rows) => { rows = next }, setInsertError: (error: { code?: string } | null) => { insertError = error }, getInserted: () => inserted }
+  return { api: courseReviewApi(client), client, queryCalls, setRows: (next: typeof rows) => { rows = next }, setOfferingRows: (next: Record<string, unknown>[]) => { offeringRows = next }, setInsertError: (error: { code?: string } | null) => { insertError = error }, getInserted: () => inserted }
 }
+
+test('loads only catalog-verified offerings with their exact section and term details', async () => {
+  const f = fixture()
+  f.setOfferingRows([
+    { id: 'offering-1', course_code: 'CSE 416', course_number: '416', course_title: 'Software Engineering', professor_name: 'Ada Lovelace', professor_first_name: 'Ada', professor_last_name: 'Lovelace', section: '01', semester: 'Fall', academic_year: 2026, catalog_verified: true },
+  ])
+  expect(await f.api.loadOfferings()).toEqual([{ id: 'offering-1', code: 'CSE 416', title: 'Software Engineering', professor: 'Ada Lovelace', semester: 'Fall', year: 2026, section: '01', courseNumber: '416', published: true }])
+  expect(f.queryCalls[0].table).toBe('course_offerings')
+  expect(f.queryCalls[0].filters).toContainEqual(['catalog_verified', true])
+})
 
 test('reads by stable offering ID and the anonymous projection without reviewer fields', async () => {
   const f = fixture()

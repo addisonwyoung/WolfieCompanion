@@ -3,8 +3,8 @@ import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import { accountApi } from './account'
 import type { StudentProfile, ClassRow, PictureChange, SavedCourse } from './account'
 
-type State = { status: 'loading' | 'signed-out' | 'ineligible' | 'error' | 'ready'; userId: string | null; profile: StudentProfile | null; courses: SavedCourse[]; message: string }
-const empty: State = { status: 'loading', userId: null, profile: null, courses: [], message: '' }
+type State = { status: 'loading' | 'signed-out' | 'ineligible' | 'error' | 'ready'; userId: string | null; profile: StudentProfile | null; courses: SavedCourse[]; plannerCourses: SavedCourse[]; message: string }
+const empty: State = { status: 'loading', userId: null, profile: null, courses: [], plannerCourses: [], message: '' }
 export function useAccount(client: SupabaseClient) {
   const api = useMemo(() => accountApi(client), [client])
   const [state, setState] = useState<State>(empty)
@@ -85,8 +85,8 @@ export function useAccount(client: SupabaseClient) {
   }
   async function saveClasses(rows: ClassRow[]) {
     const run = generation.current
-    const courses = await api.saveClasses(rows)
-    if (mounted.current && run === generation.current) setState(previous => ({ ...previous, courses }))
+    const { courses, plannerCourses } = await api.saveClasses(rows)
+    if (mounted.current && run === generation.current) setState(previous => ({ ...previous, courses, plannerCourses }))
   }
   async function signIn() {
     denied.current = false; callbackError.current = false

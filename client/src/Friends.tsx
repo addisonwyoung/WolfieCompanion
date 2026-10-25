@@ -58,7 +58,7 @@ export default function Friends({ friends, busyIds, onRetry, onViewProfile, onUn
     if (!open && element.open) element.close()
   }, [open])
   return <section className="panel friend-requests" aria-label="Friends">
-    <button className="friend-requests-trigger" type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
+    <button className="friend-requests-trigger" type="button" aria-label="Friends" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
       Friends <span className="friend-list-count">{friends.status === 'success' ? friends.data.length : ' '}</span>
     </button>
     <dialog className="friend-dialog" ref={dialog} aria-labelledby="friends-heading" onCancel={event => { event.preventDefault(); closeFriends() }} onKeyDown={event => {
