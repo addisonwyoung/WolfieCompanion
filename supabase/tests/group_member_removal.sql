@@ -1,0 +1,40 @@
+-- Disposable local PostgreSQL ONLY. Synthetic accounts rolled back.
+\set ON_ERROR_STOP on
+begin;
+create or replace function pg_temp.assert(ok boolean,message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'ASSERT: %',message; end if; end $$;
+insert into auth.users(id,email,email_confirmed_at) select ('b0000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'removal'||n||'@stonybrook.edu',now() from generate_series(1,4)n;
+insert into auth.identities select id,'google',jsonb_build_object('email',email,'email_verified',true) from auth.users where id::text like 'b0000000-%';
+insert into public.friendships(user_id,friend_id) select 'b0000000-0000-0000-0000-000000000001',id from auth.users where id::text like 'b0000000-%' and right(id::text,12)::int>1;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000001',true);
+select set_config('test.remove_group',public.group_create(array['b0000000-0000-0000-0000-000000000002'::uuid,'b0000000-0000-0000-0000-000000000003'::uuid],gen_random_uuid(),'Removal group')->>'group_id',true);
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000002',true);
+select public.group_send_message(current_setting('test.remove_group')::uuid,'Keep my saved message',gen_random_uuid());
+do $$ begin begin perform public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000003');raise exception 'non creator removed';exception when insufficient_privilege then null;end;end $$;
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000004',true);
+do $$ begin begin perform public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000003');raise exception 'outsider removed';exception when insufficient_privilege then null;end;end $$;
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000001',true);
+do $$ begin begin perform public.group_remove_member(current_setting('test.remove_group')::uuid,auth.uid());raise exception 'removed creator';exception when invalid_parameter_value then null;end;end $$;
+select public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000002');
+select public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000002');
+select pg_temp.assert(jsonb_array_length(public.group_history(current_setting('test.remove_group')::uuid))=1,'removed sender history retained');
+select public.group_send_message(current_setting('test.remove_group')::uuid,'While removed',gen_random_uuid());
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000002',true);
+select pg_temp.assert((select count(*)=0 from public.group_messages where group_id=current_setting('test.remove_group')::uuid),'RLS denies removed reader');
+select pg_temp.assert(public.messaging_inbox()='[]' and public.messaging_unread()='[]','no removed inbox or unread');
+do $$ begin
+ begin perform public.group_detail(current_setting('test.remove_group')::uuid);raise exception 'removed detail';exception when insufficient_privilege then null;end;
+ begin perform public.group_history(current_setting('test.remove_group')::uuid);raise exception 'removed history';exception when insufficient_privilege then null;end;
+ begin perform public.group_send_message(current_setting('test.remove_group')::uuid,'Blocked',gen_random_uuid());raise exception 'removed send';exception when insufficient_privilege then null;end;
+ begin perform public.group_mark_read(current_setting('test.remove_group')::uuid,2);raise exception 'removed read';exception when insufficient_privilege then null;end;
+end $$;
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000001',true);
+select public.group_add_members(current_setting('test.remove_group')::uuid,array['b0000000-0000-0000-0000-000000000002'::uuid],gen_random_uuid());
+select public.group_send_message(current_setting('test.remove_group')::uuid,'After rejoin',gen_random_uuid());
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000002',true);
+select pg_temp.assert(jsonb_array_length(public.group_history(current_setting('test.remove_group')::uuid))=1 and public.group_history(current_setting('test.remove_group')::uuid)->0->>'body'='After rejoin','rejoin floor hides previous membership and absence');
+select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-000000000001',true);
+select public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000002');
+select public.group_remove_member(current_setting('test.remove_group')::uuid,'b0000000-0000-0000-0000-000000000003');
+select pg_temp.assert(jsonb_array_length(public.group_detail(current_setting('test.remove_group')::uuid)->'members')=1,'group persists below creation minimum');
+rollback;

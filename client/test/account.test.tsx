@@ -145,3 +145,26 @@ test('classmate profile Message closes native dialog before focusing account cha
  expect(mock.dm.contact).toHaveBeenCalledWith({student:'peer',course:'CSE 310'},expect.anything())
  fireEvent.change(screen.getByRole('textbox'),{target:{value:'Navigation draft'}});fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}));expect(screen.queryByDisplayValue('Navigation draft')).toBeNull()
 })
+
+test.each(['create','add','send','retry','reconnect'] as const)('group %s tears down private state on App account replacement',async mode=>{
+ let release!:(value:unknown)=>void
+ const detail={group_id:'group',name:'Private group title',creator_id:'a',joined_after_sequence:0,last_read_sequence:0,members:[{student_id:'a',name:'Owner'},{student_id:'peer',name:'Ada'},{student_id:'other',name:'Grace'}]}
+ const candidates=[{student_id:'peer',name:'Ada',major:null,can_add:true,reason:null},{student_id:'other',name:'Grace',major:null,can_add:true,reason:null},{student_id:'later',name:'Later friend',major:null,can_add:true,reason:null}]
+ const saved={id:'group-row',conversation_id:'group',sender_id:'peer',sender_name:'Ada',client_message_id:'request',sequence:1,body:'Private group text',created_at:'2026-10-25T15:00:00Z'}
+ mock.dm.groups={candidates:vi.fn().mockResolvedValue(candidates),detail:vi.fn().mockResolvedValue(detail),create:vi.fn(()=>new Promise(r=>{release=r})),add:vi.fn(()=>new Promise(r=>{release=r})),history:vi.fn().mockResolvedValue([saved]),send:vi.fn(()=>new Promise(r=>{release=r}))}
+ vi.mocked(mock.dm.inbox).mockResolvedValue([{kind:'group',conversation_id:'group',student_id:null,name:detail.name,member_count:3,last_message_at:saved.created_at,message_time:saved.created_at,preview:saved.body}])
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}))
+ if(mode==='create'){
+  fireEvent.click(screen.getByText('New group'));fireEvent.click(await screen.findByRole('checkbox',{name:/Ada/}));fireEvent.click(screen.getByRole('checkbox',{name:/Grace/}));fireEvent.click(screen.getByText('Create group'))
+ }else{
+  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Message'})
+  if(mode==='add'){fireEvent.click(screen.getByText('Add members'));fireEvent.click(await screen.findByRole('checkbox',{name:/Later friend/}));fireEvent.click(screen.getByText('Add selected members'))}
+  if(mode==='retry'){vi.mocked(mock.dm.groups.send).mockRejectedValueOnce(Error('Private group failure'));fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}));await screen.findByText('Retry send')}
+  if(mode==='send'){fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}))}
+  if(mode==='reconnect'){vi.mocked(mock.dm.groups.history).mockImplementationOnce(()=>new Promise(r=>{release=r}));act(()=>window.dispatchEvent(new Event('online')));await waitFor(()=>expect(release).toBeTypeOf('function'))}
+ }
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([]);act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(release)await act(async()=>release(mode==='reconnect'?[saved]:mode==='send'?{...saved,sender_id:'a'}:detail))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByText('Private group title')).toBeNull();expect(screen.queryByText('Private group text')).toBeNull();expect(screen.queryByDisplayValue('Private group draft')).toBeNull();expect(screen.queryByText('Private group failure')).toBeNull()
+ act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(document.querySelector('dialog[open]')).toBeNull()
+})

@@ -57,7 +57,7 @@ describe('friends list', () => {
     const onUnfriend = vi.fn()
     const api = { directory: vi.fn(async () => []), sendToStudent: vi.fn(async () => 'request-id') } as unknown as FriendApi
     render(<Friends friends={{ status: 'success', data: [friend, otherFriend] }} busyIds={new Set()} onRetry={vi.fn()} onViewProfile={onViewProfile} onUnfriend={onUnfriend} api={api} onOpenRequests={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Friends' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Friends 2' }))
     expect(screen.getByRole('dialog', { name: 'Friends' })).toBeInTheDocument()
     expect(screen.getByText('Accepted Friend')).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search friends' }), { target: { value: 'morgan' } })

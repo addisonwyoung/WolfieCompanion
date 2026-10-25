@@ -59,7 +59,7 @@ do $$ begin
 end $$;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 do $$ begin
-  begin perform * from public.course_recommendation_profiles('AMS210'); raise exception 'unsaved course accepted';
+  begin perform * from public.course_recommendation_profiles('PHY131'); raise exception 'unsaved course accepted';
   exception when insufficient_privilege then null; end;
   begin perform * from public.course_recommendation_profiles('bad'); raise exception 'invalid course accepted';
   exception when invalid_parameter_value then null; end;

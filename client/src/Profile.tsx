@@ -110,7 +110,7 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
         <p className="field-help">Your name and major are always shared with eligible students who saved the same course. Choose which other details to share. Courses are self-reported.</p>
         {([['share_year', 'year of study'], ['share_interests', 'interests'], ['share_residence_status', 'residence status'], ['share_avatar', 'profile picture']] as const).map(([key, label]) => <label className="sharing-choice" key={key}><input type="checkbox" checked={draft[key] === true} onChange={e => setDraft({ ...draft, [key]: e.target.checked })} /> Share my {label} with classmates</label>)}
         <label className="sharing-choice"><input type="checkbox" checked={draft.allow_new_dms !== false} onChange={event => setDraft({ ...draft, allow_new_dms: event.target.checked })} /> Allow new direct messages</label>
-        <p className="field-help">New DMs are open by default. Turning this off only prevents new conversations. Existing chats stay available and both people can keep messaging.</p>
+        <p className="field-help">New DMs are open by default. Turning this off prevents new direct conversations and new group additions. Existing direct and group chats stay available.</p>
         <label htmlFor="picture">Profile picture (optional)</label><input id="picture" type="file" accept="image/png,image/jpeg" aria-describedby="picture-help profile-error" onChange={e => {
           const next = e.target.files?.[0]; if (!next) return
           if (!['image/png','image/jpeg'].includes(next.type) || !next.size || next.size > 5 * 1024 * 1024) { setError('Choose a nonempty PNG or JPEG up to 5 MiB.'); e.target.value = ''; return }
