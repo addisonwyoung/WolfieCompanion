@@ -4,7 +4,7 @@ import type { FriendApi, FriendRelationship, FriendRequest, FriendStudent } from
 
 export type LoadState<T> = { status: 'idle' | 'loading' | 'success' | 'error'; data: T[] }
 const empty = <T,>(): LoadState<T> => ({ status: 'idle', data: [] })
-export function useFriendships(api: FriendApi, client: SupabaseClient, userId: string | null, course: string | null, friendCourses: string[] = []) {
+export function useFriendships(api: FriendApi, client: SupabaseClient, userId: string | null, course: string | null, section: string | null, friendCourses: string[] = []) {
   const [attempt, setAttempt] = useState(0)
   const [inbox, setInbox] = useState<LoadState<FriendRequest>>(empty())
   const [relationships, setRelationships] = useState<LoadState<FriendRelationship>>(empty())
@@ -24,7 +24,7 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
   currentUserRef.current = userId
   const refresh = useCallback(() => setAttempt(value => value + 1), [])
   const inboxKey = userId ?? ''
-  const peopleKey = userId && course ? `${userId}:${course}` : ''
+  const peopleKey = userId && course && section ? `${userId}:${course}:${section}` : ''
   const normalizedFriendCoursesKey = JSON.stringify([...new Set(friendCourses)].sort())
   const friendsKey = userId ? JSON.stringify([userId, normalizedFriendCoursesKey]) : ''
   const visibleInbox = inboxOwner === inboxKey ? inbox : userId ? { status: 'loading' as const, data: [] } : empty<FriendRequest>()
@@ -34,17 +34,17 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
     if (!userId) { inboxOwnerRef.current = ''; peopleOwnerRef.current = ''; friendsOwnerRef.current = ''; return }
     const controller = new AbortController()
     const sameInbox = inboxOwnerRef.current === userId
-    const nextPeopleOwner = course ? `${userId}:${course}` : ''
+    const nextPeopleOwner = course && section ? `${userId}:${course}:${section}` : ''
     const samePeople = peopleOwnerRef.current === nextPeopleOwner
     inboxOwnerRef.current = userId; peopleOwnerRef.current = nextPeopleOwner
     setInbox(previous => ({ status: 'loading', data: sameInbox ? previous.data : [] }))
     void api.inbox(controller.signal).then(data => { if (!controller.signal.aborted) { setInbox({ status: 'success', data }); setInboxOwner(userId) } }, () => { if (!controller.signal.aborted) { setInbox(previous => ({ status: 'error', data: previous.data })); setInboxOwner(userId) } })
-    if (course) {
+    if (course && section) {
       setRelationships(previous => ({ status: 'loading', data: samePeople ? previous.data : [] }))
-      void api.relationships(course, controller.signal).then(data => { if (!controller.signal.aborted) { setRelationships({ status: 'success', data }); setPeopleOwner(nextPeopleOwner) } }, () => { if (!controller.signal.aborted) { setRelationships(previous => ({ status: 'error', data: previous.data })); setPeopleOwner(nextPeopleOwner) } })
+      void api.relationships(course, section, controller.signal).then(data => { if (!controller.signal.aborted) { setRelationships({ status: 'success', data }); setPeopleOwner(nextPeopleOwner) } }, () => { if (!controller.signal.aborted) { setRelationships(previous => ({ status: 'error', data: previous.data })); setPeopleOwner(nextPeopleOwner) } })
     } else setRelationships(empty())
     return () => controller.abort()
-  }, [api, userId, course, attempt])
+  }, [api, userId, course, section, attempt])
   useEffect(() => {
     if (!userId) return
     const controller = new AbortController()
@@ -84,9 +84,9 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
     finally { if (currentUserRef.current === actor) setBusyIds(previous => { const next = new Set(previous); next.delete(id); return next }) }
   }
   const relationshipById = useMemo(() => new Map(visibleRelationships.data.map(row => [row.student_id, row])), [visibleRelationships.data])
-  function send(courseCode: string, student: string) {
+  function send(courseCode: string, sectionCode: string, student: string) {
     const actor = userId
-    return act(student, async () => { const requestId = await api.send(courseCode, student); if (actor && currentUserRef.current === actor) setRelationships(previous => ({ ...previous, data: previous.data.map(row => row.student_id === student ? { ...row, relationship: 'outgoing_pending', request_id: requestId } : row) })) })
+    return act(student, async () => { const requestId = await api.send(courseCode, sectionCode, student); if (actor && currentUserRef.current === actor) setRelationships(previous => ({ ...previous, data: previous.data.map(row => row.student_id === student ? { ...row, relationship: 'outgoing_pending', request_id: requestId } : row) })) })
   }
   function respond(request: string, action: 'accept' | 'decline') {
     const incoming = visibleInbox.data.find(item => item.request_id === request)

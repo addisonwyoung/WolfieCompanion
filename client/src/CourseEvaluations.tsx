@@ -5,6 +5,24 @@ import type { CourseEvaluation } from './evaluationData'
 import { DuplicateCourseReviewError } from './courseReviews'
 import type { CourseReviewApi } from './courseReviews'
 
+interface BarValue { label: string; count: number; tone?: 'yes' | 'no' }
+
+function ReviewBarChart({ title, id, rows }: { title: string; id: string; rows: BarValue[] }) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0)
+  const scale = Math.max(total, 1)
+  return <section className="review-chart" aria-labelledby={id}>
+    <h3 id={id}>{title}</h3>
+    {rows.map(row => <div className="review-chart-row" key={row.label}>
+      <span>{row.label}</span>
+      <div className="review-chart-track" role="meter" aria-label={`${row.label} ${title.toLocaleLowerCase()}`} aria-valuemin={0} aria-valuemax={scale} aria-valuenow={row.count}>
+        <span className={`review-chart-fill${row.tone ? ` review-chart-${row.tone}` : ''}`} style={{ width: `${row.count / scale * 100}%` }} />
+      </div>
+      <strong>{row.count}</strong>
+    </div>)}
+    <p className="field-help">{total} {total === 1 ? 'response' : 'responses'}</p>
+  </section>
+}
+
 export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const [query, setQuery] = useState('')
   const [offerings, setOfferings] = useState<CourseOffering[]>([])
@@ -13,12 +31,19 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [persistedByOffering, setPersistedByOffering] = useState<Record<string, CourseEvaluation[]>>({})
   const [submittedIds, setSubmittedIds] = useState<string[]>([])
+  const [eligibleOfferingIds, setEligibleOfferingIds] = useState<string[] | null>(null)
+  const [eligibilityError, setEligibilityError] = useState('')
+  const [currentOfferingIds, setCurrentOfferingIds] = useState<string[] | null>(null)
+  const [currentOfferingsError, setCurrentOfferingsError] = useState('')
+  const [currentOfferingsAttempt, setCurrentOfferingsAttempt] = useState(0)
   const [loadErrors, setLoadErrors] = useState<Record<string, boolean>>({})
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [submissionStatusError, setSubmissionStatusError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hours, setHours] = useState('')
   const [difficulty, setDifficulty] = useState('')
+  const [classRating, setClassRating] = useState('')
+  const [wouldRecommend, setWouldRecommend] = useState('')
   const [review, setReview] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState('')
@@ -26,7 +51,10 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const visibleOfferings = offerings.filter(offering =>
     `${offering.code} ${offering.title}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   )
-  const selected = offerings.find(offering => offering.id === selectedId) ?? offerings[0] ?? null
+  const enrolledOfferings = currentOfferingIds === null ? [] : offerings.filter(offering => currentOfferingIds.includes(offering.id))
+  const currentOfferings = visibleOfferings.filter(offering => currentOfferingIds?.includes(offering.id))
+  const otherOfferings = currentOfferingIds === null ? visibleOfferings : visibleOfferings.filter(offering => !currentOfferingIds.includes(offering.id))
+  const selected = offerings.find(offering => offering.id === selectedId) ?? enrolledOfferings[0] ?? offerings[0] ?? null
 
   useEffect(() => {
     let active = true
@@ -61,14 +89,55 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
     return () => { active = false }
   }, [api])
 
+  useEffect(() => {
+    let active = true
+    setCurrentOfferingIds(null)
+    setCurrentOfferingsError('')
+    void api.myCurrentOfferingIds().then(ids => {
+      if (active) setCurrentOfferingIds(ids)
+    }).catch(error => {
+      if (active) setCurrentOfferingsError(error instanceof Error ? error.message : 'Unable to load your current-semester classes. Please retry.')
+    })
+    return () => { active = false }
+  }, [api, currentOfferingsAttempt])
+
+  useEffect(() => {
+    let active = true
+    void api.myVerifiedOfferingIds().then(ids => {
+      if (active) {
+        setEligibleOfferingIds(ids)
+        setEligibilityError('')
+      }
+    }).catch(error => {
+      if (active) setEligibilityError(error instanceof Error ? error.message : 'Unable to check your verified course enrollments. Please retry.')
+    })
+    return () => { active = false }
+  }, [api])
+
   const currentEvaluations = selected ? persistedByOffering[selected.id] ?? [] : []
   const averages = summarizeEvaluations(currentEvaluations)
+  const classRatings = currentEvaluations.map(item => item.classRating).filter((value): value is number => typeof value === 'number')
+  const averageClassRating = classRatings.length ? classRatings.reduce((sum, value) => sum + value, 0) / classRatings.length : null
+  const recommendationAnswers = currentEvaluations.map(item => item.wouldRecommend).filter((value): value is boolean => typeof value === 'boolean')
+  const recommendYes = recommendationAnswers.filter(Boolean).length
+  const recommendNo = recommendationAnswers.length - recommendYes
+  const difficultyDistribution = [1, 2, 3, 4, 5].map(value => ({
+    label: String(value), count: currentEvaluations.filter(item => item.difficulty === value).length,
+  }))
+  const classRatingDistribution = [1, 2, 3, 4, 5].map(value => ({
+    label: String(value), count: classRatings.filter(rating => rating === value).length,
+  }))
   const alreadySubmitted = selected ? submittedIds.includes(selected.id) : false
+  const canReviewSelected = selected !== null && eligibleOfferingIds?.includes(selected.id) === true
   const loadState = selected ? (loadErrors[selected.id] ? 'error' : Object.hasOwn(persistedByOffering, selected.id) ? 'ready' : 'loading') : 'loading'
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selected) return
+    if (!canReviewSelected) {
+      setNotice('A verified enrollment in this exact offering is required to publish a review.')
+      return
+    }
     if (alreadySubmitted || isSubmitting) {
       setNotice('You can publish only one review for this offering.')
       return
@@ -76,8 +145,11 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
     const nextErrors: Record<string, string> = {}
     const parsedHours = Number(hours)
     const parsedDifficulty = Number(difficulty)
+    const parsedClassRating = Number(classRating)
     if (hours.trim() === '' || !Number.isFinite(parsedHours) || parsedHours < 0 || parsedHours > 40) nextErrors.hours = 'Enter weekly hours from 0 to 40.'
     if (difficulty.trim() === '' || !Number.isInteger(parsedDifficulty) || parsedDifficulty < 1 || parsedDifficulty > 5) nextErrors.difficulty = 'Choose a whole-number rating from 1 to 5.'
+    if (classRating.trim() === '' || !Number.isInteger(parsedClassRating) || parsedClassRating < 1 || parsedClassRating > 5) nextErrors.classRating = 'Choose a whole-number class rating from 1 to 5.'
+    if (wouldRecommend !== 'yes' && wouldRecommend !== 'no') nextErrors.wouldRecommend = 'Choose yes or no.'
     if (review.length > 1000) nextErrors.review = 'Review must be 1,000 characters or fewer.'
     setErrors(nextErrors)
     setNotice('')
@@ -85,11 +157,13 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
 
     setIsSubmitting(true)
     try {
-      const saved = await api.submit(selected.id, { weeklyHours: parsedHours, difficulty: parsedDifficulty, review: review.trim() })
+      const saved = await api.submit(selected.id, { weeklyHours: parsedHours, difficulty: parsedDifficulty, classRating: parsedClassRating, wouldRecommend: wouldRecommend === 'yes', review: review.trim() })
       setPersistedByOffering(current => ({ ...current, [selected.id]: saved }))
       setSubmittedIds(current => [...new Set([...current, selected.id])])
       setHours('')
       setDifficulty('')
+      setClassRating('')
+      setWouldRecommend('')
       setReview('')
       setErrors({})
       setNotice('Your anonymous review is saved and published for this offering.')
@@ -114,8 +188,17 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
         <input id="offering-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. CSE 416" />
         {offeringsError && <div className="error" role="alert"><p>Course offerings could not be loaded.</p><button type="button" onClick={() => setOfferingsAttempt(value => value + 1)}>Retry offerings</button></div>}
         {!offeringsError && offerings.length === 0 && <p className="muted" role="status">{offeringsAttempt === 0 ? 'Loading published offerings…' : 'No catalog-verified offerings are available yet.'}</p>}
-        <ul className="offering-list" aria-label="Matching course offerings">
-          {visibleOfferings.map(offering => <li key={offering.id}><button className="offering-button" aria-pressed={selectedId === offering.id} onClick={() => { setSelectedId(offering.id); setNotice(''); setErrors({}) }}>
+        {currentOfferingIds === null && !currentOfferingsError && <p className="muted" role="status">Loading your current classes…</p>}
+        {currentOfferingsError && <div className="error" role="alert"><p>{currentOfferingsError}</p><button type="button" onClick={() => setCurrentOfferingsAttempt(value => value + 1)}>Retry current classes</button></div>}
+        <h3 className="review-heading current-offerings-heading">Your current offerings</h3>
+        {currentOfferings.length > 0 ? <ul className="offering-list" aria-label="Your current course offerings">
+          {currentOfferings.map(offering => <li key={offering.id}><button className="offering-button" aria-pressed={selectedId === offering.id} onClick={() => { setSelectedId(offering.id); setNotice(''); setErrors({}) }}>
+            <strong>{offering.code}: {offering.title}</strong><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span>
+          </button></li>)}
+        </ul> : currentOfferingIds !== null && !currentOfferingsError && <p className="muted" role="status">No current-semester enrollments have a published offering yet.</p>}
+        <h3 className="review-heading">Other published offerings</h3>
+        <ul className="offering-list" aria-label="Other published course offerings">
+          {otherOfferings.map(offering => <li key={offering.id}><button className="offering-button" aria-pressed={selectedId === offering.id} onClick={() => { setSelectedId(offering.id); setNotice(''); setErrors({}) }}>
             <strong>{offering.code}: {offering.title}</strong><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span>
           </button></li>)}
         </ul>
@@ -129,30 +212,39 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
           <p className="muted">{selected.professor}{selected.section ? ` · Section ${selected.section}` : ''} · {selected.semester} {selected.year}</p>
           {loadState === 'loading' && <p role="status">Loading course reviews…</p>}
           {loadState === 'error' && <div className="error" role="alert"><p>Saved course reviews could not be loaded.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry reviews</button></div>}
-          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div><div><strong>{currentEvaluations.length}</strong><span>{currentEvaluations.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
+          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div>{averageClassRating !== null && <div><strong>{averageClassRating.toFixed(1)} / 5</strong><span>average class rating</span></div>}<div><strong>{currentEvaluations.length}</strong><span>{currentEvaluations.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
+          {currentEvaluations.length > 0 && <div className="review-chart-grid">
+            <ReviewBarChart title="Would you recommend this class?" id="recommendation-chart-heading" rows={[{ label: 'Yes', count: recommendYes, tone: 'yes' }, { label: 'No', count: recommendNo, tone: 'no' }]} />
+            <ReviewBarChart title="Difficulty rating (out of 5)" id="difficulty-chart-heading" rows={difficultyDistribution} />
+            <ReviewBarChart title="Class rating (out of 5)" id="class-rating-chart-heading" rows={classRatingDistribution} />
+          </div>}
           {(currentEvaluations.length > 0 || loadState === 'ready') && <>
             <h3 className="review-heading">Anonymous reviews</h3>
-            {currentEvaluations.length ? <ul className="review-list">{currentEvaluations.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5</span></li>)}</ul> : <p className="muted review-empty-note">No written reviews to display yet.</p>}
+            {currentEvaluations.length ? <ul className="review-list">{currentEvaluations.map(item => <li key={item.id}><p>{item.review || 'No written comment provided.'}</p><span>{item.weeklyHours} hours/week · Difficulty {item.difficulty}/5{item.classRating == null ? '' : ` · Class rating ${item.classRating}/5`}{item.wouldRecommend == null ? '' : ` · Would recommend: ${item.wouldRecommend ? 'Yes' : 'No'}`}</span></li>)}</ul> : <p className="muted review-empty-note">No written reviews to display yet.</p>}
           </>}
           </>}
         </section>
 
-        <section className="panel submission-panel" aria-labelledby="submission-heading">
+        {selected && eligibleOfferingIds !== null && !eligibilityError && canReviewSelected && <section className="panel submission-panel" aria-labelledby="submission-heading">
           <p className="eyebrow">YOUR EXPERIENCE</p><h2 id="submission-heading">Write an anonymous review</h2>
           {submissionStatusError && <p className="field-help" role="status">{submissionStatusError}</p>}
-          {!selected ? <p className="muted">Choose an offering before writing a review.</p> : alreadySubmitted ? <p className="submitted-note" role="status">You’ve already published a review for this offering. Reading reviews remains available.</p> : <form onSubmit={submit} noValidate>
+          {alreadySubmitted ? <p className="submitted-note" role="status">You’ve already published a review for this offering. Reading reviews remains available.</p> : <form onSubmit={submit} noValidate>
             <label htmlFor="review-offering">Course offering</label><select id="review-offering" value={selected.id} onChange={event => { setSelectedId(event.target.value); setNotice(''); setErrors({}) }}>{offerings.map(offering => <option key={offering.id} value={offering.id}>{offering.code} · {offering.professor}{offering.section ? ` · Section ${offering.section}` : ''} · {offering.semester} {offering.year}</option>)}</select>
             <label htmlFor="review-hours">Weekly hours</label><input id="review-hours" type="number" min="0" max="40" step="any" value={hours} onChange={event => setHours(event.target.value)} aria-invalid={Boolean(errors.hours)} aria-describedby={errors.hours ? 'hours-error' : 'hours-help'} />
             {errors.hours ? <p id="hours-error" className="error">{errors.hours}</p> : <p id="hours-help" className="field-help">Enter a value from 0 to 40.</p>}
             <label htmlFor="review-difficulty">Difficulty</label><select id="review-difficulty" value={difficulty} onChange={event => setDifficulty(event.target.value)} aria-invalid={Boolean(errors.difficulty)} aria-describedby={errors.difficulty ? 'difficulty-error' : undefined}><option value="">Select a rating</option>{[1, 2, 3, 4, 5].map(value => <option key={value} value={value}>{value} — {['', 'Very easy', 'Easy', 'Moderate', 'Hard', 'Very hard'][value]}</option>)}</select>
             {errors.difficulty && <p id="difficulty-error" className="error">{errors.difficulty}</p>}
+            <label htmlFor="review-class-rating">Class rating</label><select id="review-class-rating" value={classRating} onChange={event => setClassRating(event.target.value)} aria-invalid={Boolean(errors.classRating)} aria-describedby={errors.classRating ? 'class-rating-error' : undefined}><option value="">Select a rating</option><option value="1">1 — Strongly disliked it</option><option value="2">2 — Didn’t like it</option><option value="3">3 — It was okay</option><option value="4">4 — Really liked it</option><option value="5">5 — Loved it!</option></select>
+            {errors.classRating && <p id="class-rating-error" className="error">{errors.classRating}</p>}
+            <fieldset className="review-take-again"><legend>Would you recommend this class?</legend><label><input type="radio" name="review-recommend" value="yes" checked={wouldRecommend === 'yes'} onChange={event => setWouldRecommend(event.target.value)} /> Yes</label><label><input type="radio" name="review-recommend" value="no" checked={wouldRecommend === 'no'} onChange={event => setWouldRecommend(event.target.value)} /> No</label></fieldset>
+            {errors.wouldRecommend && <p className="error">{errors.wouldRecommend}</p>}
             <label htmlFor="review-text">Written review</label><textarea id="review-text" rows={5} maxLength={1000} value={review} onChange={event => setReview(event.target.value)} aria-invalid={Boolean(errors.review)} aria-describedby={errors.review ? 'review-error' : 'review-count'} />
             {errors.review ? <p id="review-error" className="error">{errors.review}</p> : <p id="review-count" className="field-help">{review.length}/1,000 characters. Written review is optional.</p>}
             <button className="primary publish-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Publishing…' : 'Publish review'}</button>
           </form>}
           {notice && <p className="submission-notice" role="status">{notice}</p>}
           <p className="session-note">New reviews are saved to the course offering. Reviewer identity is never shown.</p>
-        </section>
+        </section>}
       </div>
     </div>
   </section>

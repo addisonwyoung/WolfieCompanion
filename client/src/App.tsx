@@ -34,7 +34,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const [plannerOpened, setPlannerOpened] = useState(false)
   const reviews = useMemo(() => courseReviewApi(client), [client])
   const peers = useMemo(() => peerApi(client), [client])
-  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string } | null>(null)
+  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string; section: string } | null>(null)
   const discover = useMemo(() => classmateApi(client), [client])
   const recommend = useMemo(() => courseRecommendationApi(client), [client])
   const friendsApi = useMemo(() => friendApi(client), [client])
@@ -51,9 +51,10 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     try { await account.signOut() } catch (error) { setActionError((error as Error).message); setSignOutFailed(true) }
   }
   const selected = account.courses.some(c => c.id === selectedId) ? selectedId : account.courses[0]?.id ?? null
-  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, account.courses.find(c => c.id === selected)?.code ?? null)
-  const recommendations = useCourseRecommendations(recommend, account.status === 'ready' ? account.userId : null, account.courses.find(c => c.id === selected)?.code ?? null)
-  const friendState = useFriendships(friendsApi, client, account.status === 'ready' ? account.userId : null, account.courses.find(c => c.id === selected)?.code ?? null, account.courses.map(course => course.code))
+  const selectedCourse = account.courses.find(c => c.id === selected)
+  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null)
+  const recommendations = useCourseRecommendations(recommend, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null)
+  const friendState = useFriendships(friendsApi, client, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null, account.courses.map(course => course.code))
   const [previousStatus, setPreviousStatus] = useState(account.status)
   if (previousStatus !== account.status) { setPreviousStatus(account.status); if (dmTarget) setDmTarget(null); if (peer) setPeer(null); if (friendProfileId) setFriendProfileId(null) }
   async function signIn() {
@@ -79,11 +80,11 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
         <div className="dashboard"><div className="profile-column"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} />
           <Friends friends={friendState.friends} busyIds={friendState.busyIds} onRetry={friendState.retry} onViewProfile={setFriendProfileId} onUnfriend={id => { void friendState.unfriend(id) }} api={friendsApi} onOpenRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} relationshipById={friendState.relationshipById} />
           <FriendRequests incoming={friendState.inbox.data} loading={friendState.inbox.status === 'loading'} error={friendState.inbox.status === 'error'} busyIds={friendState.busyIds} onRespond={(id, action) => { void friendState.respond(id, action) }} onViewProfile={setFriendProfileId} onRetry={friendState.retry} />
-        </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => setPeer({ id, user: account.userId, course: selected! })} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
-          relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code) => friendState.send(code, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
+        </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => { if (selectedCourse?.section) setPeer({ id, user: account.userId, course: selectedCourse.code, section: selectedCourse.section }) }} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
+          relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code, section) => friendState.send(code, section, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
         </div>
       </div>
-      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selected && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={account.courses.find(course => course.id === selected)!.code} student={peer.id} onClose={() => setPeer(null)} />}
+      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selectedCourse?.code && peer.section === selectedCourse?.section && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={peer.course} section={peer.section} student={peer.id} onClose={() => setPeer(null)} />}
       {view === 'dashboard' && friendProfileId && <FriendProfileDialog key={`${account.userId}-${friendProfileId}`} messaging={messaging} onMessage={openMessage} api={friendsApi} student={friendProfileId} onClose={() => setFriendProfileId(null)} />}
       {friendState.actionError && <div className="friend-action-error" role="alert">{friendState.actionError}<button type="button" onClick={() => friendState.retryAction?.()}>Retry action</button><button type="button" onClick={friendState.clearError}>Dismiss</button></div>}
       {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}

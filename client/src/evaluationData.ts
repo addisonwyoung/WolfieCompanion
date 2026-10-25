@@ -16,6 +16,8 @@ export interface CourseEvaluation {
   weeklyHours: number
   difficulty: number
   review: string
+  classRating?: number | null
+  wouldRecommend?: boolean | null
 }
 
 export function summarizeEvaluations(evaluations: CourseEvaluation[]) {

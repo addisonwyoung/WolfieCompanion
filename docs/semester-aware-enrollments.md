@@ -6,6 +6,16 @@ This change adds a follow-up migration. The app never applies SQL automatically;
 
 The migration expects the existing account, course review/offering, classmate discovery/profile, academic item, friend request/friendship, course recommendation, and course catalog migrations to have been applied first. In particular, apply `supabase/migrations/202610240003_course_catalog.sql` and manually populate `course_catalog` before applying `supabase/migrations/202610250001_semester_aware_enrollments.sql`.
 
+After that migration, apply `supabase/migrations/202610250002_course_review_insert_privilege.sql`. It restores the column-limited insert grant required by the review form; the existing row-level security policy still requires a verified enrollment in the exact offering.
+
+Apply `supabase/migrations/202610250003_hide_demo_course_offerings.sql` to remove the original demo offerings (CSE 416, BIO 201, and MAT 210) from Course Evaluations. It marks those offerings unverified so they are no longer listed, while preserving any reviews and enrollment references already attached to them.
+
+Apply `supabase/migrations/202610250004_course_review_class_feedback.sql` to add a 1–5 class rating and a required take-again yes/no answer for new reviews. Existing reviews remain intact and have no values for these new fields.
+
+Then apply `supabase/migrations/202610250005_course_review_recommendation_label.sql` to rename the yes/no field to match the “Would you recommend this class?” question. This preserves existing answers and refreshes the public review projection.
+
+Apply `supabase/migrations/202610250006_section_scoped_classmates.sql` to make dashboard classmate lists, recommendations, section-based friend actions, and classmate profile access require the same current course section. The application displays each course section separately. Course evaluations already use section-specific offerings and do not need a separate section change.
+
 Review the new migration before running it. It preserves the existing `course_offerings` IDs and `course_reviews` references. It keeps `user_courses` and `user_course_sections` as planner compatibility links because `academic_items` references those rows. It does not delete planner items or legacy course rows.
 
 ## Catalog and unknown-course review

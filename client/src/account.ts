@@ -52,13 +52,15 @@ export function accountApi(client: SupabaseClient) {
       if (p.error || c.error || planner.error || !p.data) throw new Error('Unable to load your profile and classes. Please retry.')
       const grouped = new Map<string, SavedCourse>()
       for (const row of (c.data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; verification_status: string }[]) {
-        const id = row.code.toLowerCase().replace(' ', '-')
-        const current = grouped.get(row.code)
+        const section = row.section ?? ''
+        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}`
+        const key = `${row.code}:${section}`
+        const current = grouped.get(key)
         if (current) {
           if (row.section && !current.sections?.includes(row.section)) current.sections = [...(current.sections ?? []), row.section].sort()
           if (current.verificationStatus !== 'pending') current.verificationStatus = row.verification_status
         } else {
-          grouped.set(row.code, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
+          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
         }
       }
       return { profile: p.data as StudentProfile, courses: [...grouped.values()], plannerCourses: (planner.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
@@ -69,11 +71,14 @@ export function accountApi(client: SupabaseClient) {
       if (error) throw new Error('Classes could not be saved. Your draft is still here; please retry.')
       const grouped = new Map<string, SavedCourse>()
       for (const row of (data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; verification_status: string }[]) {
-        const course = grouped.get(row.code)
+        const section = row.section ?? ''
+        const key = `${row.code}:${section}`
+        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}`
+        const course = grouped.get(key)
         if (course) {
           if (row.section && !course.sections?.includes(row.section)) course.sections = [...(course.sections ?? []), row.section].sort()
           if (course.verificationStatus !== 'pending') course.verificationStatus = row.verification_status
-        } else grouped.set(row.code, { id: row.code.toLowerCase().replace(' ', '-'), databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
+        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
       }
       const { data: planner, error: plannerError } = await client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code')
       if (plannerError) throw new Error('Classes were saved, but planner course links could not be refreshed. Reload your workspace to retry.')

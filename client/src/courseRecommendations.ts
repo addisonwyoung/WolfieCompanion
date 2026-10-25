@@ -20,7 +20,7 @@ export interface RankedRecommendation extends CourseRecommendation {
   sharedResidenceStatus: 'commuter' | 'dormer' | null
 }
 
-export type RecommendationApi = (courseCode: string, signal: AbortSignal) => Promise<CourseRecommendation[]>
+export type RecommendationApi = (courseCode: string, section: string, signal: AbortSignal) => Promise<CourseRecommendation[]>
 export const recommendationError = 'Unable to load course recommendations. Please retry.'
 
 function parseRecommendation(value: unknown): CourseRecommendation {
@@ -56,9 +56,9 @@ export function parseRecommendations(data: unknown): CourseRecommendation[] {
 }
 
 export function courseRecommendationApi(client: SupabaseClient): RecommendationApi {
-  return async (courseCode, signal) => {
+  return async (courseCode, section, signal) => {
     try {
-      const { data, error } = await client.rpc('course_recommendation_profiles', { p_course_code: courseCode }).abortSignal(signal)
+      const { data, error } = await client.rpc('course_recommendation_profiles', { p_course_code: courseCode, p_section: section }).abortSignal(signal)
       if (error) throw new Error(recommendationError)
       return parseRecommendations(data)
     } catch {
