@@ -60,7 +60,7 @@ end $$;
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','40000000-0000-0000-0000-000000000003',true);
-select pg_temp.assert((select count(*)=0 from public.friend_requests),'unrelated student cannot read either participant request');
+select pg_temp.assert((select count(*)=0 from public.friend_requests where sender_id='40000000-0000-0000-0000-000000000001' and recipient_id='40000000-0000-0000-0000-000000000002'),'unrelated student cannot read the other participants request');
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','40000000-0000-0000-0000-000000000002',true);

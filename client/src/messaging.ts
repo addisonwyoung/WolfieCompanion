@@ -1,9 +1,12 @@
+import { groupApi, groupError, missingGroups, parseCombined } from './groupMessaging'
+import type { GroupApi, ConversationKind } from './groupMessaging'
 import type { SupabaseClient } from '@supabase/supabase-js'
-export interface Contact { student_id: string; name: string; conversation_id: string | null; can_send: boolean; reason: 'closed' | 'unavailable' | null }
-export interface Message { id: string; conversation_id: string; sequence: number; sender_id: string; client_message_id: string; body: string; created_at: string }
-export interface Conversation { conversation_id: string; student_id: string; name: string; last_message_at: string; preview: string }
+export interface Contact { history_floor?: number; student_id: string; name: string; conversation_id: string | null; can_send: boolean; reason: 'closed' | 'unavailable' | null }
+export interface Message { id: string; conversation_id: string; sequence: number; sender_id: string | null; sender_name?: string; client_message_id: string; body: string; created_at: string }
+export interface Conversation { kind?: ConversationKind; conversation_id: string; student_id: string | null; name: string; last_message_at: string; message_time?: string | null; preview: string | null; member_count?: number }
 export interface Target { student: string; course?: string }
 export interface MessagingApi {
+ groups?: GroupApi
  contact(target: Target, signal: AbortSignal): Promise<Contact | null>
  inbox(signal: AbortSignal, before?: Conversation): Promise<Conversation[]>
  history(id: string, signal: AbortSignal, before?: number, after?: number): Promise<Message[]>
@@ -40,8 +43,16 @@ function failure(error: { code?: string } | null) {
 }
 export function messagingApi(client: SupabaseClient): MessagingApi {
  return {
+  groups: groupApi(client),
   async contact(target, signal) { if(!identifier(target.student))throw new Error('Invalid contact');const {data,error}=await client.rpc('dm_contact_state',{p_student_id:target.student,p_course_code:target.course??null}).abortSignal(signal);if(error)throw failure(error);return parseContact(data,target.student) },
-  async inbox(signal,before) { if(before)parseConversation(before);const {data,error}=await client.rpc('dm_inbox',{p_before_activity:before?.last_message_at??null,p_before_id:before?.conversation_id??null,p_limit:50}).abortSignal(signal);if(error)throw failure(error);return rows(data,parseConversation) },
+  async inbox(signal,before) {
+   if(before){if(before.kind)parseCombined({...before,message_time:before.message_time??null,member_count:before.member_count??null});else parseConversation(before)}
+   const result=await client.rpc('messaging_inbox',{p_before_activity:before?.last_message_at??null,p_before_kind:before?(before.kind??'direct'):null,p_before_id:before?.conversation_id??null,p_limit:50}).abortSignal(signal)
+   if(!result.error)return rows(result.data,parseCombined)
+   if(!missingGroups(result.error))throw groupError(result.error)
+   if(before?.kind==='group')return []
+   const {data,error}=await client.rpc('dm_inbox',{p_before_activity:before?.last_message_at??null,p_before_id:before?.conversation_id??null,p_limit:50}).abortSignal(signal);if(error)throw failure(error);return rows(data,parseConversation)
+  },
   async history(id,signal,before,after) { if(!identifier(id))throw new Error('Invalid conversation');if ((before!==undefined&&(!Number.isSafeInteger(before)||before<=0))||(after!==undefined&&(!Number.isSafeInteger(after)||after<0))||(before!==undefined&&after!==undefined))throw new Error('Invalid history cursor');const {data,error}=await client.rpc('dm_history',{p_conversation_id:id,p_before_sequence:before??null,p_after_sequence:after??null,p_limit:50}).abortSignal(signal);if(error)throw failure(error);return rows(data,row=>parseMessage(row,id)) },
   async send(target,body,request) { if(!identifier(target.student)||!identifier(request))throw new Error('Invalid send request');validateMessage(body);const {data,error}=await client.rpc('dm_send_message',{p_student_id:target.student,p_body:body,p_client_message_id:request,p_course_code:target.course??null});if(error)throw failure(error);const row=parseMessage(data);if(row.client_message_id!==request||row.body!==body)throw new Error('Send could not be confirmed. Please retry.');return row },
  }
