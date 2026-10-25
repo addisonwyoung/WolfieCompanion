@@ -3,7 +3,7 @@ import ManualClasses from './ManualClasses'
 import ScheduleImportPreview from './ScheduleImportPreview'
 import type { CourseId, Course } from './sampleData'
 import type { ClassmateState } from './useClassmates'
-import type { StudentProfile } from './account'
+import type { StudentProfile, ClassRow } from './account'
 import { rankRecommendations } from './courseRecommendations'
 import type { RankedRecommendation } from './courseRecommendations'
 import type { RecommendationState } from './useCourseRecommendations'
@@ -11,7 +11,7 @@ import type { FriendRelationship } from './friendshipApi'
 
 export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
   enrolledCourses: Course[]
-  onAddClasses: (rows: { code: string; section: string }[]) => Promise<void>
+  onAddClasses: (rows: ClassRow[]) => Promise<void>
   selectedId: CourseId | null
   onSelect: (id: CourseId) => void
   roster: ClassmateState
@@ -40,7 +40,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
       {!enrolledCourses.length && <p className="empty-state">No saved classes yet. Enter classes manually or confirm a reviewed schedule.</p>}
       <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
         <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
-        <strong>{course.code}</strong>{!!course.sections?.length && <span className="course-state">Section {course.sections.join(', ')}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : 'View classmates'}</span>
+        <strong>{course.code}</strong>{!!course.sections?.length && <span className="course-state">Section {course.sections.join(', ')}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : 'View classmates'}</span>
       </button>)}</div>
     </section>
     {selected && <section className="classmates" aria-label={`${selected.code} student lists`}>
@@ -55,7 +55,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
       {roster.status === 'success' && (classmates.length ? <ul className="roster">{classmates.map(student => <li key={student.student_id} className="panel student-card">
         <h3>{student.name}</h3>{onViewProfile && <button onClick={() => onViewProfile(student.student_id)} aria-label={`View profile of ${student.name}`}>View profile</button>}<p className="student-major">{student.major ?? 'Major not added'}</p>
       </li>)}</ul> : <div className="panel empty-state"><h3>No classmates yet</h3><p className="muted">No other students have saved this course yet.</p></div>)}
-      <p className="roster-note">Your name and major are visible to eligible students sharing a saved course. You choose whether to share your year, interests, residence status, and picture in Edit profile. Optional details stay private until shared. Courses are self-reported; matching does not verify semesters or official enrollment.</p>
+      <p className="roster-note">Your name and major are visible to eligible students sharing a current-semester course. You choose whether to share your year, interests, residence status, and picture in Edit profile. Optional details stay private until shared. Course enrollment is self-reported, not official registration.</p>
       </> : <>
       <div className="roster-heading"><div><p className="eyebrow">COURSE CONNECTIONS</p><h2 id="recommendations-heading">People you may connect with in {selected.code}</h2></div></div>
       {recommendations.status === 'loading' && <p role="status">Loading course recommendations…</p>}

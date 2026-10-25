@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CourseEvaluation } from './evaluationData'
+import type { CourseEvaluation, CourseOffering } from './evaluationData'
 
 export interface CourseReviewInput {
   weeklyHours: number
@@ -42,6 +42,25 @@ export function courseReviewApi(client: SupabaseClient) {
   }
 
   return {
+    async loadOfferings(): Promise<CourseOffering[]> {
+      const { data, error } = await client.from('course_offerings')
+        .select('id,course_code,course_number,course_title,professor_name,professor_first_name,professor_last_name,section,semester,academic_year,catalog_verified')
+        .eq('catalog_verified', true)
+        .order('course_code').order('semester').order('academic_year').order('section')
+      if (isMissingReviewRelation(error)) throw new CourseReviewStorageUnavailableError()
+      if (error) throw new Error('Unable to load course offerings. Please retry.')
+      return (data ?? []).map(row => ({
+        id: row.id,
+        code: row.course_code,
+        title: row.course_title,
+        professor: row.professor_name,
+        semester: row.semester,
+        year: row.academic_year,
+        section: row.section ?? undefined,
+        courseNumber: row.course_number ?? undefined,
+        published: true,
+      })) as CourseOffering[]
+    },
     loadOffering,
     async myOfferingIds(): Promise<string[]> {
       const { data, error } = await client.rpc('my_course_review_offerings')

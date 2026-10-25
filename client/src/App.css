@@ -154,7 +154,8 @@ footer > span:first-child { font-weight: 600; }
 .import-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .schedule-import button { padding: 9px 12px; }
 .schedule-import button:disabled { opacity: .55; cursor: not-allowed; }
-.import-row { grid-template-columns: minmax(0, 1fr) minmax(0, .6fr) auto; align-items: end; border-bottom: 1px solid #e9e0e2; padding-bottom: 12px; }
+.import-row { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: end; border-bottom: 1px solid #e9e0e2; padding-bottom: 12px; }
+.import-row > label { min-width: 0; }
 .import-warning { grid-column: 1 / -1; color: #8a3b22; margin: 0 !important; }
 @media (max-width: 600px) {
   .import-inputs { grid-template-columns: minmax(0, 1fr); }

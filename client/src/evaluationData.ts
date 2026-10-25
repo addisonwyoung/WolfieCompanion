@@ -3,8 +3,10 @@ export interface CourseOffering {
   code: string
   title: string
   professor: string
-  semester: 'Spring' | 'Summer' | 'Fall'
+  semester: 'Spring' | 'Summer' | 'Fall' | 'Winter'
   year: number
+  section?: string
+  courseNumber?: string
   published: true
 }
 

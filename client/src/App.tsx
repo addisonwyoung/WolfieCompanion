@@ -86,7 +86,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selected && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={account.courses.find(course => course.id === selected)!.code} student={peer.id} onClose={() => setPeer(null)} />}
       {view === 'dashboard' && friendProfileId && <FriendProfileDialog key={`${account.userId}-${friendProfileId}`} messaging={messaging} onMessage={openMessage} api={friendsApi} student={friendProfileId} onClose={() => setFriendProfileId(null)} />}
       {friendState.actionError && <div className="friend-action-error" role="alert">{friendState.actionError}<button type="button" onClick={() => friendState.retryAction?.()}>Retry action</button><button type="button" onClick={friendState.clearError}>Dismiss</button></div>}
-      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
+      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
       {view === 'messages' && <Messages key={account.userId} api={messaging} client={client} userId={account.userId!} initialTarget={dmTarget} />}
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
     </div></MessagingNotifications>}
