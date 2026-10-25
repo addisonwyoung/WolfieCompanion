@@ -91,10 +91,11 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
 
   useEffect(() => {
     let active = true
-    setCurrentOfferingIds(null)
-    setCurrentOfferingsError('')
     void api.myCurrentOfferingIds().then(ids => {
-      if (active) setCurrentOfferingIds(ids)
+      if (active) {
+        setCurrentOfferingIds(ids)
+        setCurrentOfferingsError('')
+      }
     }).catch(error => {
       if (active) setCurrentOfferingsError(error instanceof Error ? error.message : 'Unable to load your current-semester classes. Please retry.')
     })
