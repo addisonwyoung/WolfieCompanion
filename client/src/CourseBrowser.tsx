@@ -8,10 +8,12 @@ import { rankRecommendations } from './courseRecommendations'
 import type { RankedRecommendation } from './courseRecommendations'
 import type { RecommendationState } from './useCourseRecommendations'
 import type { FriendRelationship } from './friendshipApi'
+import type { ProfessorCatalogState } from './courseProfessors'
 
-export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
+export default function CourseBrowser({ enrolledCourses, onAddClasses, professorCatalog, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
   enrolledCourses: Course[]
   onAddClasses: (rows: ClassRow[]) => Promise<void>
+  professorCatalog: ProfessorCatalogState
   selectedId: CourseId | null
   onSelect: (id: CourseId) => void
   roster: ClassmateState
@@ -31,19 +33,27 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
   const rankedRecommendations: RankedRecommendation[] = recommendations?.status === 'success' && profile
     ? rankRecommendations(profile, recommendations.candidates).filter(candidate => relationshipById.get(candidate.student_id)?.relationship !== 'accepted')
     : []
+  async function saveClasses(rows: ClassRow[]) {
+    if (professorCatalog.status !== 'success') throw new Error('The approved professor list is unavailable. Retry it before saving classes.')
+    await onAddClasses(rows)
+  }
   return <div className="course-browser">
     <section className="panel courses" aria-labelledby="courses-heading">
       <div className="section-top"><h2 id="courses-heading">Your courses</h2><span className="muted">{enrolledCourses.length} {enrolledCourses.length === 1 ? 'section' : 'sections'}</span></div>
       <p className="muted">Pick a course section to see who’s learning alongside you.</p>
-      <ManualClasses onSave={onAddClasses} />
-      <ScheduleImportPreview onAddClasses={onAddClasses} />
+      <ManualClasses onSave={saveClasses} catalog={professorCatalog} />
+      <ScheduleImportPreview onAddClasses={saveClasses} catalog={professorCatalog} />
       {!enrolledCourses.length && <p className="empty-state">No saved classes yet. Enter classes manually or confirm a reviewed schedule.</p>}
       <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
         <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
-        <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : 'View classmates'}</span>
+        <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : course.verificationStatus === 'verified' ? 'View classmates' : 'Verification required'}</span>
       </button>)}</div>
     </section>
     {selected && <section className="classmates" aria-label={`${selected.code} student lists`}>
+      {selected.verificationStatus !== 'verified' ? <div className="panel empty-state">
+        <h2>{selected.verificationStatus === 'pending' ? 'Course awaiting verification' : 'Course not verified'}</h2>
+        <p className="muted">This course section must be verified before you can view its classmates or recommendations.</p>
+      </div> : <>
       {recommendations && <div className="course-list-switcher" role="group" aria-label={`${selected.code} section ${selected.section ?? ''} people lists`}>
         <button type="button" aria-pressed={activeList === 'classmates'} onClick={() => setActiveList('classmates')}>Classmates</button>
         <button type="button" aria-pressed={activeList === 'recommendations'} onClick={() => setActiveList('recommendations')}>Recommendations</button>
@@ -86,6 +96,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, selectedI
           </div>
         })()}
       </li>)}</ul> : <div className="panel empty-state"><h3>No recommendations yet</h3><p className="muted">No other eligible students have saved this section.</p></div>)}
+      </>}
       </>}
     </section>}
   </div>

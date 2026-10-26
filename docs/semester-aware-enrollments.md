@@ -16,13 +16,17 @@ Then apply `supabase/migrations/202610250005_course_review_recommendation_label.
 
 Apply `supabase/migrations/202610250006_section_scoped_classmates.sql` to make dashboard classmate lists, recommendations, section-based friend actions, and classmate profile access require the same current course section. The application displays each course section separately. Course evaluations already use section-specific offerings and do not need a separate section change.
 
+Apply `supabase/migrations/202610260001_course_professor_verification.sql` after the semester-aware enrollment migration. It adds the owner-managed `course_professors` list and updates the atomic enrollment/approval functions. The manual and OCR course-entry flows both use this list. A listed professor creates or reuses a section/term-specific evaluation offering; an unlisted professor is saved to the dashboard as pending and does not create an offering until verified.
+
+Apply `supabase/migrations/202610260002_verified_section_classmates.sql` after the professor-verification migration. It keeps pending and rejected courses on the dashboard but requires verified current-semester enrollment before classmate, recommendation, profile, and course-based friend functions allow access. Once an enrollment is verified, those lists become available on the next request or page reload.
+
 Review the new migration before running it. It preserves the existing `course_offerings` IDs and `course_reviews` references. It keeps `user_courses` and `user_course_sections` as planner compatibility links because `academic_items` references those rows. It does not delete planner items or legacy course rows.
 
 ## Catalog and unknown-course review
 
-Add and maintain `course_catalog` rows through owner-controlled database access. Students cannot add catalog entries through the application. When a saved course does not match the catalog, the application stores the enrollment for the current dashboard and adds a pending `verify_courses` row. Review queue rows include the course prefix/number, section, professor names, submitter, semester/year, and status.
+Add and maintain `course_catalog` rows through owner-controlled database access. Students cannot add catalog entries through the application. Add approved professors to `course_professors` with the course prefix, course number, first name, and last name; the professor list is shared by every section and term for that course. Students cannot edit this allow-list.
 
-To approve a submission, first add the matching catalog row, then set the matching `verify_courses.status` to `approved`. The migration trigger creates or reuses its exact offering and links the enrollment. Setting the status to `rejected` leaves the class visible in the dashboard but does not create an offering or grant review eligibility.
+If a student chooses **Other**, the application saves the course on the dashboard as awaiting verification and adds a pending `verify_courses` row. To approve an unlisted professor, first ensure the course is in `course_catalog`, then set the submission's status to `approved` and `reviewed_at` to the current timestamp. The trigger adds that professor to `course_professors`, creates/reuses the exact section/term offering, and links the enrollment. Other pending submissions for the same course and professor are promoted too. Setting the status to `rejected` leaves the class visible on the dashboard but does not create an offering or grant review eligibility.
 
 ## Semester dates
 
