@@ -1,13 +1,16 @@
+import { parseOffsets } from './academicReminders'
+import type { ReminderOffset } from './academicReminders'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const itemTypes = ['assignment', 'exam', 'quiz', 'project'] as const
 export type ItemType = typeof itemTypes[number]
 export interface AcademicInput {
+  reminder_offsets?: ReminderOffset[] | null;
   user_course_id: string; title: string; type: ItemType; due_date: string
   due_time: string | null; notes: string | null; location: string | null; completed_at: string | null
 }
 export interface AcademicItem extends AcademicInput { id: string }
-const columns = 'id,user_course_id,title,type,due_date,due_time,notes,location,completed_at'
+const columns = 'id,user_course_id,title,type,due_date,due_time,notes,location,completed_at,reminder_offsets'
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function normalizeItem(input: AcademicInput): AcademicInput {
   const result: AcademicInput = {
@@ -16,6 +19,7 @@ export function normalizeItem(input: AcademicInput): AcademicInput {
     notes: input.notes?.trim() || null, location: input.location?.trim() || null,
     completed_at: input.completed_at,
   }
+  if ('reminder_offsets' in input) {result.reminder_offsets=input.reminder_offsets==null?null:parseOffsets(input.reminder_offsets);if(!result.due_time&&result.reminder_offsets?.includes('three_hours'))throw Error('Three-hour reminders require a due time.')}
   if (!uuid.test(result.user_course_id)) throw new Error('Choose a saved course.')
   if (!result.title || result.title.length > 200) throw new Error('Enter a title of 1 to 200 characters.')
   if (!itemTypes.includes(result.type)) throw new Error('Choose a listed item type.')
@@ -31,24 +35,28 @@ function failure(error: { code?: string } | null, action: string) {
   return new Error(`Unable to ${action}. Please retry.`)
 }
 export function academicItemsApi(client: SupabaseClient) {
+  let reminderColumns=true
+  const selection=()=>reminderColumns?columns:columns.replace(',reminder_offsets','')
   return {
     async load(): Promise<AcademicItem[]> {
-      const { data, error } = await client.from('academic_items').select(columns).order('due_date')
+      let { data, error } = await client.from('academic_items').select(selection()).order('due_date')
+      if(error&&['42703','PGRST204'].includes(error.code)){reminderColumns=false;const fallback=await client.from('academic_items').select(selection()).order('due_date');data=fallback.data;error=fallback.error}
       if (error) throw failure(error, 'load academic items')
-      return data ?? []
+      return (data ?? []) as unknown as AcademicItem[]
     },
     async save(input: AcademicInput, id?: string): Promise<AcademicItem> {
       const value = normalizeItem(input)
+      if(!reminderColumns&&'reminder_offsets' in value)throw new Error('Reminder storage is not set up yet. Your draft is retained; ask the owner to apply the migration.')
       const table = client.from('academic_items')
       const query = id ? table.update(value).eq('id', id) : table.insert(value)
-      const { data, error } = await query.select(columns).single()
+      const { data, error } = await query.select(selection()).single()
       if (error || !data) throw failure(error, 'save this item')
-      return data as AcademicItem
+      return data as unknown as AcademicItem
     },
     async complete(id: string, completed: boolean): Promise<AcademicItem> {
-      const { data, error } = await client.from('academic_items').update({ completed_at: completed ? new Date().toISOString() : null }).eq('id', id).select(columns).single()
+      const { data, error } = await client.from('academic_items').update({ completed_at: completed ? new Date().toISOString() : null }).eq('id', id).select(selection()).single()
       if (error || !data) throw failure(error, 'update completion')
-      return data as AcademicItem
+      return data as unknown as AcademicItem
     },
     async remove(id: string): Promise<void> {
       // Returning the deleted ID distinguishes a committed deletion from a zero-row RLS result.

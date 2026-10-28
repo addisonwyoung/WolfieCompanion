@@ -156,3 +156,5 @@ After the owner reviews and manually applies the [messaging migration and deploy
 
 
 For group texting, follow [group messaging setup](group-messaging.md). Apply the owner-reviewed group migration once to the shared project before testing New group. Creating needs you plus two accepted friends; only the creator can add more friends, and closed new DMs prevent new additions. Later members see only post-join messages. Existing direct/group chats continue after preferences or friendships change. No additional keys/services are required.
+
+Academic reminders require the owner-reviewed `202610280001_academic_reminders.sql` migration after the existing accounts/academic migrations. No new environment variables or notification credentials are needed. The Notifications bell is for persistent in-app coursework reminders; it does not send closed-app push/email. See [academic reminders](academic-items.md#persistent-academic-reminders) for settings, deployment, local tests and the two-device acceptance checklist. Never run reminder test fixtures on the shared Supabase database.
