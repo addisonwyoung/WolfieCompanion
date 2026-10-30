@@ -1,13 +1,16 @@
 import './academicDialogSupport'
+import '@testing-library/jest-dom/vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import App from '../src/App'
 import type { AccountApi, StudentProfile } from '../src/account'
+import type { MessagingApi, Message } from '../src/messaging'
 import type { AcademicApi } from '../src/academicItems'
-const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi}))
+const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi,dm:{} as MessagingApi}))
 vi.mock('../src/account',async original=>({...await original<typeof import('../src/account')>(),accountApi:()=>mock.api}))
 vi.mock('../src/academicItems',async original=>({...await original<typeof import('../src/academicItems')>(),academicItemsApi:()=>mock.items}))
+vi.mock('../src/messaging',async original=>({...await original<typeof import('../src/messaging')>(),messagingApi:()=>mock.dm}))
 const profile=(id='a'):StudentProfile=>({id,name:`Student ${id}`,major:null,year:null,interests:[],residence_status:null,avatar_path:null})
 const session=(id:string)=>({user:{id},access_token:`token-${id}`}) as Session
 function fake(initial:Session|null=null){
@@ -16,24 +19,40 @@ function fake(initial:Session|null=null){
  const auth={getSession:vi.fn(async()=>({data:{session:current},error:null})),onAuthStateChange:vi.fn((fn:typeof listener)=>{listener=fn;return {data:{subscription:{unsubscribe}}}}),signInWithOAuth:vi.fn(async()=>({error:null})),signOut:vi.fn(async()=>{current=null;listener('SIGNED_OUT',null);return {error:null}})}
  return {client:{auth} as unknown as SupabaseClient,auth,unsubscribe,emit:(id:string|null,event='SIGNED_IN')=>{current=id?session(id):null;listener(event,current)}}
 }
-beforeEach(()=>{mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[]}),saveClasses:vi.fn().mockResolvedValue([{id:'cse-310',code:'CSE 310',sections:['01']}]),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
-
+beforeEach(()=>{mock.dm={contact:vi.fn().mockResolvedValue({student_id:'peer',name:'Message Peer',conversation_id:'thread',can_send:true,reason:null}),inbox:vi.fn().mockResolvedValue([{conversation_id:'thread',student_id:'peer',name:'Message Peer',last_message_at:'2026-10-23T20:00:00Z',preview:'Saved private row'}]),history:vi.fn().mockResolvedValue([{id:'saved',conversation_id:'thread',sequence:1,sender_id:'peer',client_message_id:'request',body:'Saved private row',created_at:'2026-10-23T20:00:00Z'}]),send:vi.fn()};mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[],plannerCourses:[]}),saveClasses:vi.fn().mockResolvedValue({courses:[{id:'cse-310',code:'CSE 310',sections:['01']}],plannerCourses:[{id:'cse-310',databaseId:'legacy',code:'CSE 310',sections:['01']}]}),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
 test('Campus Explorer opens lazily, preserves filters across navigation and clears on account teardown', async () => {
- const f=fake(session('a'))
- const order=vi.fn(); order.mockReturnValueOnce({order}).mockResolvedValue({data:[],error:null})
- Object.assign(f.client,{from:vi.fn(()=>({select:()=>({order})})),rpc:vi.fn(async()=>({data:false,error:null}))})
- render(<App client={f.client}/>); await screen.findByText('Student a')
- expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Campus Explorer'}))
- await screen.findByRole('heading',{name:'Campus Explorer'})
- expect(screen.getByRole('button',{name:'Campus Explorer'})).toHaveAttribute('aria-pressed','true')
- const printers=screen.getByRole('checkbox',{name:'Printers'}); fireEvent.click(printers)
- fireEvent.click(screen.getByRole('button',{name:'My dashboard'}))
- expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Campus Explorer'}))
- expect(screen.getByRole('checkbox',{name:'Printers'})).not.toBeChecked()
- act(()=>f.emit(null)); await screen.findByRole('button',{name:'Continue with Google'})
- expect(screen.queryByRole('heading',{name:'Campus Explorer'})).not.toBeInTheDocument()
+  const f = fake(session('a'))
+  const order = vi.fn()
+  order.mockReturnValueOnce({ order }).mockResolvedValue({ data: [], error: null })
+
+  Object.assign(f.client, {
+    from: vi.fn(() => ({ select: () => ({ order }) })),
+    rpc: vi.fn(async () => ({ data: false, error: null }))
+  })
+
+  render(<App client={f.client} />)
+  await screen.findByText('Student a')
+
+  expect(screen.queryByRole('heading', { name: 'Campus Explorer' })).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Campus Explorer' }))
+  await screen.findByRole('heading', { name: 'Campus Explorer' })
+
+  expect(screen.getByRole('button', { name: 'Campus Explorer' })).toHaveAttribute('aria-pressed', 'true')
+
+  const printers = screen.getByRole('checkbox', { name: 'Printers' })
+  fireEvent.click(printers)
+
+  fireEvent.click(screen.getByRole('button', { name: 'My dashboard' }))
+  expect(screen.queryByRole('heading', { name: 'Campus Explorer' })).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Campus Explorer' }))
+  expect(screen.getByRole('checkbox', { name: 'Printers' })).not.toBeChecked()
+
+  act(() => f.emit(null))
+  await screen.findByRole('button', { name: 'Continue with Google' })
+
+  expect(screen.queryByRole('heading', { name: 'Campus Explorer' })).not.toBeInTheDocument()
 })
 test('Google start failure, cancellation and unsubscribe',async()=>{
  const f=fake();const v=render(<App client={f.client}/>);await screen.findByRole('button',{name:'Continue with Google'})
@@ -43,7 +62,7 @@ test('Google start failure, cancellation and unsubscribe',async()=>{
 })
 test('restores empty account, manual classes call persistence, signout clears state',async()=>{
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');expect(screen.getByText(/No saved classes yet/)).toBeInTheDocument();expect(screen.queryByText('Alex Morgan')).not.toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Enter classes manually'}));fireEvent.change(screen.getByLabelText('Manual course code 1'),{target:{value:'cse310'}});fireEvent.change(screen.getByLabelText('Manual section 1'),{target:{value:'01'}});fireEvent.click(screen.getByRole('button',{name:'Save classes',exact:true}));expect(await screen.findByRole('heading',{name:'Classmates in CSE 310'})).toBeInTheDocument();expect(mock.api.saveClasses).toHaveBeenCalledWith([{code:'cse310',section:'01'}])
+ fireEvent.click(screen.getByRole('button',{name:'Enter classes manually'}));fireEvent.change(screen.getByLabelText('Manual course code 1'),{target:{value:'cse310'}});fireEvent.change(screen.getByLabelText('Manual section 1'),{target:{value:'01'}});fireEvent.change(screen.getByLabelText('Professor first name 1'),{target:{value:'Ada'}});fireEvent.change(screen.getByLabelText('Professor last name 1'),{target:{value:'Lovelace'}});fireEvent.click(screen.getByRole('button',{name:/^Save classes$/}));expect(await screen.findByRole('heading',{name:'Classmates in CSE 310'})).toBeInTheDocument();expect(mock.api.saveClasses).toHaveBeenCalledWith([{code:'cse310',section:'01',professor_first_name:'Ada',professor_last_name:'Lovelace'}])
  fireEvent.click(screen.getByRole('button',{name:'Sign out'}));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByText('Student a')).not.toBeInTheDocument()
 })
 test('ineligible signs out, failed load retries',async()=>{
@@ -52,14 +71,14 @@ test('ineligible signs out, failed load retries',async()=>{
 })
 test('late A cannot populate B and refresh does not discard workspace',async()=>{
  let resolveA!:(data:Awaited<ReturnType<AccountApi['load']>>)=>void
- vi.mocked(mock.api.load).mockImplementationOnce(()=>new Promise(r=>{resolveA=r})).mockResolvedValueOnce({profile:profile('b'),courses:[]});const f=fake(session('a'));render(<App client={f.client}/>);await waitFor(()=>expect(mock.api.load).toHaveBeenCalledTimes(1));act(()=>{f.emit(null);f.emit('b')});await screen.findByText('Student b')
- await act(async()=>resolveA({profile:profile('a'),courses:[{id:'bad',databaseId:'old-course',code:'AAA 100'}]}));expect(screen.queryByText('Student a')).not.toBeInTheDocument();act(()=>f.emit('b','TOKEN_REFRESHED'));expect(screen.getByText('Student b')).toBeInTheDocument();expect(mock.api.load).toHaveBeenCalledTimes(2);act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'})
+ vi.mocked(mock.api.load).mockImplementationOnce(()=>new Promise(r=>{resolveA=r})).mockResolvedValueOnce({profile:profile('b'),courses:[], plannerCourses:[]});const f=fake(session('a'));render(<App client={f.client}/>);await waitFor(()=>expect(mock.api.load).toHaveBeenCalledTimes(1));act(()=>{f.emit(null);f.emit('b')});await screen.findByText('Student b')
+ await act(async()=>resolveA({profile:profile('a'),courses:[{id:'bad',databaseId:'old-course',code:'AAA 100'}], plannerCourses:[]}));expect(screen.queryByText('Student a')).not.toBeInTheDocument();act(()=>f.emit('b','TOKEN_REFRESHED'));expect(screen.getByText('Student b')).toBeInTheDocument();expect(mock.api.load).toHaveBeenCalledTimes(2);act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'})
 })
 test('missing config is actionable',()=>{render(<App client={null}/>);expect(screen.getByRole('alert')).toHaveTextContent('VITE_SUPABASE_URL')})
 
 test('planner failures stay isolated and private drafts survive navigation but clear on signout',async()=>{
  mock.items={load:vi.fn().mockRejectedValueOnce(new Error('Academic storage unavailable')).mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
- vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}]})
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}], plannerCourses:[]})
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByText('Academic storage unavailable')
  fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));expect(screen.getByText('Student a')).toBeVisible()
@@ -73,21 +92,21 @@ test('planner failures stay isolated and private drafts survive navigation but c
 test.each(['editor','discard','save','delete','deleting'] as const)('external account replacement tears down %s and ignores old results',async mode=>{
  const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
  const item={id:'private-item',user_course_id:course.databaseId,title:'Private old item',type:'assignment' as const,due_date:'2026-10-23',due_time:null,notes:null,location:null,completed_at:null}
- let resolveWrite!:(value:unknown)=>void
- mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn(()=>new Promise(resolve=>{resolveWrite=resolve}))}
- vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course]})
+let resolveWrite!:(value:any)=>void
+mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn(()=>new Promise<void>(resolve=>{resolveWrite=resolve}))}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[]})
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:'Private old item'})
  if(mode==='delete'||mode==='deleting'){
    fireEvent.click(screen.getByRole('button',{name:'Actions for Private old item'}));fireEvent.click(screen.getByRole('menuitem',{name:'Delete'}))
-   if(mode==='deleting')fireEvent.click(screen.getByRole('button',{name:'Delete',exact:true}))
+   if(mode==='deleting')fireEvent.click(screen.getByRole('button',{name:/^Delete$/}))
  }else{
    fireEvent.click(screen.getByRole('button',{name:'Add item'}));fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Private unsaved draft'}})
-   if(mode==='discard')fireEvent.click(screen.getByRole('button',{name:'Cancel',exact:true}))
+   if(mode==='discard')fireEvent.click(screen.getByRole('button',{name:/^Cancel$/}))
    if(mode==='save'){fireEvent.change(screen.getByLabelText('Due date'),{target:{value:'2026-10-23'}});fireEvent.click(screen.getByRole('button',{name:'Save item'}))}
  }
  expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
- vi.mocked(mock.items.load).mockResolvedValue([]);vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[course]})
+ vi.mocked(mock.items.load).mockResolvedValue([]);vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[course], plannerCourses:[]})
  act(()=>f.emit('b'));await screen.findByText('Student b')
  if(mode==='save'||mode==='deleting')await act(async()=>resolveWrite(mode==='save'?{...item,title:'Private unsaved draft'}:undefined))
  expect(document.querySelector('dialog[open]')).toBeNull();expect(document.body.style.overflow).not.toBe('hidden')
@@ -97,7 +116,7 @@ test.each(['editor','discard','save','delete','deleting'] as const)('external ac
 
 test('classmate dialog clears across course, navigation and auth changes and ignores stale detail results',async()=>{
  const courses=[{id:'cse-310',databaseId:'course1',code:'CSE 310'},{id:'ams-210',databaseId:'course2',code:'AMS 210'}]
- vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses})
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses, plannerCourses:[]})
  const f=fake(session('a'))
  let resolve!:(result:unknown)=>void
  const abortSignals:AbortSignal[]=[]
@@ -111,4 +130,83 @@ test('classmate dialog clears across course, navigation and auth changes and ign
  fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'View profile of Peer Name'}));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
  await act(async()=>resolve({data:{student_id:'peer',name:'Stale Secret',major:null,has_shared_avatar:false},error:null}));expect(screen.queryByText('Stale Secret')).not.toBeInTheDocument()
+})
+
+test.each(['editor','discard','save'] as const)('calendar %s tears down on external account replacement and ignores stale results',async mode=>{
+ const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
+ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+ const item={id:'private-calendar-item',user_course_id:course.databaseId,title:'Private calendar work',type:'assignment' as const,due_date:date,due_time:null,notes:'Private notes',location:null,completed_at:null}
+let resolveWrite!:(value:any)=>void
+mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn()}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[]})
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:item.title});fireEvent.click(screen.getByRole('tab',{name:'Calendar'}))
+ fireEvent.click(screen.getByRole('button',{name:/^Edit Private calendar work,/}));fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Private calendar draft'}})
+ if(mode==='discard')fireEvent.click(screen.getByRole('button',{name:/^Cancel$/}))
+ if(mode==='save')fireEvent.click(screen.getByRole('button',{name:'Save item'}))
+ vi.mocked(mock.items.load).mockResolvedValue([]);vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[course], plannerCourses:[]})
+ act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(mode==='save')await act(async()=>resolveWrite({...item,title:'Private calendar draft'}))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByDisplayValue('Private calendar draft')).not.toBeInTheDocument();expect(screen.queryByText('Private calendar work')).not.toBeInTheDocument();expect(document.body.style.overflow).not.toBe('hidden')
+ fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByText(/Nothing planned/);expect(screen.getByRole('tab',{name:'Agenda'})).toHaveAttribute('aria-selected','true')
+ fireEvent.click(screen.getByRole('tab',{name:'Calendar'}));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('table')).not.toBeInTheDocument()
+})
+
+test.each(['draft','load','send','retry','reconnect'] as const)('messaging %s clears on account replacement; late work never enters the new account',async mode=>{
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
+ fireEvent.click(screen.getByRole('button',{name:/^Messages$/}));await screen.findByRole('button',{name:/Message Peer/})
+ let resolve!:(rows:Message[])=>void
+ if(mode==='load')vi.mocked(mock.dm.history).mockImplementationOnce(()=>new Promise(r=>{resolve=r}))
+ fireEvent.click(screen.getByRole('button',{name:/Message Peer/}))
+ if(mode!=='load'){
+  const input=await screen.findByRole('textbox',{name:'Message'});fireEvent.change(input,{target:{value:'Private old draft'}})
+  if(mode==='send')vi.mocked(mock.dm.send).mockImplementationOnce(()=>new Promise(r=>{resolve=row=>r(row[0])}))
+  if(mode==='retry')vi.mocked(mock.dm.send).mockRejectedValueOnce(new Error('Private old error'))
+  if(mode==='send'||mode==='retry'){fireEvent.click(screen.getByRole('button',{name:/^Send$/}));if(mode==='retry')await screen.findByRole('button',{name:'Retry send'})}
+  if(mode==='reconnect'){vi.mocked(mock.dm.history).mockImplementationOnce(()=>new Promise(r=>{resolve=r}));act(()=>window.dispatchEvent(new Event('online')));await waitFor(()=>expect(resolve).toBeTypeOf('function'))}
+ }
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[], plannerCourses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([])
+ act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(resolve)await act(async()=>resolve([{id:'late',conversation_id:'thread',sequence:2,sender_id:'a',client_message_id:'late',body:'Late private result',created_at:'2026-10-23T20:00:00Z'}]))
+ expect(screen.queryByDisplayValue('Private old draft')).toBeNull();expect(screen.queryByText('Private old error')).toBeNull();expect(screen.queryByText('Saved private row')).toBeNull();expect(screen.queryByText('Late private result')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:/^Messages$/}));await screen.findByText(/No conversations yet/);expect(screen.queryByRole('textbox')).toBeNull()
+ act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('heading',{name:'Messages'})).toBeNull()
+})
+test('classmate profile Message closes native dialog before focusing account chat; navigation drops draft',async()=>{
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'course1',code:'CSE 310'}], plannerCourses:[]})
+ const f=fake(session('a'));Object.assign(f.client,{rpc:(name:string)=>name==='find_classmates'?Promise.resolve({data:[{student_id:'peer',name:'Peer Name',major:'Math'}],error:null}):{abortSignal:async()=>({data:{student_id:'peer',name:'Peer Name',major:'Math',has_shared_avatar:false},error:null})}})
+ render(<App client={f.client}/>);fireEvent.click(await screen.findByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(screen.getByRole('button',{name:/^Message$/})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:/^Message$/}))
+ await waitFor(()=>expect(screen.getByRole('heading',{name:'Message Peer'})).toHaveFocus());expect(document.querySelector('dialog[open]')).toBeNull()
+ expect(mock.dm.contact).toHaveBeenCalledWith({student:'peer',course:'CSE 310'},expect.anything())
+ fireEvent.change(screen.getByRole('textbox'),{target:{value:'Navigation draft'}});fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));fireEvent.click(screen.getByRole('button',{name:/^Message$/}));expect(screen.queryByDisplayValue('Navigation draft')).toBeNull()
+})
+
+test.each(['create','add','send','retry','reconnect'] as const)('group %s tears down private state on App account replacement',async mode=>{
+ let release!:(value:any)=>void
+ const detail={group_id:'group',name:'Private group title',creator_id:'a',joined_after_sequence:0,last_read_sequence:0,members:[{student_id:'a',name:'Owner'},{student_id:'peer',name:'Ada'},{student_id:'other',name:'Grace'}]}
+ const candidates=[{student_id:'peer',name:'Ada',major:null,can_add:true,reason:null},{student_id:'other',name:'Grace',major:null,can_add:true,reason:null},{student_id:'later',name:'Later friend',major:null,can_add:true,reason:null}]
+ const saved={id:'group-row',conversation_id:'group',sender_id:'peer',sender_name:'Ada',client_message_id:'request',sequence:1,body:'Private group text',created_at:'2026-10-25T15:00:00Z'}
+mock.dm.groups = {
+  candidates: vi.fn().mockResolvedValue(candidates),
+  detail: vi.fn().mockResolvedValue(detail),
+  create: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['create']>>>(r => { release = r })),
+  add: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['add']>>>(r => { release = r })),
+  remove: vi.fn().mockResolvedValue(undefined),
+  history: vi.fn().mockResolvedValue([saved]),
+  send: vi.fn(() => new Promise<Message>(r => { release = r }))
+}; vi.mocked(mock.dm.inbox).mockResolvedValue([{kind:'group',conversation_id:'group',student_id:null,name:detail.name,member_count:3,last_message_at:saved.created_at,message_time:saved.created_at,preview:saved.body}])
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');fireEvent.click(screen.getByRole('button',{name:/^Message$/}))
+ if(mode==='create'){
+  fireEvent.click(screen.getByText('New group'));fireEvent.click(await screen.findByRole('checkbox',{name:/Ada/}));fireEvent.click(screen.getByRole('checkbox',{name:/Grace/}));fireEvent.click(screen.getByText('Create group'))
+ }else{
+  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Message'})
+  if(mode==='add'){fireEvent.click(screen.getByText('Add members'));fireEvent.click(await screen.findByRole('checkbox',{name:/Later friend/}));fireEvent.click(screen.getByText('Add selected members'))}
+  if(mode==='retry'){vi.mocked(mock.dm.groups!.send).mockRejectedValueOnce(Error('Private group failure'));fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}));await screen.findByText('Retry send')}
+  if(mode==='send'){fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}))}
+  if(mode==='reconnect'){vi.mocked(mock.dm.groups!.history).mockImplementationOnce(()=>new Promise(r=>{release=r}));act(()=>window.dispatchEvent(new Event('online')));await waitFor(()=>expect(release).toBeTypeOf('function'))}
+ }
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[], plannerCourses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([]);act(()=>f.emit('b'));await screen.findByText('Student b')
+ if(release)await act(async()=>release(mode==='reconnect'?[saved]:mode==='send'?{...saved,sender_id:'a'}:detail))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByText('Private group title')).toBeNull();expect(screen.queryByText('Private group text')).toBeNull();expect(screen.queryByDisplayValue('Private group draft')).toBeNull();expect(screen.queryByText('Private group failure')).toBeNull()
+ act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(document.querySelector('dialog[open]')).toBeNull()
 })

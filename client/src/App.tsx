@@ -4,8 +4,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { useAccount } from './useAccount'
 import { classmateApi } from './classmates'
 import { useClassmates } from './useClassmates'
+import { courseRecommendationApi } from './courseRecommendations'
+import { useCourseRecommendations } from './useCourseRecommendations'
+import { friendApi } from './friendshipApi'
+import { useFriendships } from './useFriendships'
 import Profile from './Profile'
 import ClassmateProfile from './PeerProfileDialog'
+import FriendProfileDialog from './FriendProfileDialog'
+import FriendRequests from './FriendRequests'
+import Friends from './Friends'
 import { peerApi } from './classmateProfile'
 import CourseBrowser from './CourseBrowser'
 import CrowdMeter from './CrowdMeter'
@@ -13,6 +20,11 @@ import CourseEvaluations from './CourseEvaluations'
 import { courseReviewApi } from './courseReviews'
 import AcademicItems from './AcademicPlanner'
 import { academicItemsApi } from './academicItems'
+import Messages from './Messages'
+import { MessagingNotifications, MessagesNavigation } from './MessagingNotifications'
+import { messagingApi } from './messaging'
+import { professorCatalogApi, useProfessorCatalog } from './courseProfessors'
+import type { Target } from './messaging'
 import './App.css'
 import { campusLocationsApi } from './campusLocations'
 const CampusExplorer = lazy(() => import('./CampusExplorer'))
@@ -21,26 +33,39 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
   const campus = useMemo(() => campusLocationsApi(client), [client])
   const [explorerOpened, setExplorerOpened] = useState(false)
+  const messaging = useMemo(() => messagingApi(client), [client])
+  const [dmTarget, setDmTarget] = useState<Target | null>(null)
   const items = useMemo(() => academicItemsApi(client), [client])
   const [plannerOpened, setPlannerOpened] = useState(false)
   const reviews = useMemo(() => courseReviewApi(client), [client])
+  const professorsApi = useMemo(() => professorCatalogApi(client), [client])
+  const professorCatalog = useProfessorCatalog(professorsApi, account.status === 'ready' ? account.userId : null)
   const peers = useMemo(() => peerApi(client), [client])
-  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string } | null>(null)
+  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string; section: string } | null>(null)
   const discover = useMemo(() => classmateApi(client), [client])
+  const recommend = useMemo(() => courseRecommendationApi(client), [client])
+  const friendsApi = useMemo(() => friendApi(client), [client])
   const [view, setView] = useState('dashboard')
-  function navigate(next: string) { setPeer(null); setView(next) }
+  function openMessage(target: Target) { setPeer(null); setFriendProfileId(null); setDmTarget(target); setView('messages') }
+  function navigate(next: string) { setDmTarget(null); setPeer(null); setFriendProfileId(null); setView(next) }
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [friendProfileId, setFriendProfileId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [signingIn, setSigningIn] = useState(false)
   const [signOutFailed, setSignOutFailed] = useState(false)
   async function signOut() {
-    setPeer(null); setActionError(''); setSignOutFailed(false)
+    setDmTarget(null); setPeer(null); setFriendProfileId(null); setActionError(''); setSignOutFailed(false)
     try { await account.signOut() } catch (error) { setActionError((error as Error).message); setSignOutFailed(true) }
   }
   const selected = account.courses.some(c => c.id === selectedId) ? selectedId : account.courses[0]?.id ?? null
-  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, account.courses.find(c => c.id === selected)?.code ?? null)
+  const selectedCourse = account.courses.find(c => c.id === selected)
+  const verifiedCourseCode = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.code : null
+  const verifiedCourseSection = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.section ?? null : null
+  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection)
+  const recommendations = useCourseRecommendations(recommend, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection)
+  const friendState = useFriendships(friendsApi, client, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null, account.courses.map(course => course.code))
   const [previousStatus, setPreviousStatus] = useState(account.status)
-  if (previousStatus !== account.status) { setPreviousStatus(account.status); if (peer) setPeer(null) }
+  if (previousStatus !== account.status) { setPreviousStatus(account.status); if (dmTarget) setDmTarget(null); if (peer) setPeer(null); if (friendProfileId) setFriendProfileId(null) }
   async function signIn() {
     if (signingIn) return
     setSigningIn(true); setActionError('')
@@ -56,18 +81,38 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {account.message && <p role="alert">{account.message}</p>}<p className="field-help">Use your verified @stonybrook.edu email.</p>
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
-    {account.status === 'ready' && account.profile && <div key={account.userId}>
-      <nav className="app-nav" aria-label="Main navigation"><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
+    {account.status === 'ready' && account.profile && <MessagingNotifications key={account.userId} client={client} userId={account.userId!}><div>
+      <nav className="app-nav" aria-label="Main navigation"><MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')} /><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button> 
+      <button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button>
+      <button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
-        <div className="dashboard"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} /><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => setPeer({ id, user: account.userId, course: selected! })} roster={roster} onRetry={roster.retry} /></div>
+        <div className="dashboard"><div className="profile-column"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} />
+          <Friends friends={friendState.friends} busyIds={friendState.busyIds} onRetry={friendState.retry} onViewProfile={setFriendProfileId} onUnfriend={id => { void friendState.unfriend(id) }} api={friendsApi} onOpenRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} relationshipById={friendState.relationshipById} />
+          <FriendRequests incoming={friendState.inbox.data} loading={friendState.inbox.status === 'loading'} error={friendState.inbox.status === 'error'} busyIds={friendState.busyIds} onRespond={(id, action) => { void friendState.respond(id, action) }} onViewProfile={setFriendProfileId} onRetry={friendState.retry} />
+        </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} professorCatalog={professorCatalog} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => { if (selectedCourse?.section) setPeer({ id, user: account.userId, course: selectedCourse.code, section: selectedCourse.section }) }} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
+          relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code, section) => friendState.send(code, section, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
+        </div>
       </div>
-      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selected && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} api={peers} course={account.courses.find(course => course.id === selected)!.code} student={peer.id} onClose={() => setPeer(null)} />}
-      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
+      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selectedCourse?.code && peer.section === selectedCourse?.section && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={peer.course} section={peer.section} student={peer.id} onClose={() => setPeer(null)} />}
+      {view === 'dashboard' && friendProfileId && <FriendProfileDialog key={`${account.userId}-${friendProfileId}`} messaging={messaging} onMessage={openMessage} api={friendsApi} student={friendProfileId} onClose={() => setFriendProfileId(null)} />}
+      {friendState.actionError && <div className="friend-action-error" role="alert">{friendState.actionError}<button type="button" onClick={() => friendState.retryAction?.()}>Retry action</button><button type="button" onClick={friendState.clearError}>Dismiss</button></div>}
+      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
+      {view === 'messages' && <Messages key={account.userId} api={messaging} client={client} userId={account.userId!} initialTarget={dmTarget} />}
       {view === 'spaces' && <CrowdMeter />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
-      {explorerOpened && <div hidden={view !== 'explorer'}><Suspense fallback={<p role="status">Loading Campus Explorer…</p>}><CampusExplorer api={campus} userId={account.userId!} active={view === 'explorer'} /></Suspense></div>}
-    </div>}
+      {explorerOpened && (
+        <div hidden={view !== 'explorer'}>
+          <Suspense fallback={<p role="status">Loading Campus Explorer…</p>}>
+            <CampusExplorer
+              api={campus}
+              userId={account.userId!}
+              active={view === 'explorer'}
+            />
+          </Suspense>
+        </div>
+      )}
+    </div></MessagingNotifications>}
   </>
 }
 export default function App({ client = supabase }: { client?: SupabaseClient | null }) {

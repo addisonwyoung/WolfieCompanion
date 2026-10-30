@@ -1,0 +1,44 @@
+-- Disposable local database only, after both messaging migrations.
+\set ON_ERROR_STOP on
+create or replace function pg_temp.assert(ok boolean,message text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'ASSERT: %',message; end if; end $$;
+begin;
+insert into auth.users(id,email,email_confirmed_at) select ('80000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'unread'||n||'@stonybrook.edu',now() from generate_series(1,3)n;
+insert into auth.identities select id,'google',jsonb_build_object('email',email,'email_verified',true) from auth.users where id::text like '80000000-%';
+insert into public.user_courses(user_id,course_code) select id,'CSE 310' from auth.users where id::text like '80000000-%';
+set local role authenticated;
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
+select pg_temp.assert(public.dm_unread()='[]','empty initial unread');
+select public.dm_send_message('80000000-0000-0000-0000-000000000002','First',gen_random_uuid(),'CSE310');
+select set_config('test.unread_thread',public.dm_contact_state('80000000-0000-0000-0000-000000000002')->>'conversation_id',true);
+select public.dm_send_message('80000000-0000-0000-0000-000000000002','Second',gen_random_uuid());
+select pg_temp.assert(public.dm_unread()='[]','own outgoing never unread');
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000002',true);
+select pg_temp.assert((public.dm_unread()->0->>'count')::int=2,'recipient sees two incoming');
+select public.dm_send_message('80000000-0000-0000-0000-000000000001','Reply',gen_random_uuid());
+select pg_temp.assert((public.dm_unread()->0->>'count')::int=2,'outgoing reply does not erase unread');
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
+select pg_temp.assert((public.dm_unread()->0->>'count')::int=1,'independent viewer unread');
+select public.dm_mark_read(current_setting('test.unread_thread')::uuid,3);
+select pg_temp.assert(public.dm_unread()='[]','viewing clears incoming');
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000002',true);
+select public.dm_send_message('80000000-0000-0000-0000-000000000001','New arrival',gen_random_uuid());
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
+select public.dm_mark_read(current_setting('test.unread_thread')::uuid,2);
+select pg_temp.assert((public.dm_unread()->0->>'count')::int=1,'stale read cannot rewind or clear a newer arrival');
+do $$ begin
+ begin perform public.dm_mark_read(current_setting('test.unread_thread')::uuid,99999);raise exception 'future cursor accepted';exception when invalid_parameter_value then null;end;
+ begin perform * from public.dm_read_positions;raise exception 'read positions leaked';exception when insufficient_privilege then null;end;
+ begin insert into public.dm_read_positions values(auth.uid(),current_setting('test.unread_thread')::uuid,4);raise exception 'direct write allowed';exception when insufficient_privilege then null;end;
+end $$;
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000003',true);
+select pg_temp.assert(public.dm_unread()='[]','third-party no unread leak');
+do $$ begin begin perform public.dm_mark_read(current_setting('test.unread_thread')::uuid,4);raise exception 'third-party mark allowed';exception when insufficient_privilege then null;end;end $$;
+reset role;
+update auth.users set email_confirmed_at=null where id='80000000-0000-0000-0000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
+do $$ begin begin perform public.dm_unread();raise exception 'ineligible access';exception when insufficient_privilege then null;end;end $$;
+reset role;
+set local role anon;
+do $$ begin begin perform public.dm_unread();raise exception 'anonymous access';exception when insufficient_privilege then null;end;end $$;
+rollback;
