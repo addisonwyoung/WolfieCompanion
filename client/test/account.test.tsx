@@ -212,7 +212,7 @@ mock.dm.groups = {
     release = value => resolve(value as Message)
   }))
 }; vi.mocked(mock.dm.inbox).mockResolvedValue([{kind:'group',conversation_id:'group',student_id:null,name:detail.name,member_count:3,last_message_at:saved.created_at,message_time:saved.created_at,preview:saved.body}])
- const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');fireEvent.click(screen.getByRole('button',{name:/^Message$/}))
+ const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');fireEvent.click(screen.getByRole('button',{name:/^Messages$/}))
  if(mode==='create'){
   fireEvent.click(screen.getByText('New group'));fireEvent.click(await screen.findByRole('checkbox',{name:/Ada/}));fireEvent.click(screen.getByRole('checkbox',{name:/Grace/}));fireEvent.click(screen.getByText('Create group'))
  }else{
