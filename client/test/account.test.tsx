@@ -92,8 +92,12 @@ test('planner failures stay isolated and private drafts survive navigation but c
 test.each(['editor','discard','save','delete','deleting'] as const)('external account replacement tears down %s and ignores old results',async mode=>{
  const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
  const item={id:'private-item',user_course_id:course.databaseId,title:'Private old item',type:'assignment' as const,due_date:'2026-10-23',due_time:null,notes:null,location:null,completed_at:null}
-let resolveWrite!:(value:any)=>void
-mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn(()=>new Promise<void>(resolve=>{resolveWrite=resolve}))}
+let resolveWrite!:(value:unknown)=>void
+mock.items={load:vi.fn().mockResolvedValue([item]),save: vi.fn(() => new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve => {
+  resolveWrite = value => resolve(value as Awaited<ReturnType<AcademicApi['save']>>)
+})),complete:vi.fn(),remove: vi.fn(() => new Promise<void>(resolve => {
+  resolveWrite = () => resolve()
+}))}
  vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[]})
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:'Private old item'})
@@ -136,8 +140,10 @@ test.each(['editor','discard','save'] as const)('calendar %s tears down on exter
  const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
  const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
  const item={id:'private-calendar-item',user_course_id:course.databaseId,title:'Private calendar work',type:'assignment' as const,due_date:date,due_time:null,notes:'Private notes',location:null,completed_at:null}
-let resolveWrite!:(value:any)=>void
-mock.items={load:vi.fn().mockResolvedValue([item]),save:vi.fn(()=>new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve=>{resolveWrite=resolve})),complete:vi.fn(),remove:vi.fn()}
+let resolveWrite!:(value:unknown)=>void
+mock.items={load:vi.fn().mockResolvedValue([item]),save: vi.fn(() => new Promise<Awaited<ReturnType<AcademicApi['save']>>>(resolve => {
+  resolveWrite = value => resolve(value as Awaited<ReturnType<AcademicApi['save']>>)
+})),complete:vi.fn(),remove:vi.fn()}
  vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[]})
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));await screen.findByRole('heading',{name:item.title});fireEvent.click(screen.getByRole('tab',{name:'Calendar'}))
@@ -182,29 +188,48 @@ test('classmate profile Message closes native dialog before focusing account cha
 })
 
 test.each(['create','add','send','retry','reconnect'] as const)('group %s tears down private state on App account replacement',async mode=>{
- let release!:(value:any)=>void
+ let release!:(value:unknown)=>void
  const detail={group_id:'group',name:'Private group title',creator_id:'a',joined_after_sequence:0,last_read_sequence:0,members:[{student_id:'a',name:'Owner'},{student_id:'peer',name:'Ada'},{student_id:'other',name:'Grace'}]}
  const candidates=[{student_id:'peer',name:'Ada',major:null,can_add:true,reason:null},{student_id:'other',name:'Grace',major:null,can_add:true,reason:null},{student_id:'later',name:'Later friend',major:null,can_add:true,reason:null}]
  const saved={id:'group-row',conversation_id:'group',sender_id:'peer',sender_name:'Ada',client_message_id:'request',sequence:1,body:'Private group text',created_at:'2026-10-25T15:00:00Z'}
 mock.dm.groups = {
   candidates: vi.fn().mockResolvedValue(candidates),
   detail: vi.fn().mockResolvedValue(detail),
-  create: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['create']>>>(r => { release = r })),
-  add: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['add']>>>(r => { release = r })),
+
+  create: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['create']>>>(resolve => {
+    release = value => resolve(value as Awaited<ReturnType<NonNullable<MessagingApi['groups']>['create']>>)
+  })),
+
+  add: vi.fn(() => new Promise<Awaited<ReturnType<NonNullable<MessagingApi['groups']>['add']>>>(resolve => {
+    release = value => resolve(value as Awaited<ReturnType<NonNullable<MessagingApi['groups']>['add']>>)
+  })),
+
   remove: vi.fn().mockResolvedValue(undefined),
+
   history: vi.fn().mockResolvedValue([saved]),
-  send: vi.fn(() => new Promise<Message>(r => { release = r }))
+
+  send: vi.fn(() => new Promise<Message>(resolve => {
+    release = value => resolve(value as Message)
+  }))
 }; vi.mocked(mock.dm.inbox).mockResolvedValue([{kind:'group',conversation_id:'group',student_id:null,name:detail.name,member_count:3,last_message_at:saved.created_at,message_time:saved.created_at,preview:saved.body}])
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a');fireEvent.click(screen.getByRole('button',{name:/^Message$/}))
  if(mode==='create'){
   fireEvent.click(screen.getByText('New group'));fireEvent.click(await screen.findByRole('checkbox',{name:/Ada/}));fireEvent.click(screen.getByRole('checkbox',{name:/Grace/}));fireEvent.click(screen.getByText('Create group'))
  }else{
-  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Message'})
+  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Messages'})
   if(mode==='add'){fireEvent.click(screen.getByText('Add members'));fireEvent.click(await screen.findByRole('checkbox',{name:/Later friend/}));fireEvent.click(screen.getByText('Add selected members'))}
   if(mode==='retry'){vi.mocked(mock.dm.groups!.send).mockRejectedValueOnce(Error('Private group failure'));fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}));await screen.findByText('Retry send')}
   if(mode==='send'){fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}))}
-  if(mode==='reconnect'){vi.mocked(mock.dm.groups!.history).mockImplementationOnce(()=>new Promise(r=>{release=r}));act(()=>window.dispatchEvent(new Event('online')));await waitFor(()=>expect(release).toBeTypeOf('function'))}
- }
+if (mode === 'reconnect') {
+  vi.mocked(mock.dm.groups!.history).mockImplementationOnce(
+    () => new Promise<Message[]>(resolve => {
+      release = value => resolve(value as Message[])
+    })
+  )
+
+  act(() => window.dispatchEvent(new Event('online')))
+  await waitFor(() => expect(release).toBeTypeOf('function'))
+} }
  vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[], plannerCourses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([]);act(()=>f.emit('b'));await screen.findByText('Student b')
  if(release)await act(async()=>release(mode==='reconnect'?[saved]:mode==='send'?{...saved,sender_id:'a'}:detail))
  expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByText('Private group title')).toBeNull();expect(screen.queryByText('Private group text')).toBeNull();expect(screen.queryByDisplayValue('Private group draft')).toBeNull();expect(screen.queryByText('Private group failure')).toBeNull()
