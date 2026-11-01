@@ -42,7 +42,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [error, setError] = useState('')
   const [courseId, setCourseId] = useState(courses[0]?.id ?? '')
   const course = courses.find(value => value.id === courseId) ?? courses[0]
-  const roster = useClassmates(classmatesApi, course ? userId : null, course?.code ?? null)
+  const roster = useClassmates(classmatesApi, course?.section ? userId : null, course?.code ?? null, course?.section ?? null)
   const [selectedPeers, setSelectedPeers] = useState<Classmate[]>([])
   const [groupName, setGroupName] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
@@ -120,7 +120,9 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!course || !selectedPeers.length || !groupName.trim()) return
-    void perform(() => api.create({ courseCode: course.code, name: groupName, invitees: selectedPeers.map(peer => peer.student_id) }), result => {
+    const section = course.section
+    if (!section) { setError('Choose a saved course section before inviting classmates.'); return }
+    void perform(() => api.create({ courseCode: course.code, section, name: groupName, invitees: selectedPeers.map(peer => peer.student_id) }), result => {
       if (typeof result === 'string') setSelectedGroupId(result)
       setGroupName(''); setSelectedPeers([])
     })
@@ -142,35 +144,36 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
 
     {!!pendingInvites.length && <section className="study-invitations panel" aria-labelledby="study-invitations-title">
       <p className="eyebrow">YOU HAVE AN INVITATION</p><h2 id="study-invitations-title">Group invitations</h2>
-      {pendingInvites.map(group => <article className="study-invitation" key={group.group_id}><div><h3>{group.name}</h3><p>{group.course_code} · invited by {group.members.find(member => member.role === 'owner')?.name ?? 'a classmate'}</p></div><div className="study-actions"><button type="button" disabled={busy} onClick={() => void perform(() => api.respond(group.group_id, true))}>Accept</button><button type="button" disabled={busy} onClick={() => void perform(() => api.respond(group.group_id, false))}>Decline</button></div></article>)}
+      {pendingInvites.map(group => <article className="study-invitation" key={group.group_id}><div><h3>{group.name}</h3><p>{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''} · invited by {group.members.find(member => member.role === 'owner')?.name ?? 'a classmate'}</p></div><div className="study-actions"><button type="button" disabled={busy} onClick={() => void perform(() => api.respond(group.group_id, true))}>Accept</button><button type="button" disabled={busy} onClick={() => void perform(() => api.respond(group.group_id, false))}>Decline</button></div></article>)}
     </section>}
 
     <div className="study-groups-grid">
       <section className="panel study-setup" aria-labelledby="study-setup-heading">
         <div className="study-section-heading"><span className="study-step">01</span><div><p className="eyebrow">START WITH A CLASS</p><h2 id="study-setup-heading">Create a group</h2></div></div>
         {!courses.length ? <div className="study-empty"><h3>Add a course first</h3><p>Study groups start from a course you have saved.</p><button type="button" className="primary" onClick={onGoToCourses}>Go to My dashboard</button></div> : <>
-          <label htmlFor="study-course">Shared course</label><select id="study-course" value={course?.id ?? ''} onChange={event => changeCourse(event.target.value)}>{courses.map(saved => <option value={saved.id} key={saved.id}>{saved.code}{saved.sections?.length ? ` · Section ${saved.sections.join(', ')}` : ''}</option>)}</select>
-          <p className="field-help">Students who saved this course can be invited. They will choose whether to join.</p>
+          <label htmlFor="study-course">Shared course</label><select id="study-course" value={course?.id ?? ''} onChange={event => changeCourse(event.target.value)}>{courses.map(saved => <option value={saved.id} key={saved.id}>{saved.code}{saved.section ? ` · Section ${saved.section}` : saved.sections?.length ? ` · Sections ${saved.sections.join(', ')}` : ''}</option>)}</select>
+          <p className="field-help">Choose a course section to find classmates from that section. Invited students choose whether to join.</p>
           <div className="study-roster-heading"><h3>Invite classmates</h3><span>{selectedPeers.length}/7 selected</span></div>
-          {roster.status === 'loading' && <p role="status">Finding classmates in {course?.code}…</p>}
+          {!course?.section && <div className="study-empty"><p>Save a course with a section before inviting classmates.</p><button type="button" className="primary" onClick={onGoToCourses}>Go to My dashboard</button></div>}
+          {course?.section && roster.status === 'loading' && <p role="status">Finding classmates in {course.code} · Section {course.section}…</p>}
           {roster.status === 'error' && <div className="study-empty"><p role="alert">{roster.message}</p><button type="button" onClick={roster.retry}>Retry</button></div>}
-          {roster.status === 'success' && !roster.classmates.length && <div className="study-empty"><h3>No classmates in {course?.code} yet</h3><p>Other students need to save this course before they appear here.</p></div>}
+          {roster.status === 'success' && !roster.classmates.length && <div className="study-empty"><h3>No classmates in {course?.code} · Section {course.section} yet</h3><p>Other students need to save this section before they appear here.</p></div>}
           {roster.status === 'success' && !!roster.classmates.length && <ul className="study-peer-list">{roster.classmates.map(peer => {
             const checked = selectedPeers.some(item => item.student_id === peer.student_id)
             return <li key={peer.student_id}><label className="study-peer-choice"><input type="checkbox" checked={checked} disabled={!checked && selectedPeers.length >= 7} onChange={() => togglePeer(peer)} /><span><strong>{peer.name}</strong><small>{peer.major ?? 'Major not added'}</small></span><span>{checked ? 'Selected' : 'Invite'}</span></label></li>
           })}</ul>}
-          <form className="study-group-form" onSubmit={createGroup}><label htmlFor="study-group-name">Group name<input id="study-group-name" value={groupName} onChange={event => setGroupName(event.target.value)} maxLength={80} placeholder={`${course?.code ?? 'Course'} study group`} required /></label><button className="primary" type="submit" disabled={busy || !selectedPeers.length || !groupName.trim()}>{busy ? 'Creating…' : 'Create group and invite'}</button></form>
+          <form className="study-group-form" onSubmit={createGroup}><label htmlFor="study-group-name">Group name<input id="study-group-name" value={groupName} onChange={event => setGroupName(event.target.value)} maxLength={80} placeholder={`${course?.code ?? 'Course'} study group`} required /></label><button className="primary" type="submit" disabled={busy || !course?.section || !selectedPeers.length || !groupName.trim()}>{busy ? 'Creating…' : 'Create group and invite'}</button></form>
         </>}
       </section>
 
       <section className="panel study-groups-list" aria-labelledby="study-groups-list-title">
         <div className="study-section-heading"><span className="study-step">02</span><div><p className="eyebrow">YOUR STUDY TEAMS</p><h2 id="study-groups-list-title">Your groups</h2></div></div>
-        {!activeGroups.length ? <div className="study-empty"><h3>No joined groups yet</h3><p>Create a group or accept an invitation to start comparing times.</p></div> : <ul className="study-saved-groups">{activeGroups.map(group => <li key={group.group_id}><button type="button" className="study-group-card" aria-pressed={selectedGroupId === group.group_id} onClick={() => { setSelectedGroupId(group.group_id); setDraft(fromGroup(group, userId)) }}><span className="eyebrow">{group.course_code}</span><strong>{group.name}</strong><span>{group.members.filter(member => member.status === 'accepted').length} members · {group.members.filter(member => member.status === 'pending').length} pending</span></button></li>)}</ul>}
+        {!activeGroups.length ? <div className="study-empty"><h3>No joined groups yet</h3><p>Create a group or accept an invitation to start comparing times.</p></div> : <ul className="study-saved-groups">{activeGroups.map(group => <li key={group.group_id}><button type="button" className="study-group-card" aria-pressed={selectedGroupId === group.group_id} onClick={() => { setSelectedGroupId(group.group_id); setDraft(fromGroup(group, userId)) }}><span className="eyebrow">{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''}</span><strong>{group.name}</strong><span>{group.members.filter(member => member.status === 'accepted').length} members · {group.members.filter(member => member.status === 'pending').length} pending</span></button></li>)}</ul>}
       </section>
     </div>
 
     {selectedGroup?.my_status === 'accepted' && <section className="panel study-detail" aria-labelledby="study-detail-heading">
-      <header className="study-detail-header"><div><p className="eyebrow">{selectedGroup.course_code} · GROUP SCHEDULE</p><h2 id="study-detail-heading">{selectedGroup.name}</h2><p>{members.length} accepted member{members.length === 1 ? '' : 's'}{selectedGroup.members.some(member => member.status === 'pending') ? ` · ${selectedGroup.members.filter(member => member.status === 'pending').length} invitation pending` : ''}</p></div><button type="button" disabled={busy} onClick={() => { if (selectedGroup.owner_id === userId && members.length === 1 && !window.confirm('You are the only accepted member. Leaving will permanently delete this group. Continue?')) return; void perform(() => api.leave(selectedGroup.group_id), () => setSelectedGroupId(null)) }}>Leave group</button></header>
+      <header className="study-detail-header"><div><p className="eyebrow">{selectedGroup.course_code}{selectedGroup.course_section ? ` · Section ${selectedGroup.course_section}` : ''} · GROUP SCHEDULE</p><h2 id="study-detail-heading">{selectedGroup.name}</h2><p>{members.length} accepted member{members.length === 1 ? '' : 's'}{selectedGroup.members.some(member => member.status === 'pending') ? ` · ${selectedGroup.members.filter(member => member.status === 'pending').length} invitation pending` : ''}</p></div><button type="button" disabled={busy} onClick={() => { if (selectedGroup.owner_id === userId && members.length === 1 && !window.confirm('You are the only accepted member. Leaving will permanently delete this group. Continue?')) return; void perform(() => api.leave(selectedGroup.group_id), () => setSelectedGroupId(null)) }}>Leave group</button></header>
       <p className="study-schedule-guidance">Add recurring free windows you are comfortable sharing. Course codes and sections do not include meeting times, so the app cannot infer schedules from them.</p>
       <div className="study-members">
         {members.map(member => {

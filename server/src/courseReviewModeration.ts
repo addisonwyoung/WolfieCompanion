@@ -168,12 +168,13 @@ export function courseReviewRouter(env: NodeJS.ProcessEnv = process.env) {
     res.set('Cache-Control', 'no-store');
     const token = req.headers.authorization?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) { res.status(401).json({ error: 'Sign in to publish a review.' }); return; }
-    const { offeringId, weeklyHours, difficulty, review } = req.body ?? {};
+    const { offeringId, weeklyHours, difficulty, classRating, wouldRecommend, review } = req.body ?? {};
     if (typeof offeringId !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(offeringId) ||
         typeof weeklyHours !== 'number' || !Number.isFinite(weeklyHours) || weeklyHours < 0 || weeklyHours > 40 ||
         !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5 ||
+        !Number.isInteger(classRating) || classRating < 1 || classRating > 5 || typeof wouldRecommend !== 'boolean' ||
         typeof review !== 'string' || review.length > 1000) {
-      res.status(400).json({ error: 'Check the offering, hours, difficulty, and review length.' }); return;
+      res.status(400).json({ error: 'Check the offering, hours, ratings, recommendation, and review length.' }); return;
     }
     const url = env.SUPABASE_URL, publishableKey = env.SUPABASE_PUBLISHABLE_KEY, serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !publishableKey || !serviceKey) { res.status(503).json({ error: 'Review publishing is not configured on the server.' }); return; }
@@ -184,6 +185,14 @@ export function courseReviewRouter(env: NodeJS.ProcessEnv = process.env) {
       const { data: eligible, error: eligibilityError } = await userClient.rpc('account_is_eligible');
       if (eligibilityError || eligible !== true) { res.status(403).json({ error: 'An eligible student account is required to publish a review.' }); return; }
       const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { data: enrollment, error: enrollmentError } = await admin.from('course_enrollments')
+        .select('id')
+        .eq('user_id', auth.user.id)
+        .eq('course_offering_id', offeringId)
+        .eq('verification_status', 'verified')
+        .maybeSingle();
+      if (enrollmentError) throw enrollmentError;
+      if (!enrollment) { res.status(403).json({ error: 'A verified enrollment in this exact offering is required to publish a review.' }); return; }
       const { data: existing, error: lookupError } = await admin.from('course_reviews').select('id').eq('user_id', auth.user.id).eq('offering_id', offeringId).maybeSingle();
       if (lookupError) throw lookupError;
       if (existing) { res.status(409).json({ error: 'You have already published a review for this offering.' }); return; }
@@ -191,7 +200,8 @@ export function courseReviewRouter(env: NodeJS.ProcessEnv = process.env) {
       if (moderation.classification === 'blocked') { res.status(422).json({ error: 'This review was blocked because it contains explicit language or appears to contain severe abuse or hateful content. Edit it and try again.' }); return; }
       const { error: insertError } = await admin.from('course_reviews').insert({
         offering_id: offeringId, user_id: auth.user.id, weekly_hours: weeklyHours,
-        difficulty, review: review.trim(), moderation_status: moderation.classification,
+        difficulty, class_rating: classRating, would_recommend: wouldRecommend,
+        review: review.trim(), moderation_status: moderation.classification,
       });
       if (insertError?.code === '23505') { res.status(409).json({ error: 'You have already published a review for this offering.' }); return; }
       if (insertError) throw insertError;

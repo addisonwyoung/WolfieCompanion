@@ -3,28 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 
 export interface PictureAccess {
-  caller: (token: string, course: string, peer: string) => Promise<string | null>;
-  picture: (caller: string, course: string, peer: string) => Promise<Buffer | null>;
+  caller: (token: string, course: string, section: string, peer: string) => Promise<string | null>;
+  picture: (caller: string, course: string, section: string, peer: string) => Promise<Buffer | null>;
 }
 export function createPictureAccess(factory: typeof createClient = createClient, env: NodeJS.ProcessEnv = process.env): PictureAccess { return {
-  async caller(token, course, peer) {
+  async caller(token, course, section, peer) {
     const url = env.SUPABASE_URL, key = env.SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) throw new Error('Configuration unavailable');
     const client = factory(url, key, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await client.auth.getUser(token);
     if (error || !data.user) return null;
-    const detail = await client.rpc('get_classmate_profile', { p_course_code: course, p_student_id: peer });
+    const detail = await client.rpc('get_classmate_profile', { p_course_code: course, p_section: section, p_student_id: peer });
     if (detail.error) {
       if (['42501', '22023'].includes(detail.error.code)) return null;
       throw new Error('Profile unavailable');
     }
     return detail.data?.has_shared_avatar === true ? data.user.id : null;
   },
-  async picture(caller, course, peer) {
+  async picture(caller, course, section, peer) {
     const url = env.SUPABASE_URL, key = env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error('Configuration unavailable');
     const client = factory(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const resolved = await client.rpc('resolve_classmate_avatar', { p_caller_id: caller, p_student_id: peer, p_course_code: course });
+    const resolved = await client.rpc('resolve_classmate_avatar', { p_caller_id: caller, p_student_id: peer, p_course_code: course, p_section: section });
     if (resolved.error) throw new Error('Picture unavailable');
     const path = resolved.data;
     if (typeof path !== 'string' || !path.startsWith(`${peer}/`) || !/^[a-f0-9-]+\/(?:[a-f0-9-]+)\.(png|jpg)$/.test(path)) return null;
@@ -41,14 +41,14 @@ export function classmatePictureRouter(access: PictureAccess = pictureAccess) {
     res.set('Cache-Control', 'private, no-store').set('X-Content-Type-Options', 'nosniff');
     const token = req.headers.authorization?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) { res.status(401).json({ error: 'Sign in to view this picture.' }); return; }
-    const { course, student } = req.query;
-    if (typeof course !== 'string' || !/^[A-Z]{2,4}\s*\d{3}$/i.test(course.trim()) || typeof student !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(student) || Object.keys(req.query).some(key => !['course','student'].includes(key))) {
+    const { course, section, student } = req.query;
+    if (typeof course !== 'string' || !/^[A-Z]{2,5}\s*\d{3}[A-Z]?$/i.test(course.trim()) || typeof section !== 'string' || !/^[A-Z0-9-]{1,20}$/i.test(section.trim()) || typeof student !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(student) || Object.keys(req.query).some(key => !['course','section','student'].includes(key))) {
       res.status(400).json({ error: 'Invalid picture request.' }); return;
     }
     try {
-      const caller = await access.caller(token, course, student);
+      const caller = await access.caller(token, course, section, student);
       if (!caller) { res.status(404).json({ error: 'Picture unavailable.' }); return; }
-      const bytes = await access.picture(caller, course, student);
+      const bytes = await access.picture(caller, course, section, student);
       if (!bytes) { res.status(404).json({ error: 'Picture unavailable.' }); return; }
       // Re-encode validated pixels so stored bytes cannot inject active content.
       const image = sharp(bytes, { limitInputPixels: 20_000_000, animated: false });

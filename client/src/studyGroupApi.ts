@@ -5,11 +5,11 @@ export type StudyDay = typeof studyDays[number]
 export interface StudyWindow { day: StudyDay; start_minute: number; end_minute: number }
 export interface StudyGroupMember { user_id: string; name: string; status: 'pending' | 'accepted'; role: 'owner' | 'member' }
 export interface StudyGroup {
-  group_id: string; course_code: string; name: string; owner_id: string; created_at: string
+  group_id: string; course_code: string; course_section: string | null; name: string; owner_id: string; created_at: string
   my_status: 'pending' | 'accepted'; members: StudyGroupMember[]
   availability: (StudyWindow & { user_id: string })[]
 }
-export interface GroupInviteInput { courseCode: string; name: string; invitees: string[] }
+export interface GroupInviteInput { courseCode: string; section: string; name: string; invitees: string[] }
 export interface StudyGroupApi {
   list(): Promise<StudyGroup[]>
   create(input: GroupInviteInput): Promise<string>
@@ -22,7 +22,8 @@ export const studyGroupError = 'Study groups could not be loaded. Please retry.'
 function parseGroup(value: unknown): StudyGroup {
   if (!value || typeof value !== 'object') throw new Error(studyGroupError)
   const row = value as Record<string, unknown>
-  if (typeof row.group_id !== 'string' || typeof row.course_code !== 'string' || typeof row.name !== 'string'
+  if (typeof row.group_id !== 'string' || typeof row.course_code !== 'string'
+    || (row.course_section !== null && typeof row.course_section !== 'string') || typeof row.name !== 'string'
     || typeof row.owner_id !== 'string' || typeof row.created_at !== 'string'
     || (row.my_status !== 'pending' && row.my_status !== 'accepted')
     || !Array.isArray(row.members) || !Array.isArray(row.availability)) throw new Error(studyGroupError)
@@ -59,7 +60,7 @@ export function studyGroupApi(client: SupabaseClient): StudyGroupApi {
       return data.map(parseGroup)
     },
     create: input => invoke<string>('create_study_group', {
-      p_course_code: input.courseCode, p_name: input.name.trim(), p_invitees: input.invitees,
+      p_course_code: input.courseCode, p_section: input.section, p_name: input.name.trim(), p_invitees: input.invitees,
     }),
     async respond(groupId, accept) { await invoke('respond_to_study_group_invite', { p_group_id: groupId, p_accept: accept }) },
     async saveAvailability(groupId, windows) {

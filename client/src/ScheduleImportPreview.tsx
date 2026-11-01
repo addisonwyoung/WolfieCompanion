@@ -1,9 +1,11 @@
 import { validateRows } from './account'
 import { useEffect, useRef, useState } from 'react'
+import type { ProfessorCatalogState } from './courseProfessors'
+import ProfessorPicker from './ProfessorPicker'
 interface Warning { code: string; message: string }
-interface Row { id: number; code: string; section: string; warnings: Warning[] }
+interface Row { id: number; code: string; section: string; professor_first_name: string; professor_last_name: string; warnings: Warning[] }
 const maxBytes = 10 * 1024 * 1024
-export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?: (rows: { code: string; section: string }[]) => Promise<void> | void }) {
+export default function ScheduleImportPreview({ onAddClasses, catalog }: { onAddClasses?: (rows: { code: string; section: string; professor_first_name: string; professor_last_name: string }[]) => Promise<void> | void; catalog: ProfessorCatalogState }) {
   const [expanded, setExpanded] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [url, setUrl] = useState('')
@@ -57,7 +59,7 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
       if (id !== requestId.current) return
       if (!response.ok) throw new Error(data.error || 'Extraction failed. Please try again.')
       if (!Array.isArray(data.rows) || data.rows.some((r: { code?: unknown; section?: unknown }) => typeof r.code !== 'string' || typeof r.section !== 'string')) throw new Error('Invalid preview response. Please try again.')
-      setRows(data.rows.map((r: Omit<Row, 'id'>) => ({ ...r, warnings: r.warnings ?? [], id: ++rowId.current })))
+      setRows(data.rows.map((r: { code: string; section: string; warnings?: Warning[] }) => ({ ...r, professor_first_name: '', professor_last_name: '', warnings: r.warnings ?? [], id: ++rowId.current })))
       setHasResults(true)
       setMessage(data.rows.length ? `${data.rows.length} class sections detected. Review and correct them below.` : data.warnings?.find((w: Warning) => ['NO_TEXT','NO_CLASSES'].includes(w.code))?.message || 'No classes detected. Try a clearer screenshot or add a class.')
     } catch (error) {
@@ -65,7 +67,7 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
     } finally { if (id === requestId.current) { setBusy(false); controller.current = null } }
   }
   function edit(id: number, key: 'code' | 'section', value: string) {
-    setRows(previous => previous.map(row => row.id === id ? { ...row, [key]: value, warnings: key === 'section' ? [] : row.warnings } : row))
+    setRows(previous => previous.map(row => row.id === id ? { ...row, [key]: value, ...(key === 'code' ? { professor_first_name: '', professor_last_name: '' } : {}), warnings: key === 'section' ? [] : row.warnings } : row))
   }
   const validRows = validateRows(rows)
   return <div className="schedule-import">
@@ -87,25 +89,30 @@ export default function ScheduleImportPreview({ onAddClasses }: { onAddClasses?:
           if (!row.section.trim()) issues.push('Enter the section if you can read it.')
           if (!/^[A-Za-z]{2,4}\s?\d{3}$/.test(row.code.trim())) issues.push('Use a course code such as CSE 310.')
           if (!/^[A-Za-z0-9-]{0,20}$/.test(row.section.trim())) issues.push('Use up to 20 letters, digits, or hyphens for the section.')
+          if (!row.professor_first_name.trim() || !row.professor_last_name.trim()) issues.push('Choose a professor or select Other and enter the professor’s first and last name.')
           return <div className="import-row" key={row.id}>
-            <label>Course code {index + 1}<input value={row.code} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'code', e.target.value)} /></label>
-            <label>Section {index + 1}<input value={row.section} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'section', e.target.value)} /></label>
+            <div className="class-entry-fields">
+              <label>Course code<input value={row.code} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'code', e.target.value)} /></label>
+              <label>Section<input value={row.section} aria-describedby={`row-warning-${row.id}`} onChange={e => edit(row.id, 'section', e.target.value)} /></label>
+              <ProfessorPicker key={`${row.id}-${row.code}`} id={`import-${row.id}`} code={row.code} firstName={row.professor_first_name} lastName={row.professor_last_name} catalog={catalog} onChange={(professor_first_name, professor_last_name) => setRows(previous => previous.map(r => r.id === row.id ? { ...r, professor_first_name, professor_last_name } : r))} />
+            </div>
             <button aria-label={`Remove class ${index + 1}`} onClick={() => setRows(previous => previous.filter(r => r.id !== row.id))}>Remove</button>
             <p id={`row-warning-${row.id}`} className="import-warning">{[...new Set(issues)].join(' ')}</p>
           </div>
         })}
-        {onAddClasses && <div className="import-actions"><button disabled={!validRows || busy || saving} onClick={async () => {
+        {catalog.status === 'error' && <div role="alert"><p>The approved professor list is unavailable. Apply the professor-verification migration, then retry.</p><button type="button" onClick={catalog.retry}>Retry professor list</button></div>}
+        {onAddClasses && <div className="import-actions"><button disabled={!validRows || busy || saving || catalog.status !== 'success'} onClick={async () => {
           if (!validRows || savePending.current) return
           savePending.current = true; setSaving(true)
           const id = requestId.current
           try {
-            await onAddClasses(rows.map(({ code, section }) => ({ code, section })))
-            if (id === requestId.current) setMessage('Classes saved to Your courses. They will load after your next login.')
+            await onAddClasses(rows.map(({ code, section, professor_first_name, professor_last_name }) => ({ code, section, professor_first_name, professor_last_name })))
+            if (id === requestId.current) setMessage('Classes saved to Your courses.')
           } catch (error) {
             if (id === requestId.current) setMessage(error instanceof Error ? error.message : 'Unable to save classes. Your draft is still here; please retry.')
           } finally { savePending.current = false; setSaving(false) }
         }}>{saving ? 'Saving classes…' : 'Add to Your courses'}</button></div>}
-        <button onClick={() => setRows(previous => [...previous, { id: ++rowId.current, code: '', section: '', warnings: [] }])}>Add class</button>
+        <button onClick={() => setRows(previous => [...previous, { id: ++rowId.current, code: '', section: '', professor_first_name: '', professor_last_name: '', warnings: [] }])}>Add class</button>
       </div>}
     </fieldset></section>}
   </div>

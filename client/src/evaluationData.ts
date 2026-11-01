@@ -3,8 +3,10 @@ export interface CourseOffering {
   code: string
   title: string
   professor: string
-  semester: 'Spring' | 'Summer' | 'Fall'
+  semester: 'Spring' | 'Summer' | 'Fall' | 'Winter'
   year: number
+  section?: string
+  courseNumber?: string
   published: true
 }
 
@@ -15,6 +17,8 @@ export interface CourseEvaluation {
   difficulty: number
   review: string
   moderationStatus?: 'appropriate' | 'flagged'
+  classRating?: number | null
+  wouldRecommend?: boolean | null
 }
 
 export function summarizeEvaluations(evaluations: CourseEvaluation[]) {

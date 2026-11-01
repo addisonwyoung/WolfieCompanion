@@ -6,8 +6,8 @@ export interface ClassmateProfile {
   year?: string | null; interests?: string[]; residence_status?: 'commuter' | 'dormer' | null
 }
 export interface PeerApi {
-  detail: (course: string, peer: string, signal: AbortSignal) => Promise<ClassmateProfile | null>
-  picture: (course: string, peer: string, signal: AbortSignal) => Promise<Blob>
+  detail: (course: string, section: string, peer: string, signal: AbortSignal) => Promise<ClassmateProfile | null>
+  picture: (course: string, section: string, peer: string, signal: AbortSignal) => Promise<Blob>
 }
 export function parsePeer(data: unknown, peer: string): ClassmateProfile {
   if (!data || typeof data !== 'object') throw new Error('Invalid profile')
@@ -30,18 +30,18 @@ export function parsePeer(data: unknown, peer: string): ClassmateProfile {
 }
 export function peerApi(client: SupabaseClient): PeerApi {
   return {
-    async detail(course, peer, signal) {
-      const { data, error } = await client.rpc('get_classmate_profile', { p_course_code: course, p_student_id: peer }).abortSignal(signal)
+    async detail(course, section, peer, signal) {
+      const { data, error } = await client.rpc('get_classmate_profile', { p_course_code: course, p_section: section, p_student_id: peer }).abortSignal(signal)
       if (error) {
         if (['42501','22023'].includes(error.code)) return null
         throw new Error('Unable to load profile. Please retry.')
       }
       return data === null ? null : parsePeer(data, peer)
     },
-    async picture(course, peer, signal) {
+    async picture(course, section, peer, signal) {
       const { data } = await client.auth.getSession()
       if (!data.session) throw new Error('Sign in again')
-      const response = await fetch(`/api/classmate-picture?${new URLSearchParams({ course, student: peer })}`, { signal, cache: 'no-store', headers: { Authorization: `Bearer ${data.session.access_token}` } })
+      const response = await fetch(`/api/classmate-picture?${new URLSearchParams({ course, section, student: peer })}`, { signal, cache: 'no-store', headers: { Authorization: `Bearer ${data.session.access_token}` } })
       if (!response.ok || !response.headers.get('Content-Type')?.startsWith('image/png')) throw new Error('Picture unavailable')
       return response.blob()
     },
