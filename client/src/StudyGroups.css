@@ -52,6 +52,13 @@
 .study-member-heading { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .study-member-heading h3 { font-size: 14px; }
 .study-member-heading p { font-size: 11px; margin-top: 4px; }
+.study-member-role { display: grid; gap: 5px; margin-top: 10px; max-width: 260px; }
+.study-member-role > label { color: #65656e; font-size: 11px; font-weight: 650; }
+.study-member-role select, .study-custom-role input { min-height: 36px; padding: 7px 9px; font-size: 12px; }
+.study-role-readonly { margin: 0; color: #303037; font-size: 12px; }
+.study-custom-role { display: flex; gap: 6px; }
+.study-custom-role input { min-width: 0; flex: 1; }
+.study-custom-role button { white-space: nowrap; font-size: 11px; }
 .study-availability-status { padding: 5px 8px; border-radius: 20px; background: #f2f2f4; color: #6a6a72; font-size: 10px; white-space: nowrap; }
 .study-availability-status.is-ready { background: #e8f1e9; color: #285d3b; }
 .study-time-list { display: grid; gap: 7px; }
@@ -77,7 +84,29 @@
 .study-overlap-day { color: #a82032; font-weight: 650; }
 .study-overlap-list li span:last-child { color: #6b6b74; font-size: 11px; }
 .study-overlap-message { color: #6b6b74; font-size: 12px; margin-top: 14px; line-height: 1.5; }
+.study-task-board { margin-top: 22px; padding: 22px; border: 1px solid #e6e1e1; border-radius: 10px; background: #fff; }
+.study-task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.study-task-header h3 { margin: 3px 0 5px; font-size: 19px; }
+.study-task-header .eyebrow { color: #a82032; font-size: 10px; }
+.study-task-header .field-help { margin: 0; }
+.study-task-header > span { color: #6b6b74; font-size: 11px; white-space: nowrap; }
+.study-task-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; margin: 18px 0; padding-bottom: 18px; border-bottom: 1px solid #ededee; }
+.study-task-form label { font-size: 11px; }
+.study-task-form input, .study-task-form textarea { min-height: 40px; font-size: 12px; }
+.study-task-form textarea { min-height: 74px; resize: vertical; }
+.study-task-form button { min-height: 40px; justify-self: start; white-space: nowrap; }
+.study-task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.study-task-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px; border: 1px solid #ededee; border-radius: 8px; }
+.study-task-check { display: flex; align-items: flex-start; gap: 10px; min-width: 0; flex: 1; cursor: pointer; }
+.study-task-check input { margin-top: 3px; width: 17px; height: 17px; flex: 0 0 17px; }
+.study-task-check > span { display: grid; gap: 5px; min-width: 0; }
+.study-task-check strong { font-size: 13px; overflow-wrap: anywhere; }
+.study-task-details { color: #65656e; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.study-task-check small { color: #777780; font-size: 10px; }
+.study-task-list li.is-complete { background: #f8faf8; }
+.study-task-list li.is-complete .study-task-check strong { color: #777780; text-decoration: line-through; }
+.study-task-delete { color: #9a2234; border-color: #eadcda; padding: 5px 9px; font-size: 11px; }
 .study-error { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #bd6570; border-radius: 8px; color: #8b2635; margin-bottom: 16px; font-size: 13px; }
 .study-error button { color: #8b2635; }
 @media (max-width: 800px) { .study-groups-grid { grid-template-columns: 1fr; } .study-groups-intro { flex-direction: column; } .study-draft-note { max-width: none; } }
-@media (max-width: 600px) { .study-setup, .study-groups-list, .study-detail, .study-invitations { padding: 17px; } .study-members { grid-template-columns: 1fr; } .study-invitation, .study-detail-header { flex-direction: column; } .study-overlap-list li { grid-template-columns: 1fr; gap: 5px; } .study-overlap-heading { align-items: stretch; flex-direction: column; } .study-overlap-heading label { min-width: 0; } }
+@media (max-width: 600px) { .study-setup, .study-groups-list, .study-detail, .study-invitations, .study-task-board { padding: 17px; } .study-members { grid-template-columns: 1fr; } .study-invitation, .study-detail-header { flex-direction: column; } .study-overlap-list li { grid-template-columns: 1fr; gap: 5px; } .study-overlap-heading { align-items: stretch; flex-direction: column; } .study-overlap-heading label { min-width: 0; } .study-task-header { flex-direction: column; } }

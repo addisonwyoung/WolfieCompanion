@@ -11,6 +11,8 @@ The app uses authenticated Supabase RPCs for cross-user classmate discovery. `fi
 - Let each accepted member manage only their own availability.
 - Compute weekly intersections for all accepted members and a user-entered whole-minute duration up to 24 hours.
 - Keep all new SQL as a manually reviewed migration.
+- Let a member set their own project role and the group owner assign roles to any accepted member.
+- Let accepted members add tasks and mark them complete; limit deletion to the task author or group owner.
 
 ## Decisions
 
@@ -21,6 +23,8 @@ The app uses authenticated Supabase RPCs for cross-user classmate discovery. `fi
 - A forward-only database migration widens existing availability validation to accept minute-level values while preserving saved windows.
 - The end-time check is a table-level constraint because it compares two columns; the corrective migration removes its original generated name after replacing it with the minute-precision range check.
 - When the owner leaves, ownership transfers to the earliest accepted member. If no accepted member remains, the group is deleted. A member leaving removes their availability through the membership foreign key.
+- Project roles are optional labels stored on each membership. Preset roles are available in the client, with a short custom role option.
+- Tasks are shared only with accepted members, ordered newest first, and limited to 100 entries per group. Task text and details have fixed length limits.
 - The client displays only windows long enough for the requested duration. The SQL migration is not applied automatically.
 
 ## Risks
@@ -28,7 +32,10 @@ The app uses authenticated Supabase RPCs for cross-user classmate discovery. `fi
 - [An RPC could expose schedule data to a pending invitee] → Return availability only when the caller's membership status is accepted, and expose no direct table privileges.
 - [A student may mistake course membership for official enrollment] → Describe the association as based on student-saved course records, consistent with current discovery behavior.
 - [The client can be deployed before the migration] → RPC failures are shown as retryable group errors; apply the migration before enabling this page for the group.
+- [A pending invitee could see project notes] → Return tasks only for accepted memberships and deny direct table access.
 
 ## Migration Plan
 
 Review and manually apply `supabase/migrations/202610230003_study_buddy_groups.sql` after its prerequisite account, discovery, and classmate-visibility migrations. Do not run it against shared Supabase from the application. If rollback is needed, disable the client page and review a separate rollback SQL before dropping group data.
+
+After the section-scoped study group migration, apply `supabase/migrations/202611010003_study_group_roles_and_tasks.sql` to add shared roles and tasks. Existing groups and availability are preserved. Do not apply it until the section-scoped study group migration is installed.

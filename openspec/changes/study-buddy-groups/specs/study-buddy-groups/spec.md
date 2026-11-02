@@ -61,3 +61,31 @@ The system SHALL calculate the intersection of saved availability across every a
 
 - **WHEN** the accepted members have no sufficiently long overlap, or any member has not saved availability
 - **THEN** the page explains that no result can be shown and does not suggest a time that excludes a member
+
+### Requirement: Project role assignments
+
+The system SHALL let each accepted member set their own optional project role, and SHALL let the group owner assign or change any accepted member's role. Roles SHALL be limited to 60 characters. Pending invitees SHALL NOT set or read role assignments until they accept.
+
+#### Scenario: Assign and change project roles
+
+- **WHEN** an accepted member chooses a preset or custom role for themselves, or the owner chooses a role for an accepted member
+- **THEN** the role is saved for that group and shown under that member's name to accepted group members
+
+#### Scenario: Reject role changes by another member
+
+- **WHEN** an accepted non-owner tries to change another member's role
+- **THEN** the change is rejected
+
+### Requirement: Shared group task board
+
+The system SHALL let accepted members add up to 100 shared tasks per group, each with a title of 1 to 160 characters and optional details up to 1,000 characters. Accepted members MAY mark tasks complete or reopen them. The system SHALL show the newest task first. Only the task author or group owner MAY delete a task. Pending invitees and nonmembers SHALL NOT read or modify tasks.
+
+#### Scenario: Collaborate on tasks
+
+- **WHEN** an accepted member adds a task or changes its completion state
+- **THEN** the change is persisted and visible to other accepted members after the group data refreshes
+
+#### Scenario: Protect group task data
+
+- **WHEN** a pending invitee, nonmember, or unauthorized member requests restricted task data or deletion
+- **THEN** the request is rejected and no task data is exposed or changed

@@ -9,6 +9,8 @@ import { studyDays } from './studyGroupApi'
 import type { StudyDay, StudyGroup, StudyGroupApi, StudyWindow } from './studyGroupApi'
 import './StudyGroups.css'
 
+const studyRoleOptions = ['Coordinator', 'Researcher', 'Note-taker', 'Presenter', 'Editor', 'Designer', 'Timekeeper']
+
 function uniqueWindows(windows: WeeklyAvailability[]): WeeklyAvailability[] {
   const seen = new Set<string>()
   return windows.filter(window => {
@@ -53,11 +55,15 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [startTimeInput, setStartTimeInput] = useState('10:00 AM')
   const [endTimeInput, setEndTimeInput] = useState('12:00 PM')
   const [timeInputErrors, setTimeInputErrors] = useState<{ start?: string; end?: string }>({})
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>({})
+  const [customRoleEditing, setCustomRoleEditing] = useState<Record<string, boolean>>({})
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDetails, setTaskDetails] = useState('')
   const selectedGroup = groups.find(group => group.group_id === selectedGroupId) ?? null
 
   useEffect(() => {
     let alive = true
-    setLoadState('loading')
+    setLoadState(current => current === 'ready' ? 'ready' : 'loading')
     void api.list().then(result => {
       if (alive) { setGroups(result); setLoadState('ready'); setError('') }
     }, reason => {
@@ -65,6 +71,14 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
     })
     return () => { alive = false }
   }, [api, loadVersion])
+
+  useEffect(() => {
+    const refreshVisibleGroups = () => {
+      if (document.visibilityState === 'visible') setLoadVersion(value => value + 1)
+    }
+    const timer = window.setInterval(refreshVisibleGroups, 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => { setDraft(fromGroup(selectedGroup, userId)) }, [selectedGroupId, userId])
 
@@ -127,6 +141,18 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
       setGroupName(''); setSelectedPeers([])
     })
   }
+  function updateMemberRole(memberId: string, role: string | null, afterSave?: () => void) {
+    if (!selectedGroup) return
+    void perform(() => api.setMemberRole(selectedGroup.group_id, memberId, role), afterSave)
+  }
+  function addTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedGroup || !taskTitle.trim()) return
+    void perform(() => api.addTask(selectedGroup.group_id, taskTitle, taskDetails), () => {
+      setTaskTitle('')
+      setTaskDetails('')
+    })
+  }
 
   const pendingInvites = groups.filter(group => group.my_status === 'pending')
   const activeGroups = groups.filter(group => group.my_status === 'accepted')
@@ -179,12 +205,38 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
         {members.map(member => {
           const own = member.user_id === userId
           const times = own ? draft : windowsFor(selectedGroup, member.user_id)
-          return <section className="study-member-availability" key={member.user_id}><div className="study-member-heading"><div><h3>{own ? 'Your availability' : member.name}</h3><p className="muted">{own ? 'Only accepted members of this group can see these windows.' : 'Shared with this group'}</p></div><span className={`study-availability-status${times.length ? ' is-ready' : ''}`}>{times.length ? `${times.length} window${times.length === 1 ? '' : 's'}` : 'Add availability'}</span></div>
+          const mayAssignRole = own || selectedGroup.owner_id === userId
+          const knownRole = member.study_role === null || studyRoleOptions.includes(member.study_role)
+          const isCustomRoleEditing = customRoleEditing[member.user_id] ?? !knownRole
+          const roleSelectValue = isCustomRoleEditing ? '__custom__' : member.study_role ?? ''
+          const customRoleValue = roleDrafts[member.user_id] ?? (knownRole ? '' : member.study_role ?? '')
+          return <section className="study-member-availability" key={member.user_id}><div className="study-member-heading"><div><h3>{own ? 'Your availability' : member.name}</h3><p className="muted">{own ? 'Only accepted members of this group can see these windows.' : 'Shared with this group'}</p><div className="study-member-role"><label htmlFor={`study-role-${selectedGroup.group_id}-${member.user_id}`}>Project role</label>{mayAssignRole ? <><select id={`study-role-${selectedGroup.group_id}-${member.user_id}`} value={roleSelectValue} disabled={busy} onChange={event => {
+              const value = event.target.value
+              if (value === '__custom__') {
+                setRoleDrafts(current => ({ ...current, [member.user_id]: knownRole ? '' : member.study_role ?? '' }))
+                setCustomRoleEditing(current => ({ ...current, [member.user_id]: true }))
+              } else {
+                setCustomRoleEditing(current => ({ ...current, [member.user_id]: false }))
+                updateMemberRole(member.user_id, value || null)
+              }
+            }}><option value="">Not assigned</option>{studyRoleOptions.map(role => <option key={role} value={role}>{role}</option>)}<option value="__custom__">Other role…</option>{!knownRole && <option value={member.study_role!}>{member.study_role}</option>}</select>{roleSelectValue === '__custom__' && <form className="study-custom-role" onSubmit={event => { event.preventDefault(); updateMemberRole(member.user_id, customRoleValue.trim() || null, () => setCustomRoleEditing(current => ({ ...current, [member.user_id]: false }))) }}><input aria-label={`Custom project role for ${member.name}`} value={customRoleValue} maxLength={60} placeholder="Type a role" onChange={event => setRoleDrafts(current => ({ ...current, [member.user_id]: event.target.value }))} /><button type="submit" disabled={busy || !customRoleValue.trim()}>{busy ? 'Saving…' : 'Save role'}</button></form>}</> : <p className="study-role-readonly">{member.study_role || 'Not assigned'}</p>}</div></div><span className={`study-availability-status${times.length ? ' is-ready' : ''}`}>{times.length ? `${times.length} window${times.length === 1 ? '' : 's'}` : 'Add availability'}</span></div>
             {times.length > 0 && <ul className="study-time-list">{times.map((window, index) => <li key={`${window.day}-${window.start}-${window.end}-${index}`}><span><strong>{window.day}</strong><span>{formatTime(window.start)} – {formatTime(window.end)}</span></span>{own && <button type="button" disabled={busy} onClick={() => setDraft(current => current.filter((_, currentIndex) => currentIndex !== index))}>Remove</button>}</li>)}</ul>}
             {own && <><form className="study-availability-form" onSubmit={addWindow}><div className="study-time-inputs"><label>Day<select name="day" defaultValue="Monday">{studyDays.map(day => <option key={day}>{day}</option>)}</select></label><label>From<input name="start" type="text" inputMode="text" placeholder="10:35 AM" value={startTimeInput} aria-invalid={Boolean(timeInputErrors.start)} aria-describedby={timeInputErrors.start ? 'study-start-time-error' : undefined} onChange={event => { setStartTimeInput(event.target.value); setTimeInputErrors({}) }} required />{timeInputErrors.start && <span className="study-input-error" id="study-start-time-error" role="alert">{timeInputErrors.start}</span>}</label><label>Until<input name="end" type="text" inputMode="text" placeholder="12:00 PM" value={endTimeInput} aria-invalid={Boolean(timeInputErrors.end)} aria-describedby={timeInputErrors.end ? 'study-end-time-error' : undefined} onChange={event => { setEndTimeInput(event.target.value); setTimeInputErrors({}) }} required />{timeInputErrors.end && <span className="study-input-error" id="study-end-time-error" role="alert">{timeInputErrors.end}</span>}</label></div><p className="field-help">Type a time such as 10:35 AM or 14:35. Starts can be 00:00–23:59; ends can be 00:01–24:00.</p><button type="submit">Add time</button></form><button className="primary study-save-times" type="button" disabled={busy} onClick={() => void perform(() => api.saveAvailability(selectedGroup.group_id, toStudyWindows(draft)))}>{busy ? 'Saving…' : 'Save my availability'}</button></>}
           </section>
         })}
       </div>
+      <section className="study-task-board" aria-labelledby="study-task-heading">
+        <div className="study-task-header"><div><p className="eyebrow">SHARED PROJECT SPACE</p><h3 id="study-task-heading">Tasks and notes</h3><p className="field-help">Accepted members can add tasks and mark them complete. Updates refresh automatically about every 15 seconds.</p></div><span>{selectedGroup.tasks.length}/100 tasks</span></div>
+        <form className="study-task-form" onSubmit={addTask}>
+          <label htmlFor="study-task-title">Task or note<input id="study-task-title" value={taskTitle} onChange={event => setTaskTitle(event.target.value)} maxLength={160} placeholder="e.g. Draft the introduction" required /></label>
+          <label htmlFor="study-task-details">Details (optional)<textarea id="study-task-details" rows={3} value={taskDetails} onChange={event => setTaskDetails(event.target.value)} maxLength={1000} placeholder="Add context, links as plain text, or next steps" /></label>
+          <button className="primary" type="submit" disabled={busy || !taskTitle.trim() || selectedGroup.tasks.length >= 100}>{busy ? 'Adding…' : 'Add to shared board'}</button>
+        </form>
+        {!selectedGroup.tasks.length ? <div className="study-empty"><p>No tasks or notes yet. Add the first item for your group.</p></div> : <ul className="study-task-list">{selectedGroup.tasks.map(task => {
+          const mayDelete = task.created_by === userId || selectedGroup.owner_id === userId
+          return <li key={task.id} className={task.is_complete ? 'is-complete' : ''}><label className="study-task-check"><input type="checkbox" checked={task.is_complete} disabled={busy} aria-label={`${task.is_complete ? 'Reopen' : 'Complete'} task: ${task.title}`} onChange={event => void perform(() => api.setTaskComplete(task.id, event.target.checked))} /><span><strong>{task.title}</strong>{task.details && <span className="study-task-details">{task.details}</span>}<small>Added by {task.created_by_name} · {new Date(task.created_at).toLocaleDateString()}</small></span></label>{mayDelete && <button type="button" className="study-task-delete" disabled={busy} aria-label={`Delete task: ${task.title}`} onClick={() => void perform(() => api.deleteTask(task.id))}>Delete</button>}</li>
+        })}</ul>}
+      </section>
       <section className="study-overlap" aria-labelledby="study-overlap-heading"><div className="study-overlap-heading"><div><p className="eyebrow">SHARED WINDOWS</p><h3 id="study-overlap-heading">Times that work for everyone</h3></div><label>Meeting length (minutes)<input aria-describedby="meeting-length-help" type="number" min={1} max={1440} step={1} value={durationInput} onChange={event => setDurationInput(event.target.value)} /></label></div>
         <p id="meeting-length-help" className="field-help">Enter 1 to 1,440 minutes (up to 24 hours).</p>
         {!validDuration ? <p className="study-overlap-message" role="alert">Enter a whole number from 1 to 1,440 minutes.</p> : !allHaveTimes ? <p className="study-overlap-message">Every accepted member needs to save at least one free window before we can compare the group.</p> : shared.length ? <ul className="study-overlap-list">{meetingWindows.map(window => <li key={`${window.day}-${window.start}-${window.end}`}><span className="study-overlap-day">{window.day}</span><strong>{formatTime(window.start)} – {formatTime(window.end)}</strong><span>{Math.floor((window.end - window.start) / 60)} hr {(window.end - window.start) % 60 ? `${(window.end - window.start) % 60} min` : ''} open</span></li>)}</ul> : <p className="study-overlap-message">No shared windows are long enough. Try a shorter meeting or add more availability.</p>}
