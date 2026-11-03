@@ -75,3 +75,6 @@ Troubleshooting: missing configuration shows a setup screen; an OAuth redirect m
 ## Direct messaging availability
 
 The additive `202610230001_direct_messaging.sql` migration adds the owner-only `allow_new_dms` preference, default true for existing and new users. Edit profile → Allow new direct messages supports Save/Cancel and retry after failure. Off prevents only new incoming conversations; it does not block existing chats. Authorized friends, pending-request participants, and shared-course classmates can launch Message from profiles, with participant-only persistent text history in Messages. Review [direct messaging deployment, contracts, and acceptance](direct-messaging.md) before the owner manually applies SQL. Messaging uses current caller sessions and public configuration; no new service-role key or messaging service is required.
+
+
+For group texting, follow [group messaging setup](group-messaging.md). Apply the owner-reviewed group migration once to the shared project before testing New group. Creating needs you plus two accepted friends; only the creator can add more friends, and closed new DMs prevent new additions. Later members see only post-join messages. Existing direct/group chats continue after preferences or friendships change. No additional keys/services are required.

@@ -9,7 +9,7 @@ const profile: StudentProfile = {
   id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: ['Music'], residence_status: 'dormer', avatar_path: null,
   share_year: true, share_interests: true, share_residence_status: true,
 }
-const candidate = { student_id: 'peer', name: 'Peer', major: 'Computer Science', year: null, interests: null, residence_status: null }
+const candidate = { student_id: 'peer', name: 'Peer', major: 'Computer Science', year: null, interests: null, residence_status: null, shared_courses: ['CSE 310'] }
 const base = {
   enrolledCourses: [{ id: 'cse-310', code: 'CSE 310' }], selectedId: 'cse-310' as const, onSelect: vi.fn(), onAddClasses: vi.fn(), onRetry: vi.fn(), profile,
   roster: { status: 'success' as const, classmates: [{ student_id: 'roster', name: 'Roster Classmate', major: null }] },
@@ -19,7 +19,7 @@ describe('course recommendation dashboard', () => {
   it('shows accessible loading and error states without disrupting the roster', () => {
     const { rerender } = render(<CourseBrowser {...base} recommendations={{ status: 'loading', candidates: [] }} />)
     expect(screen.getByText('Roster Classmate')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'People you may connect with' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
     expect(screen.getByRole('status')).toHaveTextContent('Loading course recommendations')
     expect(screen.queryByText('Roster Classmate')).not.toBeInTheDocument()
     rerender(<CourseBrowser {...base} recommendations={{ status: 'error', candidates: [] }} onRetryRecommendations={vi.fn()} />)
@@ -30,21 +30,24 @@ describe('course recommendation dashboard', () => {
   })
 
   it('shows zero points when no comparison fields are available and omits private details', () => {
-    render(<CourseBrowser {...base} profile={{ ...profile, major: null }} recommendations={{ status: 'success', candidates: [{ ...candidate, major: null }] }} />)
-    fireEvent.click(screen.getByRole('button', { name: 'People you may connect with' }))
+    render(<CourseBrowser {...base} profile={{ ...profile, major: null }} recommendations={{ status: 'success', candidates: [{ ...candidate, major: null, shared_courses: [] }] }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
     expect(screen.getByText('Peer')).toBeInTheDocument()
-    expect(screen.getByText('0/100')).toBeInTheDocument()
-    expect(screen.queryByText(/Academic year:/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Residence:/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Shared interests:/)).not.toBeInTheDocument()
+    expect(screen.getByText('0%')).toHaveClass('recommendation-score-low')
+    expect(screen.queryByText(/^Academic year:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Residence:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Interests:/)).not.toBeInTheDocument()
   })
 
   it('displays optional details when they are present in the public projection', () => {
-    render(<CourseBrowser {...base} recommendations={{ status: 'success', candidates: [{ ...candidate, year: 'Third year', interests: ['Music'], residence_status: 'commuter' }] }} />)
-    fireEvent.click(screen.getByRole('button', { name: 'People you may connect with' }))
+    render(<CourseBrowser {...base} recommendations={{ status: 'success', candidates: [{ ...candidate, year: 'Third year', interests: ['Music'], residence_status: 'dormer' }] }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
+    expect(screen.getByText('Things in Common:')).toBeInTheDocument()
+    expect(screen.getByText('Courses: CSE 310')).toBeInTheDocument()
+    expect(screen.getByText('Major: Computer Science')).toBeInTheDocument()
     expect(screen.getByText('Academic year: Third year')).toBeInTheDocument()
-    expect(screen.getByText('Residence: commuter')).toBeInTheDocument()
-    expect(screen.getByText('Shared interests: Music')).toBeInTheDocument()
+    expect(screen.getByText('Residence: dormer')).toBeInTheDocument()
+    expect(screen.getByText('Interests: Music')).toBeInTheDocument()
   })
 
   it('loads by course and ignores a late response from the previous selection', async () => {
@@ -62,7 +65,7 @@ describe('course recommendation dashboard', () => {
 
   it('offers a successful empty state when a course has no recommendable peers', () => {
     render(<CourseBrowser {...base} recommendations={{ status: 'success', candidates: [] }} />)
-    fireEvent.click(screen.getByRole('button', { name: 'People you may connect with' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
     expect(screen.getByText('No recommendations yet')).toBeInTheDocument()
   })
 
@@ -70,7 +73,7 @@ describe('course recommendation dashboard', () => {
     render(<CourseBrowser {...base} recommendations={{ status: 'success', candidates: [candidate] }} />)
     expect(screen.getByText('Roster Classmate')).toBeInTheDocument()
     expect(screen.queryByText('Peer')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'People you may connect with' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
     expect(screen.getByText('Peer')).toBeInTheDocument()
     expect(screen.queryByText('Roster Classmate')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Classmates' }))

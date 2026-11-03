@@ -153,3 +153,6 @@ For future updates, stop the two app terminals, pull with `git pull --ff-only`, 
 ## Direct messaging
 
 After the owner reviews and manually applies the [messaging migration and deployment checklist](direct-messaging.md), eligible students can choose Message on an authorized friend, pending-request, or classmate profile and reopen saved chats from Messages. Text history persists in Supabase. Edit profile → Allow new direct messages defaults on for both existing and new users; saving it off prevents new conversations while existing chats continue in both directions. No new keys or messaging service are needed. The owner must communicate this default and complete real-account/Realtime verification separately from local fixtures.
+
+
+For group texting, follow [group messaging setup](group-messaging.md). Apply the owner-reviewed group migration once to the shared project before testing New group. Creating needs you plus two accepted friends; only the creator can add more friends, and closed new DMs prevent new additions. Later members see only post-join messages. Existing direct/group chats continue after preferences or friendships change. No additional keys/services are required.
