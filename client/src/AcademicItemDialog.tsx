@@ -2,11 +2,14 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AcademicInput, ItemType } from './academicItems'
 import { itemTypes, normalizeItem } from './academicItems'
 import type { SavedCourse } from './account'
+import ReminderChoices from './ReminderChoices'
+import { useAcademicReminders } from './reminderContext'
+import { defaultReminderSettings } from './academicReminders'
 import { useAcademicDialog } from './useAcademicDialog'
 
 function comparable(value: AcademicInput) {
   return JSON.stringify([value.user_course_id, value.title.trim(), value.type, value.due_date,
-    value.due_time ? value.due_time.padEnd(8, ':00') : null, value.notes?.trim() || null, value.location?.trim() || null, !!value.completed_at])
+    value.due_time ? value.due_time.padEnd(8, ':00') : null, value.notes?.trim() || null, value.location?.trim() || null, !!value.completed_at, value.reminder_offsets??null])
 }
 type Field = keyof AcademicInput
 export default function AcademicItemDialog({ initial, editing, courses, busy, saveError, onClose, onSave }: {
@@ -14,6 +17,9 @@ export default function AcademicItemDialog({ initial, editing, courses, busy, sa
   onClose: () => void; onSave: (value: AcademicInput) => Promise<boolean>
 }) {
   const dialog = useAcademicDialog()
+  const reminderState=useAcademicReminders()
+  const preferences=reminderState?.settings??defaultReminderSettings
+  const [timeNotice,setTimeNotice]=useState(false)
   const id = useId()
   const [draft, setDraft] = useState(initial)
   const [confirming, setConfirming] = useState(false)
@@ -59,7 +65,7 @@ export default function AcademicItemDialog({ initial, editing, courses, busy, sa
         if (!courses.some(course => course.databaseId === value.user_course_id)) throw new Error('Choose a saved course.')
       } catch (problem) {
         const message = (problem as Error).message
-        const field: Field = /title/i.test(message) ? 'title' : /type/i.test(message) ? 'type' : /notes/i.test(message) ? 'notes' : /location/i.test(message) ? 'location' : /time/i.test(message) ? 'due_time' : /date/i.test(message) ? 'due_date' : 'user_course_id'
+        const field: Field = /reminder/i.test(message) ? 'reminder_offsets' : /title/i.test(message) ? 'title' : /type/i.test(message) ? 'type' : /notes/i.test(message) ? 'notes' : /location/i.test(message) ? 'location' : /time/i.test(message) ? 'due_time' : /date/i.test(message) ? 'due_date' : 'user_course_id'
         if (field === 'notes' || field === 'location') setDetailsOpen(true)
         setValidation({ field, message }); return
       }
@@ -72,8 +78,10 @@ export default function AcademicItemDialog({ initial, editing, courses, busy, sa
           <div className="academic-form-grid"><div><label htmlFor={fieldId('course')}>Course</label><select id={fieldId('course')} name="user_course_id" required value={draft.user_course_id} aria-invalid={invalid('user_course_id')} aria-describedby={description('user_course_id')} onChange={event => change({ user_course_id: event.target.value })}>{courses.map(course => <option key={course.databaseId} value={course.databaseId}>{course.code}</option>)}</select></div>
             <div><label htmlFor={fieldId('type')}>Type</label><select id={fieldId('type')} name="type" value={draft.type} aria-invalid={invalid('type')} aria-describedby={description('type')} onChange={event => change({ type: event.target.value as ItemType })}>{itemTypes.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}</select></div></div>
           <div className="academic-form-grid"><div><label htmlFor={fieldId('date')}>Due date</label><input id={fieldId('date')} name="due_date" type="date" required min="0001-01-01" max="9999-12-31" value={draft.due_date} aria-invalid={invalid('due_date')} aria-describedby={description('due_date')} onChange={event => change({ due_date: event.target.value })} /></div>
-            <div><label htmlFor={fieldId('time')}>Time (optional)</label><input id={fieldId('time')} name="due_time" type="time" step="1" value={draft.due_time ?? ''} aria-invalid={invalid('due_time')} aria-describedby={description('due_time')} onChange={event => change({ due_time: event.target.value || null })} /></div></div>
+            <div><label htmlFor={fieldId('time')}>Time (optional)</label><input id={fieldId('time')} name="due_time" type="time" step="1" value={draft.due_time ?? ''} aria-invalid={invalid('due_time')} aria-describedby={description('due_time')} onChange={event => {const time=event.target.value||null;setTimeNotice(!time&&!!draft.reminder_offsets?.includes('three_hours'));change({due_time:time,...(!time&&draft.reminder_offsets?.includes('three_hours')?{reminder_offsets:draft.reminder_offsets.filter(key=>key!=='three_hours')}:{})})}} /></div></div>
           <p className="field-help" id={`${id}-time-help`}>Times use America/New_York. Leave time blank to stay due throughout that calendar date; it becomes overdue the following day.</p>
+          <section className="item-reminders" aria-label="Item reminders"><label htmlFor={fieldId('reminder-mode')}>Reminders</label><select name="reminder_offsets" aria-invalid={invalid('reminder_offsets')} aria-describedby={description('reminder_offsets')} id={fieldId('reminder-mode')} value={draft.reminder_offsets==null?'inherit':'custom'} onChange={event=>change({reminder_offsets:event.target.value==='inherit'?null:preferences[draft.type].filter(key=>!!draft.due_time||key!=='three_hours')})}><option value="inherit">Use my defaults</option><option value="custom">Customize (none selected = Off)</option></select>
+          <ReminderChoices value={(draft.reminder_offsets??preferences[draft.type]).filter(key=>!!draft.due_time||key!=='three_hours')} timed={!!draft.due_time} disabled={busy||draft.reminder_offsets==null} onChange={offsets=>change({reminder_offsets:offsets})}/>{!preferences.enabled&&<p className="field-help">All reminders are currently disabled in your personal settings.</p>}{timeNotice&&<p role="status">Three-hour reminder removed because this item has no due time. Save to keep this change.</p>}</section>
           <details className="academic-optional" open={detailsOpen} onToggle={event => setDetailsOpen(event.currentTarget.open)}><summary>Optional details</summary>
             <label htmlFor={fieldId('location')}>Location (optional)</label><input id={fieldId('location')} name="location" maxLength={200} value={draft.location ?? ''} aria-invalid={invalid('location')} aria-describedby={description('location')} onChange={event => change({ location: event.target.value })} />
             <label htmlFor={fieldId('notes')}>Notes (optional)</label><textarea id={fieldId('notes')} name="notes" maxLength={5000} rows={3} value={draft.notes ?? ''} aria-invalid={invalid('notes')} aria-describedby={description('notes')} onChange={event => change({ notes: event.target.value })} />

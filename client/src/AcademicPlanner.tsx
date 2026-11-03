@@ -7,6 +7,7 @@ import AcademicItemActions from './AcademicItemActions'
 import AcademicItemDialog from './AcademicItemDialog'
 import AcademicDeleteDialog from './AcademicDeleteDialog'
 import AcademicCalendar from './AcademicCalendar'
+import { useAcademicReminders } from './reminderContext'
 import { campusDate, readableTime } from './academicCalendarDates'
 
 function empty(course: string): AcademicInput {
@@ -19,10 +20,14 @@ function readableDate(date: string) {
 }
 type Modal = { kind: 'edit'; item?: AcademicItem; initial: AcademicInput } | { kind: 'delete'; item: AcademicItem }
 
-export default function AcademicPlanner({ api, courses, onAddCourses, active = true }: {
-  api: AcademicApi; courses: SavedCourse[]; onAddCourses: () => void; active?: boolean
+export default function AcademicPlanner({ api, courses, onAddCourses, active = true, reminderTarget }: {
+  reminderTarget?: {id:string;nonce:string}|null; api: AcademicApi; courses: SavedCourse[]; onAddCourses: () => void; active?: boolean
 }) {
   const state = useAcademicItems(api)
+  const reminders=useAcademicReminders()
+  const consumedTarget=useRef('')
+  const [targetError,setTargetError]=useState('')
+  const [targetRetry,setTargetRetry]=useState(0)
   const [course, setCourse] = useState('')
   const [type, setType] = useState('')
   const tabId = useId()
@@ -101,13 +106,20 @@ export default function AcademicPlanner({ api, courses, onAddCourses, active = t
     setModal({ kind: 'edit', item, initial: item ? { ...item } : empty(course || courses[0]?.databaseId || '') })
   }
   function close() { focusRequest.current = { target: opener.current }; setModal(null) }
+  useEffect(()=>{
+    if(!reminderTarget||!active||modal||state.busy||consumedTarget.current===reminderTarget.nonce)return
+    let current=true
+    void api.load().then(items=>{if(!current)return;const item=items.find(row=>row.id===reminderTarget.id);consumedTarget.current=reminderTarget.nonce;if(!item){setTargetError('This academic item is no longer available.');return}setTargetError('');opener.current=heading.current;setMenuId(null);setModal({kind:'edit',item,initial:{...item}})},()=>{if(current)setTargetError('Unable to open this reminder item. Please retry.')})
+    return()=>{current=false}
+  },[reminderTarget,active,modal,state.busy,api,targetRetry])
   async function complete(item: AcademicItem, trigger: HTMLInputElement) {
     const next = nextId(item)
     const success = await state.mutate(() => api.complete(item.id, !item.completed_at), item.completed_at ? 'Item reopened.' : 'Item completed.')
+    if(success)void reminders?.refresh()
     if (success && mounted.current) { focusRequest.current = { nextId: next, completionTrigger: trigger }; setFocusAttempt(value => value + 1) }
   }
   return <section ref={section} className="academic-items" aria-labelledby="academic-heading">
-    <div className="academic-intro"><div><p className="eyebrow">YOUR COURSEWORK, IN ONE PLACE</p><h1 id="academic-heading" tabIndex={-1} ref={heading}>Assignments &amp; Exams</h1><p className="muted">A little clarity for what’s coming up.</p></div>
+    <>{targetError&&<p role="alert">{targetError}<button onClick={()=>setTargetRetry(n=>n+1)}>Retry item</button></p>}</><div className="academic-intro"><div><p className="eyebrow">YOUR COURSEWORK, IN ONE PLACE</p><h1 id="academic-heading" tabIndex={-1} ref={heading}>Assignments &amp; Exams</h1><p className="muted">A little clarity for what’s coming up.</p></div>
       {!!courses.length && <button ref={addButton} className="primary" disabled={state.busy || state.status !== 'success'} onClick={() => openEdit()}><span aria-hidden="true">+ </span>Add item</button>}
     </div>
     <div className="academic-view-tabs" role="tablist" aria-label="Academic item view">{(['agenda', 'calendar'] as const).map((tab, index) => <button key={tab} role="tab" id={`${tabId}-${tab}-tab`} aria-controls={`${tabId}-${tab}-panel`} aria-selected={view === tab} tabIndex={view === tab ? 0 : -1} onClick={() => changeView(tab)} onKeyDown={event => {
@@ -148,12 +160,14 @@ export default function AcademicPlanner({ api, courses, onAddCourses, active = t
     <p className="academic-time-note">Deadlines use America/New_York. Dates without a time stay due for the full calendar day.</p>
     {modal?.kind === 'edit' && <AcademicItemDialog initial={modal.initial} editing={!!modal.item} courses={courses} busy={state.busy} saveError={state.actionFailed ? state.message : null} onClose={close} onSave={async value => {
       const success = await state.mutate(() => api.save(value, modal.item?.id), 'Item saved.')
+      if(success)void reminders?.refresh()
       if (success && mounted.current) close()
       return success
     }} />}
     {modal?.kind === 'delete' && <AcademicDeleteDialog title={modal.item.title} course={courses.find(saved => saved.databaseId === modal.item.user_course_id)?.code ?? 'Saved course'} busy={state.busy} error={state.actionFailed ? state.message : null} onCancel={close} onDelete={async () => {
       const next = nextId(modal.item)
       const success = await state.mutate(() => api.remove(modal.item.id), 'Item deleted.', modal.item.id)
+      if(success)void reminders?.refresh()
       if (success && mounted.current) { focusRequest.current = { nextId: next }; setModal(null) }
       return success
     }} />}

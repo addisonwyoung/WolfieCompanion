@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { SavedCourse } from './account'
 import type { ClassmateApi, Classmate } from './classmates'
@@ -60,10 +60,20 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDetails, setTaskDetails] = useState('')
   const selectedGroup = groups.find(group => group.group_id === selectedGroupId) ?? null
+  const [draftContext, setDraftContext] = useState({ groupId: selectedGroupId, userId })
+  // Reset only when the selected group/account changes, never on a background
+  // refresh that could otherwise overwrite unsaved availability.
+  if (draftContext.groupId !== selectedGroupId || draftContext.userId !== userId) {
+    setDraftContext({ groupId: selectedGroupId, userId })
+    setDraft(fromGroup(selectedGroup, userId))
+  }
+  const refreshGroups = useCallback(() => {
+    setLoadState(current => current === 'ready' ? 'ready' : 'loading')
+    setLoadVersion(value => value + 1)
+  }, [])
 
   useEffect(() => {
     let alive = true
-    setLoadState(current => current === 'ready' ? 'ready' : 'loading')
     void api.list().then(result => {
       if (alive) { setGroups(result); setLoadState('ready'); setError('') }
     }, reason => {
@@ -74,15 +84,13 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
 
   useEffect(() => {
     const refreshVisibleGroups = () => {
-      if (document.visibilityState === 'visible') setLoadVersion(value => value + 1)
+      if (document.visibilityState === 'visible') refreshGroups()
     }
     const timer = window.setInterval(refreshVisibleGroups, 15_000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [refreshGroups])
 
-  useEffect(() => { setDraft(fromGroup(selectedGroup, userId)) }, [selectedGroupId, userId])
-
-  const members = selectedGroup?.members.filter(member => member.status === 'accepted') ?? []
+  const members = useMemo(() => selectedGroup?.members.filter(member => member.status === 'accepted') ?? [], [selectedGroup])
   const allHaveTimes = members.length > 0 && members.every(member => windowsFor(selectedGroup!, member.user_id).length > 0)
   const shared = useMemo(() => allHaveTimes && selectedGroup && validDuration
     ? findSharedWindows(members.map(member => member.user_id === userId ? draft : windowsFor(selectedGroup, member.user_id)), duration)
@@ -127,7 +135,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   async function perform(action: () => Promise<unknown>, done?: (result: unknown) => void) {
     if (busy) return
     setBusy(true); setError('')
-    try { const result = await action(); done?.(result); setLoadVersion(value => value + 1) }
+    try { const result = await action(); done?.(result); refreshGroups() }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'That change could not be saved. Please retry.') }
     finally { setBusy(false) }
   }
@@ -166,7 +174,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
 
     {error && <div className="study-error" role="alert">{error}<button type="button" onClick={() => setError('')}>Dismiss</button></div>}
     {loadState === 'loading' && <p role="status">Loading your study groups…</p>}
-    {loadState === 'error' && <div className="study-empty"><p>Groups could not be refreshed.</p><button type="button" onClick={() => setLoadVersion(value => value + 1)}>Retry</button></div>}
+    {loadState === 'error' && <div className="study-empty"><p>Groups could not be refreshed.</p><button type="button" onClick={refreshGroups}>Retry</button></div>}
 
     {!!pendingInvites.length && <section className="study-invitations panel" aria-labelledby="study-invitations-title">
       <p className="eyebrow">YOU HAVE AN INVITATION</p><h2 id="study-invitations-title">Group invitations</h2>

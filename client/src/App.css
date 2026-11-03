@@ -448,3 +448,22 @@ button.academic-destructive:hover { background: #861a2a; }
 .group-actions li button { min-height: 30px; padding: .2rem .55rem; font-size: .8rem; }
 .group-removal { padding: .75rem 1rem; border: 1px solid var(--line, #ddd); border-radius: 10px; }
 .group-removal button + button { margin-left: .5rem; }
+
+/* Academic notifications remain distinct from message unread state. */
+.notification-center { position: relative; }
+.notification-trigger { display: inline-flex; align-items: center; gap: 8px; }
+.notification-dropdown { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: min(390px, calc(100vw - 40px)); max-height: min(70vh, 620px); overflow: auto; padding: 16px; border: 1px solid #e5dfe3; border-radius: 14px; background: #fff; color: #262329; box-shadow: 0 12px 36px #29142124; }
+.notification-dropdown header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
+.notification-dropdown h2 { margin: 0; font-size: 18px; }
+.notification-dropdown ul { list-style: none; padding: 0; margin: 12px 0; }
+.notification-dropdown li { display: flex; align-items: start; gap: 6px; border-bottom: 1px solid #eee; padding: 10px 0; }
+.notification-dropdown .reminder-open { display: flex; flex-direction: column; flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 6px; gap: 5px; white-space: normal; overflow-wrap: anywhere; }
+.reminder-open span, .reminder-open small { font-weight: 400; }
+.reminder-unread { border-left: 3px solid #a71937; background: #fff5f7; }
+.reminder-dialog { padding: 22px; max-width: 520px; overflow-wrap: anywhere; }
+.reminder-dialog footer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+.reminder-choices { border: 1px solid #e5dfe3; border-radius: 8px; margin: 12px 0; padding: 12px; }
+.reminder-choices label, .reminder-switch { display: flex; align-items: center; gap: 9px; margin: 7px 0; font-size: 14px; }
+.reminder-choices input[type=checkbox], .reminder-switch input[type=checkbox] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; accent-color: #a71937; margin: 0; }
+.reminder-choices small { display: block; margin-top: 8px; font-weight: normal; }
+.item-reminders { margin: 16px 0; }
