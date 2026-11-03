@@ -7,14 +7,16 @@ import type { CourseReviewApi } from '../src/courseReviews'
 import type { CourseEvaluation } from '../src/evaluationData'
 
 function review(id: string, offeringId = courseOfferings[0].id): CourseEvaluation {
-  return { id, offeringId, weeklyHours: 8, difficulty: 3, review: 'Persisted anonymous review.' }
+  return { id, offeringId, weeklyHours: 8, difficulty: 3, review: 'Persisted anonymous review.', classRating: 4, wouldRecommend: true }
 }
 function api(overrides: Partial<CourseReviewApi> = {}) {
   return {
     loadOfferings: vi.fn(async () => courseOfferings),
     loadOffering: vi.fn(async () => [review('stored-review')]),
     myOfferingIds: vi.fn(async () => []),
-    submit: vi.fn(async () => [review('stored-review')]),
+    myCurrentOfferingIds: vi.fn(async () => [courseOfferings[0].id]),
+    myVerifiedOfferingIds: vi.fn(async () => courseOfferings.map(item => item.id)),
+    submit: vi.fn(async () => ({ reviews: [review('stored-review')], moderationStatus: 'appropriate' as const })),
     ...overrides,
   } as unknown as CourseReviewApi
 }
@@ -37,10 +39,12 @@ test('persists a valid submission and keeps duplicate errors on the selected off
   await screen.findByText('Persisted anonymous review.')
   fireEvent.change(screen.getByLabelText('Weekly hours'), { target: { value: '6.5' } })
   fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '4' } })
+  fireEvent.change(screen.getByLabelText('Class rating'), { target: { value: '4' } })
+  fireEvent.click(screen.getByLabelText('Yes'))
   fireEvent.change(screen.getByLabelText('Written review'), { target: { value: 'Useful workload feedback.' } })
   fireEvent.click(screen.getByRole('button', { name: 'Publish review' }))
   await screen.findByText('Your anonymous review is saved and published for this offering.')
-  expect(reviews.submit).toHaveBeenCalledWith(courseOfferings[0].id, { weeklyHours: 6.5, difficulty: 4, review: 'Useful workload feedback.' })
+  expect(reviews.submit).toHaveBeenCalledWith(courseOfferings[0].id, { weeklyHours: 6.5, difficulty: 4, classRating: 4, wouldRecommend: true, review: 'Useful workload feedback.' })
   view.unmount()
 
   const duplicateApi = api({ submit: vi.fn(async () => { throw new DuplicateCourseReviewError() }) })
@@ -48,6 +52,8 @@ test('persists a valid submission and keeps duplicate errors on the selected off
   await screen.findByText('Persisted anonymous review.')
   fireEvent.change(screen.getByLabelText('Weekly hours'), { target: { value: '6' } })
   fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '2' } })
+  fireEvent.change(screen.getByLabelText('Class rating'), { target: { value: '3' } })
+  fireEvent.click(screen.getByLabelText('No'))
   fireEvent.click(screen.getByRole('button', { name: 'Publish review' }))
   await screen.findByText('You have already published a review for this offering.')
   expect(screen.getByText(/already published a review for this offering. Reading reviews remains available/)).toBeInTheDocument()
@@ -76,6 +82,8 @@ test('retains the review draft when persistence fails', async () => {
   await screen.findByText('Persisted anonymous review.')
   fireEvent.change(screen.getByLabelText('Weekly hours'), { target: { value: '9' } })
   fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('Class rating'), { target: { value: '5' } })
+  fireEvent.click(screen.getByLabelText('Yes'))
   fireEvent.change(screen.getByLabelText('Written review'), { target: { value: 'Keep this draft.' } })
   fireEvent.click(screen.getByRole('button', { name: 'Publish review' }))
   expect(await screen.findByText('Save failed. Please retry.')).toBeInTheDocument()

@@ -30,7 +30,7 @@ function isMissingReviewRelation(error: { code?: string } | null) {
 export function courseReviewApi(client: SupabaseClient) {
   async function loadOffering(offeringId: string): Promise<CourseEvaluation[]> {
     const { data, error } = await client.from('course_reviews_public')
-      .select('id,offering_id,difficulty,weekly_hours,class_rating,would_recommend,review,created_at')
+      .select('id,offering_id,difficulty,weekly_hours,class_rating,would_recommend,review,moderation_status,created_at')
       .eq('offering_id', offeringId)
     if (isMissingReviewRelation(error)) throw new CourseReviewStorageUnavailableError()
     if (error) throw new Error('Unable to load course reviews. Please retry.')
@@ -40,6 +40,7 @@ export function courseReviewApi(client: SupabaseClient) {
       weeklyHours: Number(row.weekly_hours),
       difficulty: row.difficulty,
       review: row.review,
+      moderationStatus: row.moderation_status,
       classRating: row.class_rating === null ? null : Number(row.class_rating),
       wouldRecommend: row.would_recommend,
     }))
@@ -71,6 +72,19 @@ export function courseReviewApi(client: SupabaseClient) {
       if (error) throw new Error('Unable to check previous reviews. Please retry.')
       return (data ?? []).map((row: { offering_id: string }) => row.offering_id)
     },
+    async submit(offeringId: string, input: CourseReviewInput): Promise<{ reviews: CourseEvaluation[]; moderationStatus: 'appropriate' | 'flagged' }> {
+      const { data: { session } } = await client.auth.getSession()
+      if (!session) throw new Error('Sign in again before publishing your review.')
+      const response = await fetch('/api/course-reviews', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offeringId, ...input }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string; moderationStatus?: 'appropriate' | 'flagged' }
+      if (response.status === 409) throw new DuplicateCourseReviewError()
+      if (!response.ok) throw new Error(result.error || 'Your review could not be saved. Your draft is still here; please retry.')
+      return { reviews: await loadOffering(offeringId), moderationStatus: result.moderationStatus ?? 'appropriate' }
+    },
     async myVerifiedOfferingIds(): Promise<string[]> {
       const { data, error } = await client.from('course_enrollments')
         .select('course_offering_id')
@@ -91,20 +105,6 @@ export function courseReviewApi(client: SupabaseClient) {
         .not('course_offering_id', 'is', null)
       if (error) throw new Error('Unable to match your current classes to course offerings. Please retry.')
       return [...new Set((data ?? []).map(row => row.course_offering_id).filter((id): id is string => Boolean(id)))]
-    },
-    async submit(offeringId: string, input: CourseReviewInput): Promise<CourseEvaluation[]> {
-      const { error } = await client.from('course_reviews').insert({
-        offering_id: offeringId,
-        difficulty: input.difficulty,
-        weekly_hours: input.weeklyHours,
-        review: input.review,
-        class_rating: input.classRating,
-        would_recommend: input.wouldRecommend,
-      })
-      if (error?.code === '23505') throw new DuplicateCourseReviewError()
-      if (isMissingReviewRelation(error)) throw new CourseReviewStorageUnavailableError()
-      if (error) throw new Error(`Your review could not be saved (${error.code}): ${error.message}`)
-      return loadOffering(offeringId)
     },
   }
 }
