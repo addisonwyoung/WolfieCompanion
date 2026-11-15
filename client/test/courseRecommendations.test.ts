@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { courseRecommendationApi, parseRecommendations, rankRecommendations, recommendationError } from '../src/courseRecommendations'
 import type { StudentProfile } from '../src/account'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -25,8 +25,19 @@ describe('course recommendations', () => {
 
   it('hides raw RPC errors behind the safe recommendation message', async () => {
     const client = { rpc: () => ({ abortSignal: async () => ({ data: null, error: { message: 'private database detail' } }) }) } as unknown as SupabaseClient
-    await expect(courseRecommendationApi(client)('CSE 310', new AbortController().signal)).rejects.toThrow(recommendationError)
-    await expect(courseRecommendationApi(client)('CSE 310', new AbortController().signal)).rejects.not.toThrow('private database detail')
+    await expect(courseRecommendationApi(client)('CSE 310', '01', 'Ada', 'Lovelace', new AbortController().signal)).rejects.toThrow(recommendationError)
+    await expect(courseRecommendationApi(client)('CSE 310', '01', 'Ada', 'Lovelace', new AbortController().signal)).rejects.not.toThrow('private database detail')
+  })
+
+  it('sends course and section with the abort signal and parses successful RPC results', async () => {
+    const signal = new AbortController().signal
+    const abortSignal = vi.fn(async (_signal: AbortSignal) => ({ data: [candidate()], error: null }))
+    const rpc = vi.fn(() => ({ abortSignal }))
+    const client = { rpc } as unknown as SupabaseClient
+
+    await expect(courseRecommendationApi(client)('CSE 310', '01', 'Ada', 'Lovelace', signal)).resolves.toEqual([candidate()])
+    expect(rpc).toHaveBeenCalledWith('course_recommendation_profiles_by_professor', { p_course_code: 'CSE 310', p_section: '01', p_professor_first_name: 'Ada', p_professor_last_name: 'Lovelace' })
+    expect(abortSignal).toHaveBeenCalledWith(signal)
   })
 
   it('awards major, interest, course, year, and residence points on a fixed 100-point scale', () => {
@@ -42,6 +53,35 @@ describe('course recommendations', () => {
     expect(result.score).toBe(30)
     expect(result.sharedInterests).toHaveLength(5)
     expect(rankRecommendations(profile({ major: null, year: null, residence_status: null, interests: [] }), [candidate({ major: null, year: null, residence_status: null, interests: [], shared_courses: ['CSE 101', 'CSE 102', 'AMS 101', 'MAT 101', 'WRT 101', 'PHY 101'] })])[0].score).toBe(25)
+  })
+
+  it('caps shared-interest points at 30 and shared-course points at 25', () => {
+    const interests = ['Art', 'Cooking', 'Hiking', 'Music', 'Reading', 'Robotics']
+    const result = rankRecommendations(
+      profile({ major: null, year: null, residence_status: null, interests }),
+      [candidate({
+        major: null,
+        year: null,
+        residence_status: null,
+        interests,
+        shared_courses: ['CSE 101', 'CSE 102', 'AMS 101', 'MAT 101', 'WRT 101', 'PHY 101'],
+      })],
+    )[0]
+
+    expect(result.score).toBe(55)
+    expect(result.sharedInterests).toHaveLength(6)
+  })
+
+  it('reaches 100 points for a full match and excludes private profile details', () => {
+    const interests = ['Art', 'Cooking', 'Hiking', 'Music', 'Reading']
+    const fullMatch = rankRecommendations(profile({ interests }), [candidate({ interests, residence_status: 'dormer', shared_courses: ['CSE 101', 'CSE 102', 'AMS 101', 'MAT 101', 'WRT 101'] })])[0]
+    expect(fullMatch.score).toBe(100)
+
+    const privateMatch = rankRecommendations(profile({ share_year: false, share_interests: false, share_residence_status: false }), [candidate()])[0]
+    expect(privateMatch.score).toBe(25)
+    expect(privateMatch.sharedInterests).toBeNull()
+    expect(privateMatch.sharedYear).toBeNull()
+    expect(privateMatch.sharedResidenceStatus).toBeNull()
   })
 
   it('awards no points for empty, nonmatching, private, or unavailable factors', () => {

@@ -20,7 +20,7 @@ const interestCategories = [
 ] as const
 const catalogInterests = new Set(interestCategories.flatMap(category => category.interests.map(interest => interest.toLowerCase())))
 function cleanInterestDraft(interests: string[]) {
-  return [...new Map(interests.map(interest => interest.trim()).filter(Boolean).map(interest => [interest.toLowerCase(), interest])).values()]
+  return [...new Map(interests.map(interest => interest.trim()).filter(interest => interest && catalogInterests.has(interest.toLowerCase())).map(interest => [interest.toLowerCase(), interest])).values()]
 }
 
 export default function Profile({ profile, onSave, pictureUrl }: { profile: StudentProfile; onSave: (profile: StudentProfile, picture?: PictureChange) => Promise<void>; pictureUrl?: (path: string) => Promise<string> }) {
@@ -75,7 +75,6 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
   const avatarUrl = savedPicture?.path === profile.avatar_path ? savedPicture?.url : undefined
   const selectedCount = draft.interests.length
   const normalizedSearch = interestSearch.trim().toLowerCase()
-  const legacyInterests = draft.interests.filter(interest => !catalogInterests.has(interest.trim().toLowerCase()))
   return <section className="panel profile" aria-labelledby="profile-heading">
     <div className="section-top"><h2 id="profile-heading">Your profile</h2></div>
     <div className="profile-identity"><Avatar name={profile.name} url={avatarUrl} /><h3>{profile.name}</h3><p className="muted">A little about you. A place to connect.</p></div>
@@ -92,7 +91,6 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
         <div className="selected-interests" aria-label="Selected interests">
           {draft.interests.length ? <ul className="interest-chips">{draft.interests.map((interest, index) => <li key={`${index}-${interest}`}><button type="button" className="interest-chip" onClick={() => toggleInterest(interest)} aria-label={`Remove ${interest} interest`}>{interest}<span aria-hidden="true"> ×</span></button></li>)}</ul> : <p className="field-help">No interests selected.</p>}
         </div>
-        {legacyInterests.length > 0 && <p className="field-help">Some saved interests are outside the current list. They remain selected until removed.</p>}
         <div className="interest-categories">
           {interestCategories.map(category => {
             const options = category.interests.filter(interest => interest.toLowerCase().includes(normalizedSearch))

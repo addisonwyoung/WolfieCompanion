@@ -3,6 +3,7 @@ import ManualClasses from './ManualClasses'
 import ScheduleImportPreview from './ScheduleImportPreview'
 import type { CourseId, Course } from './sampleData'
 import type { ClassmateState } from './useClassmates'
+import { duplicateCourseCode } from './account'
 import type { StudentProfile, ClassRow } from './account'
 import { rankRecommendations } from './courseRecommendations'
 import type { RankedRecommendation } from './courseRecommendations'
@@ -24,7 +25,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
   onRetryRecommendations?: () => void
   relationshipById?: Map<string, FriendRelationship>
   friendActionBusy?: Set<string>
-  onSendFriend?: (student: string, course: string, section: string) => void
+  onSendFriend?: (student: string, course: string, section: string, professorFirstName: string, professorLastName: string) => void
   onOpenFriendRequests?: () => void
 }) {
   const [activeList, setActiveList] = useState<'classmates' | 'recommendations'>('classmates')
@@ -35,6 +36,8 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
     : []
   async function saveClasses(rows: ClassRow[]) {
     if (professorCatalog.status !== 'success') throw new Error('The approved professor list is unavailable. Retry it before saving classes.')
+    const duplicate = duplicateCourseCode(rows, enrolledCourses.map(course => course.code))
+    if (duplicate) throw new Error(`${duplicate} is already on your dashboard for this semester and academic year. You can add it again in another semester or academic year.`)
     await onAddClasses(rows)
   }
   return <div className="course-browser">
@@ -46,7 +49,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
       {!enrolledCourses.length && <p className="empty-state">No saved classes yet. Enter classes manually or confirm a reviewed schedule.</p>}
       <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
         <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
-        <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : course.verificationStatus === 'verified' ? 'View classmates' : 'Verification required'}</span>
+        <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.professorFirstName && course.professorLastName && <span className="course-state">{course.professorFirstName} {course.professorLastName}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : course.verificationStatus === 'verified' ? 'View classmates' : 'Verification required'}</span>
       </button>)}</div>
     </section>
     {selected && <section className="classmates" aria-label={`${selected.code} student lists`}>
@@ -59,7 +62,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
         <button type="button" aria-pressed={activeList === 'recommendations'} onClick={() => setActiveList('recommendations')}>Recommendations</button>
       </div>}
       {activeList === 'classmates' || !recommendations ? <>
-      <div className="roster-heading" aria-live="polite" aria-atomic="true"><div><p className="eyebrow">SHARED COURSE SECTION</p><h2 id="classmates-heading">Classmates in {selected.code}{selected.section ? ` · Section ${selected.section}` : ''}</h2></div>{roster.status === 'success' && <span className="count">{classmates.length} {classmates.length === 1 ? 'classmate' : 'classmates'}</span>}</div>
+      <div className="roster-heading" aria-live="polite" aria-atomic="true"><div><p className="eyebrow">SHARED COURSE SECTION</p><h2 id="classmates-heading">Classmates in {selected.code}{selected.section ? ` · Section ${selected.section}` : ''}{selected.professorFirstName && selected.professorLastName ? ` · ${selected.professorFirstName} ${selected.professorLastName}` : ''}</h2></div>{roster.status === 'success' && <span className="count">{classmates.length} {classmates.length === 1 ? 'classmate' : 'classmates'}</span>}</div>
       {roster.status === 'loading' && <p role="status">Loading classmates…</p>}
       {roster.status === 'error' && <div className="panel empty-state"><p role="alert">Unable to load classmates. Please retry.</p><button onClick={onRetry}>Retry classmates</button></div>}
       {roster.status === 'success' && (classmates.length ? <ul className="roster">{classmates.map(student => <li key={student.student_id} className="panel student-card">
@@ -67,7 +70,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
       </li>)}</ul> : <div className="panel empty-state"><h3>No classmates yet</h3><p className="muted">No other students have saved this section yet.</p></div>)}
       <p className="roster-note">Your name and major are visible to eligible students sharing this current-semester course section. You choose whether to share your year, interests, residence status, and picture in Edit profile. Optional details stay private until shared. Course enrollment is self-reported, not official registration.</p>
       </> : <>
-      <div className="roster-heading"><div><p className="eyebrow">COURSE CONNECTIONS</p><h2 id="recommendations-heading">People you may connect with in {selected.code}{selected.section ? ` · Section ${selected.section}` : ''}</h2></div></div>
+      <div className="roster-heading"><div><p className="eyebrow">COURSE CONNECTIONS</p><h2 id="recommendations-heading">People you may connect with in {selected.code}{selected.section ? ` · Section ${selected.section}` : ''}{selected.professorFirstName && selected.professorLastName ? ` · ${selected.professorFirstName} ${selected.professorLastName}` : ''}</h2></div></div>
       {recommendations.status === 'loading' && <p role="status">Loading course recommendations…</p>}
       {recommendations.status === 'error' && <div className="panel empty-state"><p role="alert">Unable to load course recommendations. Please retry.</p><button onClick={onRetryRecommendations}>Retry recommendations</button></div>}
       {recommendations.status === 'success' && (rankedRecommendations.length ? <ul className="recommendation-list">{rankedRecommendations.map(candidate => <li key={candidate.student_id} className="panel recommendation-card">
@@ -88,7 +91,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
           if (relationship === 'accepted') return <p role="status" className="friend-status">Friends</p>
           const label = busy ? 'Sending friend request' : relationship === 'declined' ? 'Send friend request again' : 'Add friend'
           return <div className="recommendation-actions">
-            <button type="button" className="add-friend-button" aria-label={label} title={relationship === 'declined' ? 'Send friend request again' : 'Add friend'} disabled={busy} onClick={() => selected.section && onSendFriend?.(candidate.student_id, selected.code, selected.section)}>
+            <button type="button" className="add-friend-button" aria-label={label} title={relationship === 'declined' ? 'Send friend request again' : 'Add friend'} disabled={busy} onClick={() => selected.section && selected.professorFirstName && selected.professorLastName && onSendFriend?.(candidate.student_id, selected.code, selected.section, selected.professorFirstName, selected.professorLastName)}>
               {busy ? <span aria-hidden="true">…</span> : <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="7" r="4" /><path d="M2.5 21a6.5 6.5 0 0 1 13 0M19 8v8m-4-4h8" /></svg>}
               <span>{busy ? 'Sending…' : 'Add friend'}</span>
             </button>

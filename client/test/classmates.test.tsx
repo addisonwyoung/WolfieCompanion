@@ -15,17 +15,17 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-test('RPC uses course code only and maps only allowlisted fields; failures are safe', async () => {
+test('RPC scopes classmates to the selected professor and maps only allowlisted fields; failures are safe', async () => {
   const rpc = vi.fn().mockResolvedValue({ data: [{ ...peer, email: 'private', interests: ['secret'] }], error: null })
   const api = classmateApi({ rpc } as unknown as SupabaseClient)
-  expect(await api('CSE 310')).toEqual([peer])
-  expect(rpc).toHaveBeenCalledWith('find_classmates', { p_course_code: 'CSE 310' })
+  expect(await api('CSE 310', '01', 'Ada', 'Lovelace')).toEqual([peer])
+  expect(rpc).toHaveBeenCalledWith('find_classmates_by_professor', { p_course_code: 'CSE 310', p_section: '01', p_professor_first_name: 'Ada', p_professor_last_name: 'Lovelace' })
   rpc.mockResolvedValueOnce({ data: null, error: { message: 'database secret' } })
-  await expect(api('CSE 310')).rejects.toThrow(classmateError)
+  await expect(api('CSE 310', '01', 'Ada', 'Lovelace')).rejects.toThrow(classmateError)
   rpc.mockRejectedValueOnce(new Error('network secret'))
-  await expect(api('CSE 310')).rejects.toThrow(classmateError)
+  await expect(api('CSE 310', '01', 'Ada', 'Lovelace')).rejects.toThrow(classmateError)
   rpc.mockResolvedValueOnce({ data: [{ name: 'invalid' }], error: null })
-  await expect(api('CSE 310')).rejects.toThrow(classmateError)
+  await expect(api('CSE 310', '01', 'Ada', 'Lovelace')).rejects.toThrow(classmateError)
 })
 
 test('request lifecycle clears course/account/expired-session results and ignores late responses', async () => {
@@ -33,7 +33,7 @@ test('request lifecycle clears course/account/expired-session results and ignore
   const second = deferred<Classmate[]>()
   const third = deferred<Classmate[]>()
   const api = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise).mockResolvedValue([])
-  const { result, rerender } = renderHook(({ user, code }: { user: string | null; code: string | null }) => useClassmates(api, user, code), { initialProps: { user: 'a', code: 'CSE 310' } as { user: string | null; code: string | null } })
+  const { result, rerender } = renderHook(({ user, code }: { user: string | null; code: string | null }) => useClassmates(api, user, code, '01', 'Ada', 'Lovelace'), { initialProps: { user: 'a', code: 'CSE 310' } as { user: string | null; code: string | null } })
   expect(result.current.status).toBe('loading')
   rerender({ user: 'a', code: 'AMS 210' })
   await act(async () => first.resolve([peer]))
@@ -58,11 +58,11 @@ test('request lifecycle clears course/account/expired-session results and ignore
 test('sign-out invalidates an in-flight request and retry refetches the active course', async () => {
   const pending = deferred<Classmate[]>()
   const api = vi.fn().mockRejectedValueOnce(new Error('offline')).mockReturnValueOnce(pending.promise).mockResolvedValue([peer])
-  const { result, rerender } = renderHook(({ user }: { user: string | null }) => useClassmates(api, user, 'CSE 310'), { initialProps: { user: 'a' } as { user: string | null } })
+  const { result, rerender } = renderHook(({ user }: { user: string | null }) => useClassmates(api, user, 'CSE 310', '01', 'Ada', 'Lovelace'), { initialProps: { user: 'a' } as { user: string | null } })
   await waitFor(() => expect(result.current.status).toBe('error'))
   act(() => result.current.retry())
   expect(result.current.status).toBe('loading')
-  expect(api).toHaveBeenLastCalledWith('CSE 310')
+  expect(api).toHaveBeenLastCalledWith('CSE 310', '01', 'Ada', 'Lovelace')
   rerender({ user: null })
   await act(async () => pending.resolve([peer]))
   expect(result.current.status).toBe('idle')
@@ -81,7 +81,7 @@ test('no lookup without a ready identity and selected code', () => {
 
 test('cards display name and major only, with separate accessible states and visibility explanation', async () => {
   const onSelect = vi.fn(), onRetry = vi.fn()
-  const props = { enrolledCourses: [{ id: 'cse-310', code: 'CSE 310' }], selectedId: 'cse-310', onSelect, onAddClasses: vi.fn(), onRetry }
+  const props = { enrolledCourses: [{ id: 'cse-310', code: 'CSE 310', section: '01', professorFirstName: 'Ada', professorLastName: 'Lovelace', verificationStatus: 'verified' }], selectedId: 'cse-310', onSelect, onAddClasses: vi.fn(), onRetry }
   const { rerender } = render(<CourseBrowser {...props} roster={{ status: 'success', classmates: [peer] }} />)
   expect(screen.getByText('Real Peer')).toBeInTheDocument()
   expect(screen.getByText('Major not added')).toBeInTheDocument()
