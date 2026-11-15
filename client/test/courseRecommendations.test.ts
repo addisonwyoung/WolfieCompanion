@@ -31,7 +31,7 @@ describe('course recommendations', () => {
 
   it('sends course and section with the abort signal and parses successful RPC results', async () => {
     const signal = new AbortController().signal
-    const abortSignal = vi.fn(async (_signal: AbortSignal) => ({ data: [candidate()], error: null }))
+    const abortSignal = vi.fn(async () => ({ data: [candidate()], error: null }))
     const rpc = vi.fn(() => ({ abortSignal }))
     const client = { rpc } as unknown as SupabaseClient
 
