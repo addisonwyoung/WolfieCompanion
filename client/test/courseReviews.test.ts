@@ -6,13 +6,13 @@ import type { CourseOffering } from '../src/evaluationData'
 const offering: CourseOffering = { id: 'offering-1', code: 'CSE 416', title: 'Software Engineering', professor: 'Dr. Lee', semester: 'Fall', year: 2026, section: '01', published: true }
 const row = (id: string) => ({ id, offering_id: offering.id, difficulty: 4, weekly_hours: 12.5, class_rating: 5, would_recommend: true, moderation_status: 'appropriate', review: 'Anonymous text', created_at: '2026-10-17T00:00:00Z' })
 
-function fixture() {
+function fixture(session: { access_token: string } | null = { access_token: 'test-token' }) {
   const queryCalls: { table: string; selected?: string; filters: [string, unknown][] }[] = []
   let rows: Record<string, unknown>[] = [row('review-1')]
   let offeringRows: Record<string, unknown>[] = []
   let fetchResponse: Partial<Response> = { ok: true, status: 201, json: async () => ({ moderationStatus: 'appropriate' }) }
   const client = {
-    auth: { getSession: vi.fn(async () => ({ data: { session: { access_token: 'test-token' } }, error: null })) },
+    auth: { getSession: vi.fn(async () => ({ data: { session }, error: null })) },
     from: vi.fn((table: string) => {
       const call = { table, filters: [] as [string, unknown][], selected: undefined as string | undefined }
       queryCalls.push(call)
@@ -74,6 +74,20 @@ test('submits through the authenticated moderation endpoint, then reloads persis
   }))
   expect(saved).toEqual({ reviews: [expect.objectContaining({ id: 'review-1' })], moderationStatus: 'appropriate' })
   expect(await f.api.myOfferingIds()).toEqual([offering.id])
+})
+
+test('does not send a review without a signed-in session', async () => {
+  const f = fixture(null)
+  await expect(f.api.submit(offering.id, { weeklyHours: 7, difficulty: 3, classRating: 4, wouldRecommend: true, review: 'Good course' }))
+    .rejects.toThrow('Sign in again before publishing your review.')
+  expect(f.fetchSpy).not.toHaveBeenCalled()
+})
+
+test('surfaces a network failure during review submission', async () => {
+  const f = fixture()
+  f.fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+  await expect(f.api.submit(offering.id, { weeklyHours: 7, difficulty: 3, classRating: 4, wouldRecommend: true, review: 'Good course' }))
+    .rejects.toThrow('Failed to fetch')
 })
 
 test('maps API duplicate responses to the duplicate review message', async () => {

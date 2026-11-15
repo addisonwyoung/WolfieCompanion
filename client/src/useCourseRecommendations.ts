@@ -3,21 +3,21 @@ import type { CourseRecommendation, RecommendationApi } from './courseRecommenda
 
 export type RecommendationState = { status: 'idle' | 'loading' | 'success' | 'error'; candidates: CourseRecommendation[] }
 
-export function useCourseRecommendations(api: RecommendationApi, userId: string | null, courseCode: string | null, section: string | null) {
+export function useCourseRecommendations(api: RecommendationApi, userId: string | null, courseCode: string | null, section: string | null, professorFirstName: string | null = null, professorLastName: string | null = null) {
   const [attempt, setAttempt] = useState(0)
-  const key = userId && courseCode && section ? JSON.stringify([userId, courseCode, section, attempt]) : null
+  const key = userId && courseCode && section && professorFirstName && professorLastName ? JSON.stringify([userId, courseCode, section, professorFirstName.toLowerCase(), professorLastName.toLowerCase(), attempt]) : null
   const [result, setResult] = useState<{ key: string; api: RecommendationApi; state: RecommendationState } | null>(null)
 
   useEffect(() => {
-    if (!key || !courseCode || !section) return
+    if (!key || !courseCode || !section || !professorFirstName || !professorLastName) return
     const controller = new AbortController()
-    void api(courseCode, section, controller.signal).then(candidates => {
+    void api(courseCode, section, professorFirstName, professorLastName, controller.signal).then(candidates => {
       if (!controller.signal.aborted) setResult({ key, api, state: { status: 'success', candidates } })
     }, () => {
       if (!controller.signal.aborted) setResult({ key, api, state: { status: 'error', candidates: [] } })
     })
     return () => controller.abort()
-  }, [api, key, courseCode, section])
+  }, [api, key, courseCode, section, professorFirstName, professorLastName])
 
   if (!key) return { status: 'idle' as const, candidates: [] as CourseRecommendation[], retry: () => setAttempt(value => value + 1) }
   const state = result?.key === key && result.api === api ? result.state : { status: 'loading' as const, candidates: [] }

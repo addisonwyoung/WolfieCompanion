@@ -49,7 +49,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const professorsApi = useMemo(() => professorCatalogApi(client), [client])
   const professorCatalog = useProfessorCatalog(professorsApi, account.status === 'ready' ? account.userId : null)
   const peers = useMemo(() => peerApi(client), [client])
-  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string; section: string } | null>(null)
+  const [peer, setPeer] = useState<{ id: string; user: string | null; course: string; section: string; professorFirstName: string; professorLastName: string } | null>(null)
   const discover = useMemo(() => classmateApi(client), [client])
   const recommend = useMemo(() => courseRecommendationApi(client), [client])
   const friendsApi = useMemo(() => friendApi(client), [client])
@@ -70,9 +70,11 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const selectedCourse = account.courses.find(c => c.id === selected)
   const verifiedCourseCode = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.code : null
   const verifiedCourseSection = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.section ?? null : null
-  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection)
-  const recommendations = useCourseRecommendations(recommend, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection)
-  const friendState = useFriendships(friendsApi, client, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null, account.courses.map(course => course.code))
+  const verifiedProfessorFirstName = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.professorFirstName ?? null : null
+  const verifiedProfessorLastName = selectedCourse?.verificationStatus === 'verified' ? selectedCourse.professorLastName ?? null : null
+  const roster = useClassmates(discover, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection, verifiedProfessorFirstName, verifiedProfessorLastName)
+  const recommendations = useCourseRecommendations(recommend, account.status === 'ready' ? account.userId : null, verifiedCourseCode, verifiedCourseSection, verifiedProfessorFirstName, verifiedProfessorLastName)
+  const friendState = useFriendships(friendsApi, client, account.status === 'ready' ? account.userId : null, selectedCourse?.code ?? null, selectedCourse?.section ?? null, account.courses.map(course => course.code), selectedCourse?.professorFirstName ?? null, selectedCourse?.professorLastName ?? null)
   const [previousStatus, setPreviousStatus] = useState(account.status)
   if (previousStatus !== account.status) { setPreviousStatus(account.status); if (dmTarget) setDmTarget(null); if (peer) setPeer(null); if (friendProfileId) setFriendProfileId(null) }
   async function signIn() {
@@ -98,11 +100,11 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
         <div className="dashboard"><div className="profile-column"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} />
           <Friends friends={friendState.friends} busyIds={friendState.busyIds} onRetry={friendState.retry} onViewProfile={setFriendProfileId} onUnfriend={id => { void friendState.unfriend(id) }} api={friendsApi} onOpenRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} relationshipById={friendState.relationshipById} />
           <FriendRequests incoming={friendState.inbox.data} loading={friendState.inbox.status === 'loading'} error={friendState.inbox.status === 'error'} busyIds={friendState.busyIds} onRespond={(id, action) => { void friendState.respond(id, action) }} onViewProfile={setFriendProfileId} onRetry={friendState.retry} />
-        </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} professorCatalog={professorCatalog} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => { if (selectedCourse?.section) setPeer({ id, user: account.userId, course: selectedCourse.code, section: selectedCourse.section }) }} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
-          relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code, section) => friendState.send(code, section, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
+        </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} professorCatalog={professorCatalog} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => { if (selectedCourse?.section && selectedCourse.professorFirstName && selectedCourse.professorLastName) setPeer({ id, user: account.userId, course: selectedCourse.code, section: selectedCourse.section, professorFirstName: selectedCourse.professorFirstName, professorLastName: selectedCourse.professorLastName }) }} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
+          relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code, section, firstName, lastName) => friendState.send(code, section, firstName, lastName, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
         </div>
       </div>
-      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selectedCourse?.code && peer.section === selectedCourse?.section && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={peer.course} section={peer.section} student={peer.id} onClose={() => setPeer(null)} />}
+      {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selectedCourse?.code && peer.section === selectedCourse?.section && peer.professorFirstName === selectedCourse?.professorFirstName && peer.professorLastName === selectedCourse?.professorLastName && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={peer.course} section={peer.section} professorFirstName={peer.professorFirstName} professorLastName={peer.professorLastName} student={peer.id} onClose={() => setPeer(null)} />}
       {view === 'dashboard' && friendProfileId && <FriendProfileDialog key={`${account.userId}-${friendProfileId}`} messaging={messaging} onMessage={openMessage} api={friendsApi} student={friendProfileId} onClose={() => setFriendProfileId(null)} />}
       {friendState.actionError && <div className="friend-action-error" role="alert">{friendState.actionError}<button type="button" onClick={() => friendState.retryAction?.()}>Retry action</button><button type="button" onClick={friendState.clearError}>Dismiss</button></div>}
       {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems reminderTarget={reminderTarget?.user===account.userId?reminderTarget:null} active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}

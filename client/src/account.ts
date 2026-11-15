@@ -16,6 +16,17 @@ export interface PictureChange { file?: File; remove?: boolean }
 export function validateRows(rows: ClassRow[]) {
   return rows.length > 0 && rows.length <= 100 && rows.every(r => /^[a-z]{2,5}\s*\d{3}[a-z]?$/i.test(r.code.trim()) && /^[a-z0-9-]{1,20}$/i.test(r.section.trim()) && r.professor_first_name.trim().length > 0 && r.professor_first_name.trim().length <= 80 && r.professor_last_name.trim().length > 0 && r.professor_last_name.trim().length <= 80)
 }
+export function duplicateCourseCode(rows: Pick<ClassRow, 'code'>[], existingCodes: string[] = []): string | null {
+  const seen = new Set(existingCodes.map(code => code.replace(/\s+/g, '').toUpperCase()))
+  for (const row of rows) {
+    const code = row.code.replace(/\s+/g, '').toUpperCase()
+    const match = /^([A-Z]{2,5})([0-9]{3}[A-Z]?)$/.exec(code)
+    const displayCode = match ? `${match[1]} ${match[2]}` : row.code.trim().toUpperCase()
+    if (seen.has(code)) return displayCode
+    seen.add(code)
+  }
+  return null
+}
 export function normalizeProfile(profile: StudentProfile): StudentProfile {
   const interests = [...new Map(profile.interests.map(s => s.trim()).filter(Boolean).map(s => [s.toLowerCase(), s])).values()]
   const next = { ...profile, allow_new_dms: profile.allow_new_dms !== false, share_year: profile.share_year === true, share_interests: profile.share_interests === true, share_residence_status: profile.share_residence_status === true, share_avatar: profile.share_avatar === true, name: profile.name.trim(), major: profile.major?.trim() || null, interests }
@@ -51,16 +62,19 @@ export function accountApi(client: SupabaseClient) {
       ])
       if (p.error || c.error || planner.error || !p.data) throw new Error('Unable to load your profile and classes. Please retry.')
       const grouped = new Map<string, SavedCourse>()
-      for (const row of (c.data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; verification_status: string }[]) {
+      for (const row of (c.data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; professor_first_name: string | null; professor_last_name: string | null; verification_status: string }[]) {
         const section = row.section ?? ''
-        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}`
-        const key = `${row.code}:${section}`
+        const firstName = row.professor_first_name?.trim() ?? ''
+        const lastName = row.professor_last_name?.trim() ?? ''
+        const professorKey = `${firstName.toLowerCase()}:${lastName.toLowerCase()}`
+        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}-prof-${professorKey.replace(/[^a-z0-9]+/g, '-')}`
+        const key = `${row.code}:${section}:${professorKey}`
         const current = grouped.get(key)
         if (current) {
           if (row.section && !current.sections?.includes(row.section)) current.sections = [...(current.sections ?? []), row.section].sort()
           if (current.verificationStatus !== 'pending') current.verificationStatus = row.verification_status
         } else {
-          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
+          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
         }
       }
       return { profile: p.data as StudentProfile, courses: [...grouped.values()], plannerCourses: (planner.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
@@ -70,15 +84,18 @@ export function accountApi(client: SupabaseClient) {
       const { data, error } = await client.rpc('save_enrollments', { rows })
       if (error) throw new Error('Classes could not be saved. Your draft is still here; please retry.')
       const grouped = new Map<string, SavedCourse>()
-      for (const row of (data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; verification_status: string }[]) {
+      for (const row of (data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; professor_first_name: string | null; professor_last_name: string | null; verification_status: string }[]) {
         const section = row.section ?? ''
-        const key = `${row.code}:${section}`
-        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}`
+        const firstName = row.professor_first_name?.trim() ?? ''
+        const lastName = row.professor_last_name?.trim() ?? ''
+        const professorKey = `${firstName.toLowerCase()}:${lastName.toLowerCase()}`
+        const key = `${row.code}:${section}:${professorKey}`
+        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}-prof-${professorKey.replace(/[^a-z0-9]+/g, '-')}`
         const course = grouped.get(key)
         if (course) {
           if (row.section && !course.sections?.includes(row.section)) course.sections = [...(course.sections ?? []), row.section].sort()
           if (course.verificationStatus !== 'pending') course.verificationStatus = row.verification_status
-        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], verificationStatus: row.verification_status })
+        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
       }
       const { data: planner, error: plannerError } = await client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code')
       if (plannerError) throw new Error('Classes were saved, but planner course links could not be refreshed. Reload your workspace to retry.')

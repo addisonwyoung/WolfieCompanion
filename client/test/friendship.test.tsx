@@ -13,7 +13,7 @@ import { useFriendships } from '../src/useFriendships'
 const incoming: FriendRequest[] = [{ request_id: 'request-1', sender_id: 'student-1', sender_name: 'Avery Student', sender_major: 'Computer Science', created_at: '2026-10-22T12:00:00Z' }]
 const profile: StudentProfile = { id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: [], residence_status: null, avatar_path: null }
 const peer = { student_id: 'peer', name: 'Peer Student', major: 'Computer Science', year: null, interests: null, residence_status: null, shared_courses: ['CSE 310'] }
-const baseBrowser = { enrolledCourses: [{ id: 'cse-310', code: 'CSE 310' }], selectedId: 'cse-310' as const, onSelect: vi.fn(), onAddClasses: vi.fn(), onRetry: vi.fn(), profile, roster: { status: 'success' as const, classmates: [] } }
+const baseBrowser = { enrolledCourses: [{ id: 'cse-310', code: 'CSE 310', section: '01', professorFirstName: 'Ada', professorLastName: 'Lovelace', verificationStatus: 'verified' }], selectedId: 'cse-310' as const, onSelect: vi.fn(), onAddClasses: vi.fn(), onRetry: vi.fn(), profile, roster: { status: 'success' as const, classmates: [] } }
 
 describe('friend request inbox', () => {
   it('shows the pending count, sender summary, profile action, and accept/decline controls', () => {
@@ -57,7 +57,7 @@ describe('friends list', () => {
     const onUnfriend = vi.fn()
     const api = { directory: vi.fn(async () => []), sendToStudent: vi.fn(async () => 'request-id') } as unknown as FriendApi
     render(<Friends friends={{ status: 'success', data: [friend, otherFriend] }} busyIds={new Set()} onRetry={vi.fn()} onViewProfile={onViewProfile} onUnfriend={onUnfriend} api={api} onOpenRequests={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Friends 2' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Friends/ }))
     expect(screen.getByRole('dialog', { name: 'Friends' })).toBeInTheDocument()
     expect(screen.getByText('Accepted Friend')).toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search friends' }), { target: { value: 'morgan' } })
@@ -83,7 +83,7 @@ describe('course relationship controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Recommendations' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send friend request again' }))
     fireEvent.click(screen.getByRole('button', { name: 'Respond to friend request' }))
-    expect(onSendFriend).toHaveBeenCalledWith('peer', 'CSE 310')
+    expect(onSendFriend).toHaveBeenCalledWith('peer', 'CSE 310', '01', 'Ada', 'Lovelace')
     expect(onOpenFriendRequests).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'View profile of Peer Student' }))
     expect(onViewProfile).toHaveBeenCalledWith('peer')
@@ -97,7 +97,7 @@ describe('friend API adapter', () => {
     const calls: Array<{ name: string; args?: Record<string, unknown> }> = []
     const responses: Record<string, unknown> = {
       friend_request_inbox: incoming,
-      course_friend_relationships: [{ student_id: 'peer', relationship: 'outgoing_pending', request_id: 'request-1' }],
+      course_friend_relationships_by_professor: [{ student_id: 'peer', relationship: 'outgoing_pending', request_id: 'request-1' }],
       friends_in_course: [{ ...peer, has_shared_avatar: false }],
       get_discoverable_profile: { ...peer, has_shared_avatar: false },
     }
@@ -105,13 +105,13 @@ describe('friend API adapter', () => {
     const api = friendApi(client)
     const signal = new AbortController().signal
     expect(await api.inbox(signal)).toEqual(incoming)
-    expect(await api.relationships('CSE 310', signal)).toHaveLength(1)
+    expect(await api.relationships('CSE 310', '01', 'Ada', 'Lovelace', signal)).toHaveLength(1)
     expect((await api.friends(['CSE 310'], signal))[0].has_shared_avatar).toBe(false)
     const privateProfile = await api.profile('peer', signal)
     expect(privateProfile).not.toHaveProperty('interests')
     await api.unfriend('peer')
-    expect(calls.map(call => call.name)).toEqual(['friend_request_inbox', 'course_friend_relationships', 'friends_in_course', 'get_discoverable_profile', 'unfriend'])
-    expect(calls[1].args).toEqual({ p_course_code: 'CSE 310' })
+    expect(calls.map(call => call.name)).toEqual(['friend_request_inbox', 'course_friend_relationships_by_professor', 'friends_in_course', 'get_discoverable_profile', 'unfriend'])
+    expect(calls[1].args).toEqual({ p_course_code: 'CSE 310', p_section: '01', p_professor_first_name: 'Ada', p_professor_last_name: 'Lovelace' })
     expect(calls[4].args).toEqual({ p_student_id: 'peer' })
   })
 
@@ -134,7 +134,7 @@ describe('friend API adapter', () => {
       unfriend: vi.fn(async () => { currentFriends = [] }),
       picture: vi.fn(async () => new Blob()),
     }
-    const { result } = renderHook(() => useFriendships(api, client, 'caller', 'CSE 310', ['CSE 310']))
+    const { result } = renderHook(() => useFriendships(api, client, 'caller', 'CSE 310', '01', ['CSE 310'], 'Ada', 'Lovelace'))
     await waitFor(() => expect(result.current.inbox.data).toHaveLength(1))
     await act(async () => { await result.current.respond('request-1', 'accept') })
     expect(result.current.inbox.data).toHaveLength(0)
@@ -146,5 +146,39 @@ describe('friend API adapter', () => {
     act(() => callbacks[0]({ new: { sender_id: 'peer', recipient_id: 'caller' }, old: {} }))
     await waitFor(() => expect(result.current.inbox.data[0].request_id).toBe('remote-request'))
     expect(api.inbox).toHaveBeenCalledTimes(4)
+  })
+
+  it('clears the send busy state after a network failure and allows retry', async () => {
+    let relationship: FriendRelationship = { student_id: 'peer', relationship: 'none', request_id: null }
+    const api: FriendApi = {
+      inbox: vi.fn(async () => []),
+      relationships: vi.fn(async () => [relationship]),
+      friends: vi.fn(async () => []),
+      directory: vi.fn(async () => []),
+      profile: vi.fn(async () => null),
+      send: vi.fn().mockRejectedValueOnce(new Error('Network unavailable')).mockImplementationOnce(async () => {
+        relationship = { student_id: 'peer', relationship: 'outgoing_pending', request_id: 'request-2' }
+        return 'request-2'
+      }),
+      sendToStudent: vi.fn(async () => 'request-2'),
+      respond: vi.fn(async () => {}),
+      unfriend: vi.fn(async () => {}),
+      picture: vi.fn(async () => new Blob()),
+    }
+    const client = {} as SupabaseClient
+    const { result } = renderHook(() => useFriendships(api, client, 'caller', 'CSE 310', '01', ['CSE 310'], 'Ada', 'Lovelace'))
+
+    await waitFor(() => expect(result.current.relationships.status).toBe('success'))
+    await act(async () => { await result.current.send('CSE 310', '01', 'Ada', 'Lovelace', 'peer') })
+
+    expect(result.current.actionError).toBe('Network unavailable')
+    expect(result.current.busyIds.has('peer')).toBe(false)
+    expect(result.current.retryAction).toEqual(expect.any(Function))
+
+    await act(async () => { await result.current.retryAction?.() })
+    await waitFor(() => expect(result.current.relationshipById.get('peer')?.relationship).toBe('outgoing_pending'))
+    expect(api.send).toHaveBeenCalledTimes(2)
+    expect(result.current.actionError).toBe('')
+    expect(result.current.busyIds.has('peer')).toBe(false)
   })
 })

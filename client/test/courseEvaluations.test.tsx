@@ -4,7 +4,7 @@ import CourseEvaluations from '../src/CourseEvaluations'
 import { courseOfferings, summarizeEvaluations } from '../src/evaluationData'
 import { DuplicateCourseReviewError } from '../src/courseReviews'
 import type { CourseReviewApi } from '../src/courseReviews'
-import type { CourseEvaluation } from '../src/evaluationData'
+import type { CourseEvaluation, CourseOffering } from '../src/evaluationData'
 
 function review(id: string, offeringId = courseOfferings[0].id): CourseEvaluation {
   return { id, offeringId, weeklyHours: 8, difficulty: 3, review: 'Persisted anonymous review.', classRating: 4, wouldRecommend: true }
@@ -31,6 +31,77 @@ test('loads persisted anonymous reviews and selects offering-specific review key
 
   fireEvent.change(screen.getByLabelText('Course offering'), { target: { value: courseOfferings[1].id } })
   await waitFor(() => expect(reviews.loadOffering).toHaveBeenCalledWith(courseOfferings[1].id))
+})
+
+test('shows the calculated average class rating for the selected offering', async () => {
+  const reviews = api({
+    loadOffering: vi.fn(async () => [
+      { ...review('one'), classRating: 3 },
+      { ...review('two'), classRating: 5 },
+    ]),
+  })
+  render(<CourseEvaluations api={reviews} />)
+
+  const averageLabel = await screen.findByText('average class rating')
+  expect(averageLabel.parentElement).toHaveTextContent('4.0 / 5')
+})
+
+test('shows when the current user has already published a review for the offering', async () => {
+  const reviews = api({ myOfferingIds: vi.fn(async () => [courseOfferings[0].id]) })
+  render(<CourseEvaluations api={reviews} />)
+
+  expect(await screen.findByText('You’ve already published a review for this offering. Reading reviews remains available.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Publish review' })).not.toBeInTheDocument()
+})
+
+test('allows review submission only for the exact enrolled course offering', async () => {
+  const enrolled: CourseOffering = { ...courseOfferings[0], id: 'cse-416-fall-2026-lee-section-01', professor: 'Dr. Lee', section: '01', semester: 'Fall', year: 2026 }
+  const otherSection: CourseOffering = { ...enrolled, id: 'cse-416-fall-2026-lee-section-02', section: '02' }
+  const otherTerm: CourseOffering = { ...enrolled, id: 'cse-416-spring-2026-lee-section-01', semester: 'Spring', year: 2026 }
+  const otherYear: CourseOffering = { ...enrolled, id: 'cse-416-fall-2025-lee-section-01', year: 2025 }
+  const otherCourse: CourseOffering = { ...courseOfferings[2], id: 'bio-201-fall-2026-kim-section-01', professor: 'Dr. Kim', section: '01', semester: 'Fall', year: 2026 }
+  const submit = vi.fn(async () => ({ reviews: [review('saved')], moderationStatus: 'appropriate' as const }))
+  const reviews = api({
+    loadOfferings: vi.fn(async () => [enrolled, otherSection, otherTerm, otherYear, otherCourse]),
+    myCurrentOfferingIds: vi.fn(async () => [enrolled.id]),
+    myVerifiedOfferingIds: vi.fn(async () => [enrolled.id]),
+    submit,
+  })
+  render(<CourseEvaluations api={reviews} />)
+
+  expect(await screen.findByRole('button', { name: 'Publish review' })).toBeInTheDocument()
+  for (const offeringName of [/Section 02/, /Spring 2026/, /Fall 2025/, /BIO 201/]) {
+    fireEvent.click(screen.getByRole('button', { name: offeringName }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Write an anonymous review' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Publish review' })).not.toBeInTheDocument()
+  }
+  expect(submit).not.toHaveBeenCalled()
+})
+
+test('does not offer review submission for an unverified course offering', async () => {
+  const submit = vi.fn(async () => ({ reviews: [review('saved')], moderationStatus: 'appropriate' as const }))
+  const reviews = api({ myCurrentOfferingIds: vi.fn(async () => []), myVerifiedOfferingIds: vi.fn(async () => []), submit })
+  render(<CourseEvaluations api={reviews} />)
+
+  expect(await screen.findByText('Persisted anonymous review.')).toBeInTheDocument()
+  expect(reviews.myVerifiedOfferingIds).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('heading', { name: 'Write an anonymous review' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Publish review' })).not.toBeInTheDocument()
+  expect(submit).not.toHaveBeenCalled()
+})
+
+test('does not display reviewer names, emails, or account identifiers', async () => {
+  const anonymousReview = {
+    ...review('anonymous'),
+    reviewer_name: 'Private Reviewer Name',
+    email: 'private-reviewer@example.com',
+    user_id: 'private-account-123',
+  }
+  const reviews = api({ loadOffering: vi.fn(async () => [anonymousReview]) })
+  render(<CourseEvaluations api={reviews} />)
+
+  expect(await screen.findByText('Persisted anonymous review.')).toBeInTheDocument()
+  expect(screen.queryByText(/Private Reviewer Name|private-reviewer@example\.com|private-account-123/)).not.toBeInTheDocument()
 })
 
 test('persists a valid submission and keeps duplicate errors on the selected offering', async () => {

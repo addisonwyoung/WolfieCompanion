@@ -44,7 +44,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [error, setError] = useState('')
   const [courseId, setCourseId] = useState(courses[0]?.id ?? '')
   const course = courses.find(value => value.id === courseId) ?? courses[0]
-  const roster = useClassmates(classmatesApi, course?.section ? userId : null, course?.code ?? null, course?.section ?? null)
+  const roster = useClassmates(classmatesApi, course?.section ? userId : null, course?.code ?? null, course?.section ?? null, course?.professorFirstName ?? null, course?.professorLastName ?? null)
   const [selectedPeers, setSelectedPeers] = useState<Classmate[]>([])
   const [groupName, setGroupName] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
