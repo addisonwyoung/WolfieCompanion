@@ -270,12 +270,27 @@ test.each(['draft','load','send','retry','reconnect'] as const)('messaging %s cl
  act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('heading',{name:'Messages'})).toBeNull()
 })
 test('classmate profile Message closes native dialog before focusing account chat; navigation drops draft',async()=>{
- vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'course1',code:'CSE 310'}], plannerCourses:[]})
- const f=fake(session('a'));Object.assign(f.client,{rpc:(name:string)=>name==='find_classmates'?Promise.resolve({data:[{student_id:'peer',name:'Peer Name',major:'Math'}],error:null}):{abortSignal:async()=>({data:{student_id:'peer',name:'Peer Name',major:'Math',has_shared_avatar:false},error:null})}})
+ const course={id:'cse-310',databaseId:'course1',code:'CSE 310',section:'01',professorFirstName:'Ada',professorLastName:'Lovelace',verificationStatus:'verified' as const}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[]})
+ const rpc=vi.fn((name:string)=>{
+  if(name==='find_classmates_by_professor')return Promise.resolve({data:[{student_id:'peer',name:'Peer Name',major:'Math'}],error:null})
+  if(name==='get_classmate_profile_by_professor')return {abortSignal:async()=>({data:{student_id:'peer',name:'Peer Name',major:'Math',has_shared_avatar:false},error:null})}
+  return {abortSignal:async()=>({data:[],error:null})}
+ })
+ const f=fake(session('a'));Object.assign(f.client,{rpc})
  render(<App client={f.client}/>);fireEvent.click(await screen.findByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(screen.getByRole('button',{name:/^Message$/})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:/^Message$/}))
  await waitFor(()=>expect(screen.getByRole('heading',{name:'Message Peer'})).toHaveFocus());expect(document.querySelector('dialog[open]')).toBeNull()
  expect(mock.dm.contact).toHaveBeenCalledWith({student:'peer',course:'CSE 310'},expect.anything())
- fireEvent.change(screen.getByRole('textbox'),{target:{value:'Navigation draft'}});fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));fireEvent.click(screen.getByRole('button',{name:/^Message$/}));expect(screen.queryByDisplayValue('Navigation draft')).toBeNull()
+ expect(rpc).toHaveBeenCalledWith('get_classmate_profile_by_professor',{p_course_code:'CSE 310',p_section:'01',p_professor_first_name:'Ada',p_professor_last_name:'Lovelace',p_student_id:'peer'})
+ fireEvent.change(screen.getByRole('textbox',{name:'Message'}),{target:{value:'Navigation draft'}})
+ fireEvent.click(screen.getByRole('button',{name:'Dashboard'}))
+ expect(screen.queryByRole('textbox',{name:'Message'})).toBeNull()
+ fireEvent.click(await screen.findByRole('button',{name:'View profile of Peer Name'}))
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Message',exact:true})).toBeEnabled())
+ fireEvent.click(screen.getByRole('button',{name:'Message',exact:true}))
+ await waitFor(()=>expect(screen.getByRole('heading',{name:'Message Peer'})).toHaveFocus())
+ expect(screen.getByRole('textbox',{name:'Message'})).toHaveValue('')
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(mock.dm.send).not.toHaveBeenCalled()
 })
 
 test.each(['create','add','send','retry','reconnect'] as const)('group %s tears down private state on App account replacement',async mode=>{
@@ -307,9 +322,16 @@ mock.dm.groups = {
  if(mode==='create'){
   fireEvent.click(screen.getByText('New group'));fireEvent.click(await screen.findByRole('checkbox',{name:/Ada/}));fireEvent.click(screen.getByRole('checkbox',{name:/Grace/}));fireEvent.click(screen.getByText('Create group'))
  }else{
-  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Messages'})
+  fireEvent.click(await screen.findByRole('button',{name:/Private group title/}));await screen.findByRole('textbox',{name:'Message'})
   if(mode==='add'){fireEvent.click(screen.getByText('Add members'));fireEvent.click(await screen.findByRole('checkbox',{name:/Later friend/}));fireEvent.click(screen.getByText('Add selected members'))}
-  if(mode==='retry'){vi.mocked(mock.dm.groups!.send).mockRejectedValueOnce(Error('Private group failure'));fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}));await screen.findByText('Retry send')}
+  if(mode==='retry'){
+   vi.mocked(mock.dm.groups!.send).mockRejectedValueOnce(Error('Private group failure'))
+   fireEvent.change(screen.getByRole('textbox',{name:'Message'}),{target:{value:'Private group draft'}})
+   fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}));await screen.findByText('Private group failure')
+   fireEvent.click(screen.getByRole('button',{name:'Retry send'}))
+   expect(mock.dm.groups!.send).toHaveBeenCalledTimes(2)
+   expect(vi.mocked(mock.dm.groups!.send).mock.calls[0]).toEqual(vi.mocked(mock.dm.groups!.send).mock.calls[1])
+  }
   if(mode==='send'){fireEvent.change(screen.getByRole('textbox'),{target:{value:'Private group draft'}});fireEvent.click(screen.getByRole('button',{name:/^Send$/}))}
 if (mode === 'reconnect') {
   vi.mocked(mock.dm.groups!.history).mockImplementationOnce(
@@ -321,8 +343,16 @@ if (mode === 'reconnect') {
   act(() => window.dispatchEvent(new Event('online')))
   await waitFor(() => expect(release).toBeTypeOf('function'))
 } }
+ // Each branch must start its asynchronous operation before account replacement.
+ await waitFor(()=>expect(release).toBeTypeOf('function'))
+ if(mode==='add')expect(mock.dm.groups!.add).toHaveBeenCalledWith('group',['later'],expect.any(String))
+ if(mode==='send'||mode==='retry')expect(mock.dm.groups!.send).toHaveBeenCalledWith('group','Private group draft',expect.any(String))
+ const sendCall=vi.mocked(mock.dm.groups!.send).mock.calls.at(-1)
+ const lateMessage={...saved,id:'late-group-row',sequence:2,sender_id:'a',client_message_id:sendCall?.[2]??'late-history',body:sendCall?.[1]??'Late private group result'}
  vi.mocked(mock.api.load).mockResolvedValue({profile:profile('b'),courses:[], plannerCourses:[]});vi.mocked(mock.dm.inbox).mockResolvedValue([]);act(()=>f.emit('b'));await screen.findByText('Student b')
- if(release)await act(async()=>release(mode==='reconnect'?[saved]:mode==='send'?{...saved,sender_id:'a'}:detail))
- expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByText('Private group title')).toBeNull();expect(screen.queryByText('Private group text')).toBeNull();expect(screen.queryByDisplayValue('Private group draft')).toBeNull();expect(screen.queryByText('Private group failure')).toBeNull()
+ await act(async()=>release(mode==='reconnect'?[lateMessage]:mode==='send'||mode==='retry'?lateMessage:mode==='add'?{...detail,members:[...detail.members,{student_id:'later',name:'Later friend'}]}:detail))
+ expect(document.querySelector('dialog[open]')).toBeNull();expect(screen.queryByText('Private group title')).toBeNull();expect(screen.queryByText('Private group text')).toBeNull();expect(screen.queryByDisplayValue('Private group draft')).toBeNull();expect(screen.queryByText('Private group draft')).toBeNull();expect(screen.queryByText('Private group failure')).toBeNull();expect(screen.queryByText('Late private group result')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Messages',exact:true}));await screen.findByText(/No conversations yet/)
+ expect(screen.queryByRole('textbox',{name:'Message'})).toBeNull()
  act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(document.querySelector('dialog[open]')).toBeNull()
 })
