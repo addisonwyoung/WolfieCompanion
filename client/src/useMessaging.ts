@@ -39,10 +39,13 @@ generation.current++;controller.abort()
  return{rows,error,loading,more,paging,loadMore,retry:()=>setAttempt(value=>value+1)}
 }
 type Attempt={id:string;body:string;status:'pending'|'failed'}
+export const messageSendTimeoutMs = 30_000
 export function useDirectChat(api:MessagingApi,target:Target,userId:string,epoch:number,onSent:()=>void,groupVerified=false){
  const [contact,setContact]=useState<Contact|null|undefined>(undefined),[messages,setMessages]=useState<Message[]>([]),[error,setError]=useState(''),[draft,setDraft]=useState(''),[attempt,setAttempt]=useState<Attempt|null>(null),[more,setMore]=useState(false),[paging,setPaging]=useState(false),[loading,setLoading]=useState(true),[retryKey,setRetryKey]=useState(0)
  const alive=useRef(false),request=useRef<Attempt|null>(null),known=useRef<Message[]>([]),currentContact=useRef<Contact|null>(null),pageBusy=useRef(false),pageController=useRef<AbortController|null>(null)
  const student=target.student,course=target.course
+ const sendTimers=useRef(new Set<ReturnType<typeof setTimeout>>())
+ useEffect(()=>{const timers=sendTimers.current;return()=>{timers.forEach(clearTimeout);timers.clear()}},[])
  function merge(data:Message[]){if(data.some(row=>(!groupVerified&&![userId,student].includes(row.sender_id??''))||(currentContact.current?.conversation_id&&row.conversation_id!==currentContact.current.conversation_id)))throw new Error('Invalid message ownership');known.current=mergeMessages(known.current,data);setMessages(known.current);const pending=request.current;if(pending&&data.some(row=>row.sender_id===userId&&row.client_message_id===pending.id&&row.body===pending.body)){request.current=null;setAttempt(null);setDraft('');setError('')}}
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;pageController.current?.abort()}},[])
  useEffect(()=>{
@@ -66,8 +69,13 @@ export function useDirectChat(api:MessagingApi,target:Target,userId:string,epoch
   let outgoing=request.current
   if(retry){if(!outgoing||outgoing.status!=='failed')return}else{if(outgoing)return;try{validateMessage(draft)}catch(error){setError((error as Error).message);return}outgoing={id:crypto.randomUUID(),body:draft,status:'pending'}}
   outgoing={...outgoing!,status:'pending'};request.current=outgoing;setAttempt(outgoing);setError('')
-  try{const row=await api.send({student,course},outgoing.body,outgoing.id);if(!alive.current||groupVerified&&!currentContact.current)return;if(row.sender_id!==userId||row.client_message_id!==outgoing.id||row.body!==outgoing.body||(currentContact.current?.conversation_id&&currentContact.current.conversation_id!==row.conversation_id))throw new Error('Send could not be confirmed. Please retry.');merge([row]);setContact(old=>old?{...old,conversation_id:row.conversation_id}:old);currentContact.current=currentContact.current?{...currentContact.current,conversation_id:row.conversation_id}:null;onSent()}
+  let timer:ReturnType<typeof setTimeout>|undefined
+  // Timing out stops waiting, not the server write. Retry must reuse this nonce;
+  // history polling can still reconcile a write whose acknowledgement was lost.
+  const timeout=new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error('Sending took too long to confirm. It may already have been delivered. Retry safely or discard the draft.')),messageSendTimeoutMs);sendTimers.current.add(timer)})
+  try{const row=await Promise.race([api.send({student,course},outgoing.body,outgoing.id),timeout]);if(!alive.current||groupVerified&&!currentContact.current)return;if(row.sender_id!==userId||row.client_message_id!==outgoing.id||row.body!==outgoing.body||(currentContact.current?.conversation_id&&currentContact.current.conversation_id!==row.conversation_id))throw new Error('Send could not be confirmed. Please retry.');merge([row]);setContact(old=>old?{...old,conversation_id:row.conversation_id}:old);currentContact.current=currentContact.current?{...currentContact.current,conversation_id:row.conversation_id}:null;onSent()}
   catch(error){if(alive.current&&request.current?.id===outgoing.id){const failed={...outgoing,status:'failed' as const};request.current=failed;setAttempt(failed);setError(error instanceof Error?error.message:'Unable to send. Please retry.')}}
+  finally{if(timer!==undefined){clearTimeout(timer);sendTimers.current.delete(timer)}}
  }
  async function loadOlder(){const id=currentContact.current?.conversation_id,before=known.current[0]?.sequence;if(!id||!before||pageBusy.current)return false;pageBusy.current=true;setPaging(true);const controller=new AbortController();pageController.current=controller;try{const page=await api.history(id,controller.signal,before);if(alive.current){merge(page);setMore(page.length===50);setError('');return true}return false}catch{if(alive.current)setError('Unable to load older messages. Please retry.');return false}finally{pageBusy.current=false;if(alive.current)setPaging(false)}}
  return{contact,messages,error,draft,setDraft,attempt,more,paging,loading,send,loadOlder,retry:()=>setRetryKey(value=>value+1),discard:()=>{request.current=null;setAttempt(null);setDraft('');setError('')}}

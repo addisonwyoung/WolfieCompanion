@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { academicItemsApi, compareItems, itemGroup, normalizeItem } from '../src/academicItems'
+import { academicItemsApi, campusDeadline, compareItems, itemGroup, normalizeItem } from '../src/academicItems'
 import type { AcademicItem } from '../src/academicItems'
 const item: AcademicItem = { id: 'item', user_course_id: '10000000-0000-0000-0000-000000000021', title: 'Homework', type: 'assignment', due_date: '2026-10-21', due_time: null, notes: null, location: null, completed_at: null }
 test('date-only remains Today through the whole campus date, then overdue; timed and completed rules', () => {
@@ -18,6 +18,33 @@ test('normalize optional time without midnight and reject invalid fields', () =>
   for (const patch of [{ title: ' ' }, { due_date: '2026-02-30' }, { due_time: '24:00' }, { user_course_id: 'cse-310' }, { notes: 'x'.repeat(5001) }, { location: 'x'.repeat(201) }, { type: 'bad' }]) {
     expect(() => normalizeItem({ ...item, ...patch } as AcademicItem)).toThrow()
   }
+})
+test('fall-back deadlines use the later occurrence and never become overdue during the first hour', () => {
+  const deadline = { ...item, due_date: '2026-11-01', due_time: '01:30:00' }
+  expect(campusDeadline(deadline.due_date, deadline.due_time)).toBe(Date.parse('2026-11-01T06:30:00Z'))
+  for (const instant of ['2026-11-01T05:45:00Z', '2026-11-01T06:00:00Z', '2026-11-01T06:30:00Z']) {
+    expect(itemGroup(deadline, new Date(instant))).toBe('Today')
+  }
+  expect(itemGroup(deadline, new Date('2026-11-01T06:30:00.001Z'))).toBe('Overdue')
+})
+test('spring-gap deadlines advance like PostgreSQL and date-only work stays due all day', () => {
+  const deadline = { ...item, due_date: '2027-03-14', due_time: '02:30' }
+  expect(campusDeadline(deadline.due_date, deadline.due_time)).toBe(Date.parse('2027-03-14T07:30:00Z'))
+  for (const instant of ['2027-03-14T06:59:59Z', '2027-03-14T07:00:00Z', '2027-03-14T07:30:00Z']) {
+    expect(itemGroup(deadline, new Date(instant))).toBe('Today')
+  }
+  expect(itemGroup(deadline, new Date('2027-03-14T07:30:00.001Z'))).toBe('Overdue')
+  expect(itemGroup({ ...deadline, due_time: null }, new Date('2027-03-15T03:59:59Z'))).toBe('Today')
+  expect(itemGroup({ ...deadline, due_time: null }, new Date('2027-03-15T04:00:00Z'))).toBe('Overdue')
+})
+test.each([
+  ['2026-07-01', '12:00', '2026-07-01T16:00:00Z'],
+  ['2026-01-01', '12:00:00', '2026-01-01T17:00:00Z'],
+  ['2028-02-29', '23:59:59.123456', '2028-03-01T04:59:59.123Z'],
+  ['0001-01-01', '00:00', '0001-01-01T04:56:02Z'],
+  ['9999-12-31', '23:59', '+010000-01-01T04:59:00Z'],
+])('campus deadlines resolve ordinary and boundary dates: %s %s', (date, time, expected) => {
+  expect(campusDeadline(date, time)).toBe(Date.parse(expected))
 })
 function fake() {
   const single = vi.fn().mockResolvedValue({ data: item, error: null })

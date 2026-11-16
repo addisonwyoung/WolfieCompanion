@@ -8,7 +8,7 @@ import type { FriendApi } from '../src/friendshipApi'
 import MessageProfileAction from '../src/MessageProfileAction'
 import { messagingApi, parseContact, parseMessage, validateMessage } from '../src/messaging'
 import type { Contact, Conversation, Message, MessagingApi } from '../src/messaging'
-import { mergeMessages, useDirectChat, useMessageInbox, useMessagingRefresh } from '../src/useMessaging'
+import { mergeMessages, messageSendTimeoutMs, useDirectChat, useMessageInbox, useMessagingRefresh } from '../src/useMessaging'
 const self='10000000-0000-0000-0000-000000000001',peer='10000000-0000-0000-0000-000000000002',thread='20000000-0000-0000-0000-000000000001'
 const id=(n:number)=>`30000000-0000-0000-0000-${String(n).padStart(12,'0')}`
 function message(n=1):Message{return {id:id(n),conversation_id:thread,sequence:n,sender_id:peer,client_message_id:id(n+500),body:`Saved message ${n}`,created_at:'2026-10-23T20:00:00Z'}}
@@ -66,6 +66,58 @@ test('lost send acknowledgement retains immutable retry identity and merges dupl
  fireEvent.click(screen.getByRole('button',{name:'Retry send'}));await waitFor(()=>expect(input).toHaveValue(''))
  expect(store.rows).toHaveLength(1);expect(document.querySelectorAll('.dm-message')).toHaveLength(1)
  const calls=vi.mocked(store.api.send).mock.calls;expect(calls[0]).toEqual(calls[1])
+})
+test('stalled send times out, preserves its draft and nonce, and retries without duplicate messages', async () => {
+ const store=fixture(),stalled=deferred<Message>()
+ vi.mocked(store.api.send).mockReturnValueOnce(stalled.promise)
+ render(<Messages api={store.api} userId={self} initialTarget={{student:peer}}/> )
+ const input=await screen.findByRole('textbox',{name:'Message'})
+ vi.useFakeTimers()
+ fireEvent.change(input,{target:{value:'Meet at the library?'}})
+ fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}))
+ expect(screen.getByRole('button',{name:'Sending…'})).toBeDisabled()
+ await act(async()=>{await vi.advanceTimersByTimeAsync(messageSendTimeoutMs)})
+ expect(screen.getByRole('alert')).toHaveTextContent('Sending took too long')
+ expect(input).toHaveValue('Meet at the library?')
+ expect(screen.getByRole('button',{name:'Discard draft'})).toBeEnabled()
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Retry send'}))})
+ expect(input).toHaveValue('');expect(input).not.toHaveAttribute('readonly')
+ expect(store.rows).toHaveLength(1)
+ expect(vi.mocked(store.api.send).mock.calls[0]).toEqual(vi.mocked(store.api.send).mock.calls[1])
+ await act(async()=>{stalled.resolve(store.rows[0])})
+ expect(document.querySelectorAll('.dm-message')).toHaveLength(1)
+})
+test.each(['history','retry'] as const)('a timed-out committed send reconciles through %s and ignores its late rejection', async recovery => {
+ const store=fixture(),stalled=deferred<Message>()
+ const commit=vi.mocked(store.api.send).getMockImplementation()!
+ vi.mocked(store.api.send).mockImplementationOnce(async(...args)=>{await commit(...args);return stalled.promise})
+ const {result,rerender,unmount}=renderHook(({epoch})=>useDirectChat(store.api,{student:peer},self,epoch,vi.fn()),{initialProps:{epoch:0}})
+ await waitFor(()=>expect(result.current.contact).toBeTruthy())
+ vi.useFakeTimers();act(()=>result.current.setDraft('Saved once'))
+ act(()=>{void result.current.send()})
+ await act(async()=>{await vi.advanceTimersByTimeAsync(messageSendTimeoutMs)})
+ expect(result.current.attempt?.status).toBe('failed');expect(store.rows).toHaveLength(1)
+ if(recovery==='history')await act(async()=>{rerender({epoch:1})})
+ else {
+  await act(async()=>{await result.current.send(true)})
+  expect(vi.mocked(store.api.send).mock.calls[0]).toEqual(vi.mocked(store.api.send).mock.calls[1])
+ }
+ expect(result.current.attempt).toBeNull();expect(result.current.draft).toBe('')
+ await act(async()=>{stalled.reject(new Error('Late offline response'))})
+ expect(result.current.error).toBe('');expect(result.current.messages).toHaveLength(1);expect(store.rows).toHaveLength(1)
+ unmount();expect(vi.getTimerCount()).toBe(0)
+})
+test('discarding a timed-out send unlocks editing, and leaving a pending chat cleans its timeout', async () => {
+ const store=fixture();vi.mocked(store.api.send).mockImplementation(()=>new Promise(()=>{}))
+ const {unmount}=render(<Messages api={store.api} userId={self} initialTarget={{student:peer}}/> )
+ const input=await screen.findByRole('textbox',{name:'Message'})
+ vi.useFakeTimers();fireEvent.change(input,{target:{value:'Unconfirmed'}})
+ fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}))
+ await act(async()=>{await vi.advanceTimersByTimeAsync(messageSendTimeoutMs)})
+ fireEvent.click(screen.getByRole('button',{name:'Discard draft'}))
+ expect(input).toHaveValue('');expect(input).not.toHaveAttribute('readonly')
+ fireEvent.change(input,{target:{value:'Another attempt'}});fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}))
+ unmount();expect(vi.getTimerCount()).toBe(0)
 })
 test('recipient closure after opening rejects first send; failed attempts can be discarded',async()=>{
  const store=fixture();render(<Messages api={store.api} userId={self} initialTarget={{student:peer}}/> )

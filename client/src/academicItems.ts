@@ -69,13 +69,27 @@ export type AcademicApi = ReturnType<typeof academicItemsApi>
 
 export const campusZone = 'America/New_York'
 const clockFormat = new Intl.DateTimeFormat('en-US', { timeZone: campusZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+const offsetFormat = new Intl.DateTimeFormat('en-US', { timeZone: campusZone, timeZoneName: 'longOffset' })
+function campusOffset(instant: number) {
+  const name = offsetFormat.formatToParts(instant).find(part => part.type === 'timeZoneName')!.value
+  const [, sign, hours, minutes, seconds = '0'] = /^GMT([+-])(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(name)!
+  return (Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds)) * (sign === '-' ? -1000 : 1000)
+}
+// Match PostgreSQL's `timestamp AT TIME ZONE 'America/New_York'`: choose the
+// later instant in a repeated hour, and advance nonexistent spring-gap times.
+export function campusDeadline(date: string, time: string): number {
+  const wall = Date.parse(`${date}T${time.length === 5 ? `${time}:00` : time}Z`)
+  const offsets = new Set([-36, 36].map(hours => campusOffset(wall + hours * 3600_000)))
+  const candidates = [...offsets].map(offset => wall - offset)
+  const matching = candidates.filter(instant => instant + campusOffset(instant) === wall)
+  return Math.max(...(matching.length ? matching : candidates))
+}
 export type ItemGroup = 'Overdue' | 'Today' | 'Upcoming' | 'Completed'
 export function itemGroup(item: AcademicItem, now = new Date()): ItemGroup {
   if (item.completed_at) return 'Completed'
   const parts = Object.fromEntries(clockFormat.formatToParts(now).map(p => [p.type, p.value]))
-  const date = `${parts.year}-${parts.month}-${parts.day}`
-  const time = `${parts.hour}:${parts.minute}:${parts.second}`
-  if (item.due_date < date || (item.due_date === date && item.due_time && item.due_time.padEnd(8, ':00') < time)) return 'Overdue'
+  const date = `${parts.year.padStart(4, '0')}-${parts.month}-${parts.day}`
+  if (item.due_time ? campusDeadline(item.due_date, item.due_time) < now.getTime() : item.due_date < date) return 'Overdue'
   return item.due_date === date ? 'Today' : 'Upcoming'
 }
 export function compareItems(a: AcademicItem, b: AcademicItem) {

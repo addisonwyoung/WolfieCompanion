@@ -11,6 +11,7 @@ import type { Message, MessagingApi } from '../src/messaging'
 import { messagingApi } from '../src/messaging'
 import { unreadApi } from '../src/messagingUnread'
 import { useGroupChat } from '../src/useGroupChat'
+import { messageSendTimeoutMs } from '../src/useMessaging'
 const self='10000000-0000-0000-0000-000000000001',a='10000000-0000-0000-0000-000000000002',b='10000000-0000-0000-0000-000000000003',c='10000000-0000-0000-0000-000000000004',id='20000000-0000-0000-0000-000000000001'
 const uuid=(n:number)=>`30000000-0000-0000-0000-${String(n).padStart(12,'0')}`
 const names:Record<string,string>={[self]:'Creator',[a]:'Ada',[b]:'Grace',[c]:'Later Friend'}
@@ -81,6 +82,25 @@ test('history older-page failure retries same cursor and group catch-up traverse
  await waitFor(()=>expect(result.current.messages).toHaveLength(50));vi.mocked(f.groups.history).mockRejectedValueOnce(Error('Offline'));await act(()=>result.current.loadOlder());await act(()=>result.current.loadOlder());expect(result.current.messages).toHaveLength(65);expect(vi.mocked(f.groups.history).mock.calls.slice(-2).map(call=>call[2])).toEqual([16,16])
  for(let n=0;n<105;n++)f.incoming();rerender({epoch:1});await waitFor(()=>expect(result.current.messages).toHaveLength(170))
  act(()=>result.current.setDraft('Saved despite lost acknowledgement'));f.lose();await act(()=>result.current.send());expect(result.current.attempt?.status).toBe('failed');await act(()=>result.current.send(true));expect(result.current.draft).toBe('');expect(f.rows).toHaveLength(171)
+})
+test('group sends recover from a stalled request using the same message ID', async () => {
+ const f=fixture(),stalled=deferred<Message>();f.seed(1)
+ vi.mocked(f.groups.send).mockReturnValueOnce(stalled.promise)
+ const {result,unmount}=renderHook(()=>useGroupChat(f.groups,id,self,0,vi.fn()))
+ await waitFor(()=>expect(result.current.messages).toHaveLength(1))
+ vi.useFakeTimers()
+ try {
+  act(()=>result.current.setDraft('Study at six?'))
+  act(()=>{void result.current.send()})
+  await act(async()=>{await vi.advanceTimersByTimeAsync(messageSendTimeoutMs)})
+  expect(result.current.attempt?.status).toBe('failed');expect(result.current.draft).toBe('Study at six?')
+  await act(async()=>{await result.current.send(true)})
+  expect(vi.mocked(f.groups.send).mock.calls[0]).toEqual(vi.mocked(f.groups.send).mock.calls[1])
+  expect(f.rows).toHaveLength(2);expect(result.current.draft).toBe('')
+  await act(async()=>{stalled.resolve(f.rows[1])})
+  expect(result.current.messages).toHaveLength(2)
+  unmount();expect(vi.getTimerCount()).toBe(0)
+ } finally { vi.useRealTimers() }
 })
 test('late creation result and private selection never enter a replacement account',async()=>{
  const f=fixture(),pending=deferred<GroupDetail>();vi.mocked(f.groups.create).mockReturnValueOnce(pending.promise)
