@@ -15,5 +15,5 @@ export function MessagingNotifications({client,userId,children,api:provided}:{cl
 }
 export function MessagesNavigation({active,onClick}:{active:boolean;onClick:()=>void}){
  const {counts}=useMessageNotifications(),total=Object.values(counts).reduce((sum,n)=>sum+n,0)
- return <button className={total?'dm-nav-unread':undefined} aria-pressed={active} onClick={onClick}>Messages{total>0&&<span className="dm-unread-badge" aria-label={`${total} unread messages`}>{total>99?'99+':total}</span>}</button>
+ return <button className={total?'dm-nav-unread':undefined} aria-pressed={active} aria-current={active?'page':undefined} onClick={onClick}>Messages{total>0&&<span className="dm-unread-badge" aria-label={`${total} unread messages`}>{total>99?'99+':total}</span>}</button>
 }

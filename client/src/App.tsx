@@ -25,18 +25,19 @@ import { academicItemsApi } from './academicItems'
 import StudyGroups from './StudyGroups'
 import { studyGroupApi } from './studyGroupApi'
 import Messages from './Messages'
-import { MessagingNotifications, MessagesNavigation } from './MessagingNotifications'
+import { MessagingNotifications } from './MessagingNotifications'
 import { messagingApi } from './messaging'
 import { professorCatalogApi, useProfessorCatalog } from './courseProfessors'
 import type { Target } from './messaging'
 import AcademicReminderProvider from './AcademicReminderProvider'
-import NotificationBell from './NotificationBell'
+import AppNavigation, { NavigationHeader } from './AppNavigation'
+import { createPortal } from 'react-dom'
 import { reminderApi } from './academicReminders'
 import './App.css'
 import { campusLocationsApi } from './campusLocations'
 const CampusExplorer = lazy(() => import('./CampusExplorer'))
 
-function AccountWorkspace({ client }: { client: SupabaseClient }) {
+function AccountWorkspace({ client, navigationHost }: { client: SupabaseClient; navigationHost: HTMLElement | null }) {
   const account = useAccount(client)
   const campus = useMemo(() => campusLocationsApi(client), [client])
   const [explorerOpened, setExplorerOpened] = useState(() => currentView() === 'explorer')
@@ -60,7 +61,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const restoreNavigation = useCallback(() => { setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null) }, [])
   const [view, setView] = useAppNavigation(restoreNavigation)
   function openMessage(target: Target) { setPeer(null); setFriendProfileId(null); setDmTarget(target); setView('messages') }
-  function navigate(next: AppView) { setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null); setView(next) }
+  function navigate(next: AppView) { if(next==='academic')setPlannerOpened(true);if(next==='explorer')setExplorerOpened(true);setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null); setView(next) }
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [signingIn, setSigningIn] = useState(false)
@@ -85,8 +86,9 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     setSigningIn(true); setActionError('')
     try { await account.signIn() } catch (error) { setActionError((error as Error).message) } finally { setSigningIn(false) }
   }
+  const navigation = navigationHost && createPortal(<AppNavigation view={view} onNavigate={navigate} onSignOut={() => void signOut()} checkItem={checkReminderItem} ready={account.status === 'ready'} onViewItem={id=>{navigate('academic');setReminderTarget({id,nonce:crypto.randomUUID(),user:account.userId!})}}/>, navigationHost)
   return <>
-    {account.status !== 'signed-out' && account.status !== 'ineligible' && <div className="account-actions"><button onClick={signOut}>Sign out</button></div>}
+    {account.status !== 'ready' && account.status !== 'signed-out' && account.status !== 'ineligible' && navigation}
     {actionError && <div role="alert" className="error"><p>{actionError}</p>{signOutFailed && <button onClick={signOut}>Retry sign out</button>}</div>}
     {account.status === 'loading' && <p className="auth-panel panel" role="status">Loading your account…</p>}
     {(account.status === 'signed-out' || account.status === 'ineligible') && <section className="auth-panel panel" aria-labelledby="signin-heading">
@@ -96,7 +98,7 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
     {account.status === 'ready' && account.profile && <AcademicReminderProvider key={account.userId} api={reminderService}><MessagingNotifications client={client} userId={account.userId!}><div>
-      <nav className="app-nav" aria-label="Main navigation"><NotificationBell key={view} checkItem={checkReminderItem} onViewItem={id=>{setPlannerOpened(true);navigate('academic');setReminderTarget({id,nonce:crypto.randomUUID(),user:account.userId!})}}/><MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')} /><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'study-groups'} onClick={() => navigate('study-groups')}>Study buddies</button><button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
+      {navigation}
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
@@ -128,9 +130,10 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   </>
 }
 export default function App({ client = supabase }: { client?: SupabaseClient | null }) {
+  const [navigationHost, setNavigationHost] = useState<HTMLElement | null>(null)
   return <>
-    <header className="site-header"><div className="header-inner"><a href="#main" className="brand"><span className="brand-mark" aria-hidden="true">W</span><span>Wolfie <strong>Companion</strong></span></a></div></header>
-    <main id="main">{client ? <AccountWorkspace client={client} /> : <section className="auth-panel panel"><h1>Account setup needed</h1><p role="alert">{configurationError}</p></section>}</main>
+    <NavigationHeader><div className="header-navigation" ref={setNavigationHost}/></NavigationHeader>
+    <main id="main">{client ? <AccountWorkspace client={client} navigationHost={navigationHost} /> : <section className="auth-panel panel"><h1>Account setup needed</h1><p role="alert">{configurationError}</p></section>}</main>
     <footer><span>Wolfie Companion</span><span>A small step toward a more connected campus.</span></footer>
   </>
 }
