@@ -45,7 +45,7 @@ test('pending profile save disables editing and duplicate submission',async()=>{
 
 test('sharing choices default private, cancel discards them and failed save retains toggles', async () => {
  const save=vi.fn().mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(undefined)
- const {rerender}=render(<Profile profile={{...profile,year:'Graduate',interests:['Music']}} onSave={save}/> )
+ const {rerender}=render(<Profile profile={{...profile,year:'Graduate',interests:['Listening to Music']}} onSave={save}/> )
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
  const year=screen.getByRole('checkbox',{name:'Share my year of study with classmates'})
  expect(year).not.toBeChecked()
@@ -60,14 +60,14 @@ test('sharing choices default private, cancel discards them and failed save reta
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await screen.findByRole('button',{name:'Edit profile'})
  const saved=save.mock.calls[1][0]
- expect(saved).toMatchObject({major:null,share_year:false,share_interests:true,share_residence_status:false,share_avatar:false,year:'Graduate',interests:['Music']})
+ expect(saved).toMatchObject({major:null,share_year:false,share_interests:true,share_residence_status:false,share_avatar:false,year:'Graduate',interests:['Listening to Music']})
  rerender(<Profile profile={saved} onSave={save}/> )
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
  expect(screen.getByRole('checkbox',{name:/interests/})).toBeChecked()
  fireEvent.click(screen.getByRole('checkbox',{name:/interests/}))
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await screen.findByRole('button',{name:'Edit profile'})
- expect(save.mock.calls[2][0]).toMatchObject({share_interests:false,interests:['Music']})
+ expect(save.mock.calls[2][0]).toMatchObject({share_interests:false,interests:['Listening to Music']})
 })
 
 test('DM availability defaults on, cancels, retains failed draft, and reloads the saved choice',async()=>{
