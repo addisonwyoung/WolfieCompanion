@@ -8,16 +8,12 @@ import AcademicItemDialog from './AcademicItemDialog'
 import AcademicDeleteDialog from './AcademicDeleteDialog'
 import AcademicCalendar from './AcademicCalendar'
 import { useAcademicReminders } from './reminderContext'
-import { campusDate, readableTime } from './academicCalendarDates'
+import { campusDate, readableTime, readableDay } from './academicCalendarDates'
 
 function empty(course: string): AcademicInput {
   return { user_course_id: course, title: '', type: 'assignment', due_date: '', due_time: null, notes: null, location: null, completed_at: null }
 }
-const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
-function readableDate(date: string) {
-  // UTC is only a display anchor for calendar components, never the deadline.
-  return dateFormat.format(new Date(`${date}T12:00:00Z`))
-}
+const readableDate = (date: string) => readableDay(date, true)
 type Modal = { kind: 'edit'; item?: AcademicItem; initial: AcademicInput } | { kind: 'delete'; item: AcademicItem }
 
 export default function AcademicPlanner({ api, courses, onAddCourses, active = true, reminderTarget }: {
@@ -147,7 +143,7 @@ export default function AcademicPlanner({ api, courses, onAddCourses, active = t
           <ul className="academic-list">{items.map(item => <li className="academic-row" key={item.id}>
             <label className="academic-completion"><input type="checkbox" data-row-completion={item.id} aria-label={`${item.completed_at ? 'Reopen' : 'Mark complete'} ${item.title}`} checked={!!item.completed_at} disabled={state.busy} onChange={event => void complete(item, event.currentTarget)} /></label>
             <div className="academic-row-content"><h3>{item.title}</h3><div className="academic-row-meta"><span>{courses.find(saved => saved.databaseId === item.user_course_id)?.code ?? 'Saved course'}</span><span className={`academic-type academic-type-${item.type}`}>{item.type}</span>{item.location && <span className="academic-location">{item.location}</span>}</div></div>
-            <div className="academic-deadline"><time dateTime={item.due_date}>{readableDate(item.due_date)}</time>{item.due_time && <span>{readableTime(item.due_time)} <span className="academic-zone">America/New_York</span></span>}</div>
+            <div className="academic-deadline"><time dateTime={item.due_date}>{readableDate(item.due_date)}</time>{item.due_time && <span>{readableTime(item.due_time)}</span>}</div>
             <AcademicItemActions title={item.title} open={menuId === item.id} disabled={state.busy} onOpenChange={open => setMenuId(open ? item.id : null)} onEdit={trigger => openEdit(item, trigger)} onDelete={trigger => { if (!modal && !state.busy) { opener.current = trigger; setModal({ kind: 'delete', item }) } }} />
           </li>)}</ul>
         </section>
@@ -157,14 +153,14 @@ export default function AcademicPlanner({ api, courses, onAddCourses, active = t
     <div role="tabpanel" id={`${tabId}-calendar-panel`} aria-labelledby={`${tabId}-calendar-tab`} hidden={view !== 'calendar'}>
       {state.status === 'success' && !!courses.length && view === 'calendar' && <AcademicCalendar items={calendarItems} courses={courses} now={now} month={month} selectedDay={selectedDay} onSelect={setSelectedDay} onEdit={openEdit} busy={state.busy} hasItems={!!state.items.length} hasFilters={!!(course || type || calendarStatus !== 'all')} onClear={() => { setCourse(''); setType(''); setCalendarStatus('all') }} />}
     </div>
-    <p className="academic-time-note">Deadlines use America/New_York. Dates without a time stay due for the full calendar day.</p>
-    {modal?.kind === 'edit' && <AcademicItemDialog initial={modal.initial} editing={!!modal.item} courses={courses} busy={state.busy} saveError={state.actionFailed ? state.message : null} onClose={close} onSave={async value => {
+    <p className="academic-time-note">Deadlines use Eastern Time. Dates without a time stay due for the full calendar day.</p>
+    {modal?.kind === 'edit' && <AcademicItemDialog active={active} initial={modal.initial} editing={!!modal.item} courses={courses} busy={state.busy} saveError={state.actionFailed ? state.message : null} onClose={close} onSave={async value => {
       const success = await state.mutate(() => api.save(value, modal.item?.id), 'Item saved.')
       if(success)void reminders?.refresh()
       if (success && mounted.current) close()
       return success
     }} />}
-    {modal?.kind === 'delete' && <AcademicDeleteDialog title={modal.item.title} course={courses.find(saved => saved.databaseId === modal.item.user_course_id)?.code ?? 'Saved course'} busy={state.busy} error={state.actionFailed ? state.message : null} onCancel={close} onDelete={async () => {
+    {modal?.kind === 'delete' && <AcademicDeleteDialog active={active} title={modal.item.title} course={courses.find(saved => saved.databaseId === modal.item.user_course_id)?.code ?? 'Saved course'} busy={state.busy} error={state.actionFailed ? state.message : null} onCancel={close} onDelete={async () => {
       const next = nextId(modal.item)
       const success = await state.mutate(() => api.remove(modal.item.id), 'Item deleted.', modal.item.id)
       if(success)void reminders?.refresh()

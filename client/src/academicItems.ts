@@ -24,7 +24,7 @@ export function normalizeItem(input: AcademicInput): AcademicInput {
   if (!result.title || result.title.length > 200) throw new Error('Enter a title of 1 to 200 characters.')
   if (!itemTypes.includes(result.type)) throw new Error('Choose a listed item type.')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(result.due_date) || result.due_date < '0001-01-01' || Number.isNaN(Date.parse(result.due_date)) || new Date(result.due_date).toISOString().slice(0, 10) !== result.due_date) throw new Error('Enter a valid due date.')
-  if (result.due_time && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(result.due_time)) throw new Error('Enter a valid time or leave it blank.')
+  if (result.due_time && !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,6})?)?$/.test(result.due_time)) throw new Error('Enter a valid time or leave it blank.')
   if ((result.notes?.length ?? 0) > 5000) throw new Error('Notes must be at most 5000 characters.')
   if ((result.location?.length ?? 0) > 200) throw new Error('Location must be at most 200 characters.')
   if (result.completed_at && Number.isNaN(Date.parse(result.completed_at))) throw new Error('Invalid completion date.')

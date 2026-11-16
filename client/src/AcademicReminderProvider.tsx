@@ -5,6 +5,7 @@ import { ReminderContext } from './reminderContext'
 export default function AcademicReminderProvider({ api, children }: { api: ReminderApi; children: ReactNode }) {
  const [rows,setRows]=useState<AcademicReminder[]>([]),[unread,setUnread]=useState(0),[settings,setSettings]=useState<ReminderSettings|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[actionError,setActionError]=useState(''),[batchRetry,setBatchRetry]=useState(false),[busy,setBusy]=useState(false),[more,setMore]=useState(false),[paging,setPaging]=useState(false)
  const alive=useRef(false),generation=useRef(0),controller=useRef<AbortController|null>(null),pages=useRef(1),writing=useRef(false),pageBusy=useRef(false),pageController=useRef<AbortController|null>(null),batchBound=useRef<number|null>(null)
+ const reading=useRef(new Map<string,Promise<boolean>>())
  const refresh=useCallback(async()=>{
   if(!alive.current||document.visibilityState==='hidden')return
   controller.current?.abort();pageController.current?.abort();pageBusy.current=false;setPaging(false)
@@ -30,6 +31,12 @@ generation.current++;controller.current?.abort();pageController.current?.abort()
   try{const page=await api.list(abort.signal,rows.at(-1));if(alive.current&&run===generation.current&&!abort.signal.aborted){pages.current++;setRows(old=>[...new Map([...old,...page.rows].map(row=>[row.id,row])).values()]);setUnread(page.unread);setMore(page.rows.length===20);setError('')}}catch(problem){if(alive.current&&!abort.signal.aborted)setError(problem instanceof Error?problem.message:'Unable to load reminders.')}finally{if(pageController.current===abort){pageBusy.current=false;if(alive.current)setPaging(false)}}
  }
  async function mutate(action:()=>Promise<void>){if(writing.current||!alive.current)return false;writing.current=true;setBusy(true);setActionError('');try{await action();if(!alive.current)return false;await refresh();return alive.current}catch(problem){if(alive.current)setActionError(problem instanceof Error?problem.message:'Unable to update reminders.');return false}finally{writing.current=false;if(alive.current)setBusy(false)}}
+ function markRead(id:string){
+  // Effect replay must observe the same write result, not a rejection from the busy guard.
+  const pending=reading.current.get(id);if(pending)return pending
+  const request=mutate(()=>api.read(id)).finally(()=>{reading.current.delete(id)})
+  reading.current.set(id,request);return request
+ }
  async function clearAll(){return mutate(async()=>{if(batchBound.current===null)batchBound.current=await api.bound();if(alive.current)setBatchRetry(true);await api.clearAll(batchBound.current);batchBound.current=null;if(alive.current)setBatchRetry(false)})}
- return <ReminderContext.Provider value={{rows,unread,settings,loading,error:actionError||error,batchRetry,busy,more,paging,refresh,loadMore,markRead:id=>mutate(()=>api.read(id)),clear:id=>mutate(()=>api.clear(id)),clearAll,saveSettings:value=>mutate(async()=>{await api.saveSettings(value)})}}>{children}</ReminderContext.Provider>
+ return <ReminderContext.Provider value={{rows,unread,settings,loading,error:actionError||error,batchRetry,busy,more,paging,refresh,loadMore,markRead,clear:id=>mutate(()=>api.clear(id)),clearAll,saveSettings:value=>mutate(async()=>{await api.saveSettings(value)})}}>{children}</ReminderContext.Provider>
 }

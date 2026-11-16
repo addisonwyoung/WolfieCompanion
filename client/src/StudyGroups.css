@@ -28,6 +28,8 @@
 .study-peer-choice > span:last-child { color: #a82032; font-size: 12px; }
 .study-group-form { border-top: 1px solid #ededee; padding-top: 4px; }
 .study-group-form button { width: 100%; }
+.study-group-form #study-group-name { display: block; margin-top: 12px; }
+#study-group-name:focus-visible { outline-width: 2px; }
 .study-saved-groups { display: grid; gap: 10px; }
 .study-group-card { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 7px; padding: 15px; border: 1px solid #e1e1e5; border-radius: 9px; background: white; }
 .study-group-card[aria-pressed='true'] { border-color: #a82032; box-shadow: 0 0 0 1px #a82032; }

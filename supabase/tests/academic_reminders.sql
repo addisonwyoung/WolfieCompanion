@@ -32,6 +32,9 @@ select pg_temp.assert(public.academic_reminders_list()->>'unread'='1','catchup d
 select set_config('test.reminder_id',public.academic_reminders_list()->'rows'->0->>'id',true);
 select public.academic_reminder_read(current_setting('test.reminder_id')::uuid);
 select pg_temp.assert(public.academic_reminders_list()->>'unread'='0' and jsonb_array_length(public.academic_reminders_list()->'rows')=1,'read retains row');
+select set_config('test.read_at',public.academic_reminders_list()->'rows'->0->>'read_at',true);
+select public.academic_reminders_refresh();select public.academic_reminder_read(current_setting('test.reminder_id')::uuid);
+select pg_temp.assert(public.academic_reminders_list()->>'unread'='0' and public.academic_reminders_list()->'rows'->0->>'read_at'=current_setting('test.read_at'),'read timestamp persists across refresh and repeated read');
 select public.academic_reminder_clear(current_setting('test.reminder_id')::uuid);select public.academic_reminder_clear(current_setting('test.reminder_id')::uuid);
 select public.academic_reminders_refresh();select pg_temp.assert(public.academic_reminders_list()->'rows'='[]','clear remains terminal');
 update public.academic_items set title='Renamed';select public.academic_reminders_refresh();select pg_temp.assert(public.academic_reminders_list()->'rows'='[]','title change no replay');

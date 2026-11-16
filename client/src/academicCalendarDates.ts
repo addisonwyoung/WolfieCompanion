@@ -3,6 +3,7 @@ import type { AcademicItem } from './academicItems'
 
 const campusFormat = new Intl.DateTimeFormat('en-US', { timeZone: campusZone, year: 'numeric', month: '2-digit', day: '2-digit' })
 const dayFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })
+const weekdayFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
 const monthFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long' })
 export function campusDate(now: Date) {
   const parts = Object.fromEntries(campusFormat.formatToParts(now).map(part => [part.type, part.value]))
@@ -30,7 +31,7 @@ export function shiftMonth(month: string, offset: -1 | 1): string | null {
   return `${String(Math.floor(index / 12) + 1).padStart(4, '0')}-${String(index % 12 + 1).padStart(2, '0')}`
 }
 export function monthSelection(month: string, today: string) { return today.startsWith(`${month}-`) ? today : `${month}-01` }
-export function readableDay(day: string) { return dayFormat.format(anchor(...day.split('-').map(Number) as [number, number, number])) }
+export function readableDay(day: string, weekday = false) { return (weekday ? weekdayFormat : dayFormat).format(anchor(...day.split('-').map(Number) as [number, number, number])) }
 export function readableMonth(month: string) { return monthFormat.format(anchor(...month.split('-').map(Number) as [number, number])) }
 export function readableTime(time: string) {
   const [hours, minutes, seconds = '00'] = time.split(':')

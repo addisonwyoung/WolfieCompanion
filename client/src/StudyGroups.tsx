@@ -1,3 +1,5 @@
+import { useExpandedScroll } from './useExpandedScroll'
+import { readableTimestampDate } from './dateTime'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { SavedCourse } from './account'
@@ -60,6 +62,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDetails, setTaskDetails] = useState('')
   const selectedGroup = groups.find(group => group.group_id === selectedGroupId) ?? null
+  const groupPanel = useExpandedScroll<HTMLElement>(selectedGroup?.my_status === 'accepted')
   const [draftContext, setDraftContext] = useState({ groupId: selectedGroupId, userId })
   // Reset only when the selected group/account changes, never on a background
   // refresh that could otherwise overwrite unsaved availability.
@@ -206,7 +209,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
       </section>
     </div>
 
-    {selectedGroup?.my_status === 'accepted' && <section className="panel study-detail" aria-labelledby="study-detail-heading">
+    {selectedGroup?.my_status === 'accepted' && <section ref={groupPanel} className="panel study-detail" aria-labelledby="study-detail-heading">
       <header className="study-detail-header"><div><p className="eyebrow">{selectedGroup.course_code}{selectedGroup.course_section ? ` · Section ${selectedGroup.course_section}` : ''} · GROUP SCHEDULE</p><h2 id="study-detail-heading">{selectedGroup.name}</h2><p>{members.length} accepted member{members.length === 1 ? '' : 's'}{selectedGroup.members.some(member => member.status === 'pending') ? ` · ${selectedGroup.members.filter(member => member.status === 'pending').length} invitation pending` : ''}</p></div><button type="button" disabled={busy} onClick={() => { if (selectedGroup.owner_id === userId && members.length === 1 && !window.confirm('You are the only accepted member. Leaving will permanently delete this group. Continue?')) return; void perform(() => api.leave(selectedGroup.group_id), () => setSelectedGroupId(null)) }}>Leave group</button></header>
       <p className="study-schedule-guidance">Add recurring free windows you are comfortable sharing. Course codes and sections do not include meeting times, so the app cannot infer schedules from them.</p>
       <div className="study-members">
@@ -242,7 +245,7 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
         </form>
         {!selectedGroup.tasks.length ? <div className="study-empty"><p>No tasks or notes yet. Add the first item for your group.</p></div> : <ul className="study-task-list">{selectedGroup.tasks.map(task => {
           const mayDelete = task.created_by === userId || selectedGroup.owner_id === userId
-          return <li key={task.id} className={task.is_complete ? 'is-complete' : ''}><label className="study-task-check"><input type="checkbox" checked={task.is_complete} disabled={busy} aria-label={`${task.is_complete ? 'Reopen' : 'Complete'} task: ${task.title}`} onChange={event => void perform(() => api.setTaskComplete(task.id, event.target.checked))} /><span><strong>{task.title}</strong>{task.details && <span className="study-task-details">{task.details}</span>}<small>Added by {task.created_by_name} · {new Date(task.created_at).toLocaleDateString()}</small></span></label>{mayDelete && <button type="button" className="study-task-delete" disabled={busy} aria-label={`Delete task: ${task.title}`} onClick={() => void perform(() => api.deleteTask(task.id))}>Delete</button>}</li>
+          return <li key={task.id} className={task.is_complete ? 'is-complete' : ''}><label className="study-task-check"><input type="checkbox" checked={task.is_complete} disabled={busy} aria-label={`${task.is_complete ? 'Reopen' : 'Complete'} task: ${task.title}`} onChange={event => void perform(() => api.setTaskComplete(task.id, event.target.checked))} /><span><strong>{task.title}</strong>{task.details && <span className="study-task-details">{task.details}</span>}<small>Added by {task.created_by_name} · {readableTimestampDate(task.created_at)}</small></span></label>{mayDelete && <button type="button" className="study-task-delete" disabled={busy} aria-label={`Delete task: ${task.title}`} onClick={() => void perform(() => api.deleteTask(task.id))}>Delete</button>}</li>
         })}</ul>}
       </section>
       <section className="study-overlap" aria-labelledby="study-overlap-heading"><div className="study-overlap-heading"><div><p className="eyebrow">SHARED WINDOWS</p><h3 id="study-overlap-heading">Times that work for everyone</h3></div><label>Meeting length (minutes)<input aria-describedby="meeting-length-help" type="number" min={1} max={1440} step={1} value={durationInput} onChange={event => setDurationInput(event.target.value)} /></label></div>

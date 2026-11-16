@@ -84,6 +84,58 @@ test('late A cannot populate B and refresh does not discard workspace',async()=>
 })
 test('missing config is actionable',()=>{render(<App client={null}/>);expect(screen.getByRole('alert')).toHaveTextContent('VITE_SUPABASE_URL')})
 
+test('dashboard cards remain single after repeated navigation and browser Back/Forward',async()=>{
+ const errors=vi.spyOn(console,'error').mockImplementation(()=>{})
+ mock.items={load:vi.fn().mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
+ render(<App client={fake(session('a')).client}/>);await screen.findByText('Student a')
+ function singleCards(){
+  for(const name of ['Friends','Friend requests','Your profile','Your courses']){
+   expect(screen.getAllByRole('region',{name,exact:true,hidden:true})).toHaveLength(1)
+  }
+ }
+ singleCards()
+ for(let n=0;n<3;n++){
+  fireEvent.click(screen.getByRole('button',{name:'Assignments & Exams'}));singleCards()
+  fireEvent.click(screen.getByRole('button',{name:'My dashboard'}));singleCards()
+ }
+ for(let n=0;n<3;n++){
+  act(()=>window.history.back())
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Assignments & Exams'})).toHaveAttribute('aria-pressed','true'))
+  singleCards()
+  act(()=>window.history.forward())
+  await waitFor(()=>expect(screen.getByRole('button',{name:'My dashboard'})).toHaveAttribute('aria-pressed','true'))
+  singleCards()
+ }
+ expect(errors.mock.calls.some(args=>String(args[0]).includes('same key'))).toBe(false)
+})
+
+test('direct planner links survive refresh and history restores the view and unsaved planner draft', async () => {
+ const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
+ mock.items={load:vi.fn().mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course],plannerCourses:[course]})
+ window.history.replaceState(null,'','/?view=academic')
+ const f=fake(session('a'))
+ let page=render(<App client={f.client}/>)
+ await screen.findByRole('button',{name:'Add item'})
+ expect(screen.getByRole('button',{name:'Assignments & Exams'})).toHaveAttribute('aria-pressed','true')
+ page.unmount()
+ page=render(<App client={f.client}/>)
+ const add=await screen.findByRole('button',{name:'Add item'})
+ await waitFor(()=>expect(add).toBeEnabled())
+ fireEvent.click(add)
+ fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Retained draft'}})
+ // Browser navigation is available even when native modality blocks the page controls.
+ act(()=>{window.history.pushState(null,'','/');window.dispatchEvent(new PopStateEvent('popstate'))})
+ await waitFor(()=>expect(screen.getByRole('button',{name:'My dashboard'})).toHaveAttribute('aria-pressed','true'))
+ expect(document.querySelector('.academic-editor-dialog[open]')).toBeNull()
+ expect(document.body.style.overflow).not.toBe('hidden')
+ act(()=>window.history.back())
+ await waitFor(()=>expect(screen.getByRole('dialog')).toBeVisible())
+ expect(screen.getByLabelText('Title')).toHaveValue('Retained draft')
+ expect(window.location.search).toBe('?view=academic')
+ page.unmount()
+})
+
 test('planner failures stay isolated and private drafts survive navigation but clear on signout',async()=>{
  mock.items={load:vi.fn().mockRejectedValueOnce(new Error('Academic storage unavailable')).mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
  vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}], plannerCourses:[]})
