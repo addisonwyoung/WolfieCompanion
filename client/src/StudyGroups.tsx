@@ -1,6 +1,5 @@
-import { useExpandedScroll } from './useExpandedScroll'
 import { readableTimestampDate } from './dateTime'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { SavedCourse } from './account'
 import type { ClassmateApi, Classmate } from './classmates'
@@ -62,7 +61,25 @@ export default function StudyGroups({ userId, courses, classmatesApi, api, onGoT
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDetails, setTaskDetails] = useState('')
   const selectedGroup = groups.find(group => group.group_id === selectedGroupId) ?? null
-  const groupPanel = useExpandedScroll<HTMLElement>(selectedGroup?.my_status === 'accepted')
+  const groupPanel = useRef<HTMLElement>(null)
+  const visibleGroupId = selectedGroup?.my_status === 'accepted' ? selectedGroup.group_id : null
+  useEffect(() => {
+    if (!visibleGroupId) return
+    const frame = requestAnimationFrame(() => {
+      const panel = groupPanel.current
+      if (!panel) return
+      const header = document.querySelector<HTMLElement>('.site-header')
+      const headerStyle = header && getComputedStyle(header)
+      const inset = header && headerStyle && ['fixed', 'sticky'].includes(headerStyle.position)
+        ? Math.max(0, header.getBoundingClientRect().height + (parseFloat(headerStyle.top) || 0)) : 0
+      panel.style.scrollMarginTop = `${inset + 16}px`
+      const bounds = panel.getBoundingClientRect()
+      const heading = panel.querySelector('.study-detail-header')?.getBoundingClientRect() ?? bounds
+      if (bounds.top >= inset + 16 && heading.bottom <= window.innerHeight) return
+      panel.scrollIntoView?.({ block: 'start', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [visibleGroupId])
   const [draftContext, setDraftContext] = useState({ groupId: selectedGroupId, userId })
   // Reset only when the selected group/account changes, never on a background
   // refresh that could otherwise overwrite unsaved availability.
