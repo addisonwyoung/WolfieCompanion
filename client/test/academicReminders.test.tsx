@@ -1,6 +1,7 @@
 import './academicDialogSupport'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { test, expect, vi } from 'vitest'
+import { StrictMode } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import AcademicReminderProvider from '../src/AcademicReminderProvider'
 import NotificationBell from '../src/NotificationBell'
@@ -29,6 +30,31 @@ test('strict reminder parsing and typed scoped API reject forged shape and prese
 })
 test('bell opening does not read; selecting reads one, details persist and View item uses original identity',async()=>{
  const f=fixture(2),navigate=vi.fn();render(view(f.api,navigate));await screen.findByRole('button',{name:'Notifications, 2 unread'});await bell();expect(f.api.read).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:/^Exam 2CSE/}));await screen.findByRole('heading',{name:'Exam 2'});await waitFor(()=>expect(f.api.read).toHaveBeenCalledWith(uid(2)));await screen.findByRole('button',{name:'Notifications, 1 unread'});await waitFor(()=>expect(screen.getByRole('button',{name:'View item'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'View item'}));expect(navigate).toHaveBeenCalledWith(uid(102));expect(f.rows).toHaveLength(2)
+})
+
+test('Strict Mode opening shares the pending read result and keeps read status after refresh and remount',async()=>{
+ const f=fixture(2),pending=deferred<void>(),persist=vi.mocked(f.api.read).getMockImplementation()!
+ vi.mocked(f.api.read).mockImplementationOnce(async id=>{await pending.promise;await persist(id)})
+ let page=render(<StrictMode>{view(f.api)}</StrictMode>)
+ await bell();fireEvent.click(screen.getByRole('button',{name:/^Exam 2CSE/}))
+ await waitFor(()=>expect(f.api.read).toHaveBeenCalledOnce())
+ await act(async()=>pending.resolve())
+ await screen.findByRole('button',{name:'Notifications, 1 unread'})
+ expect(screen.queryByText('Reading was not saved.')).not.toBeInTheDocument()
+ expect(f.rows.find(row=>row.id===uid(2))?.read_at).toBeTruthy()
+ expect(f.rows.find(row=>row.id===uid(1))?.read_at).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Close',exact:true}))
+ fireEvent.focus(window)
+ await bell()
+ expect(screen.getByRole('button',{name:/^Exam 2CSE/}).closest('li')).toHaveClass('reminder-read')
+ page.unmount()
+ page=render(<StrictMode>{view(f.api)}</StrictMode>)
+ await screen.findByRole('button',{name:'Notifications, 1 unread'});await bell()
+ fireEvent.click(screen.getByRole('button',{name:/^Exam 2CSE/}))
+ await screen.findByRole('heading',{name:'Exam 2'})
+ expect(screen.queryByText('Reading was not saved.')).not.toBeInTheDocument()
+ expect(f.api.read).toHaveBeenCalledOnce()
+ page.unmount()
 })
 test('individual clear persists and failed clear retains context until explicit retry',async()=>{
  const f=fixture();vi.mocked(f.api.clear).mockRejectedValueOnce(Error('Offline'));render(view(f.api));await bell();fireEvent.click(await screen.findByRole('button',{name:'Clear reminder for Exam 1'}));await screen.findByText('Offline');expect(f.rows).toHaveLength(1);fireEvent.click(screen.getByRole('button',{name:'Clear reminder for Exam 1'}));await screen.findByText(/No reminders/);expect(f.rows).toHaveLength(0);expect(f.api.read).not.toHaveBeenCalled()
@@ -73,7 +99,7 @@ test('item normalization handles distinct overrides and missing reminder columns
 })
 
 test('failed reminder read keeps unread count and explicit retry marks only that entry',async()=>{
- const f=fixture(2);vi.mocked(f.api.read).mockRejectedValueOnce(Error('Read offline'));render(view(f.api));await bell();fireEvent.click(await screen.findByRole('button',{name:/^Exam 2CSE/}));await screen.findByText('Reading was not saved.');expect(screen.getByRole('button',{name:'Notifications, 2 unread'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Retry read'}));await screen.findByRole('button',{name:'Notifications, 1 unread'});expect(f.rows.filter(row=>row.read_at)).toHaveLength(1)
+ const f=fixture(2);vi.mocked(f.api.read).mockRejectedValueOnce(Error('Read offline'));render(<StrictMode>{view(f.api)}</StrictMode>);await bell();fireEvent.click(await screen.findByRole('button',{name:/^Exam 2CSE/}));await screen.findByText('Reading was not saved.');expect(screen.getByRole('button',{name:'Notifications, 2 unread'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Retry read'}));await screen.findByRole('button',{name:'Notifications, 1 unread'});expect(f.rows.filter(row=>row.read_at)).toHaveLength(1)
 })
 test('missing reminder item produces unavailable state without opening an editor',async()=>{
  const f=fixture(),navigate=vi.fn();render(<AcademicReminderProvider api={f.api}><NotificationBell checkItem={async()=>false} onViewItem={navigate}/></AcademicReminderProvider>);await bell();fireEvent.click(await screen.findByRole('button',{name:/^Exam 1CSE/}));await screen.findByText('This academic item is no longer available.');expect(screen.getByRole('button',{name:'View item'})).toBeDisabled();expect(navigate).not.toHaveBeenCalled()

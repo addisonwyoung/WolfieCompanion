@@ -1,3 +1,4 @@
+import { useExpandedScroll } from './useExpandedScroll'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { normalizeProfile, years } from './account'
@@ -25,6 +26,7 @@ function cleanInterestDraft(interests: string[]) {
 
 export default function Profile({ profile, onSave, pictureUrl }: { profile: StudentProfile; onSave: (profile: StudentProfile, picture?: PictureChange) => Promise<void>; pictureUrl?: (path: string) => Promise<string> }) {
   const [editing, setEditing] = useState(false)
+  const expandedPanel = useExpandedScroll<HTMLFormElement>(editing)
   const [draft, setDraft] = useState(profile)
   const [interestSearch, setInterestSearch] = useState('')
   const [error, setError] = useState('')
@@ -78,7 +80,7 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
   return <section className="panel profile" aria-labelledby="profile-heading">
     <div className="section-top"><h2 id="profile-heading">Your profile</h2></div>
     <div className="profile-identity"><Avatar name={profile.name} url={avatarUrl} /><h3>{profile.name}</h3><p className="muted">A little about you. A place to connect.</p></div>
-    {editing ? <form onSubmit={save}>
+    {editing ? <form ref={expandedPanel} onSubmit={save}>
       <fieldset disabled={busy}>
         <legend className="eyebrow">Make it your own</legend>
         <label htmlFor="name">Name</label><input id="name" ref={nameInput} autoFocus maxLength={100} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} aria-describedby="profile-error" />

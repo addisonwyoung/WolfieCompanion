@@ -2,9 +2,10 @@ import { useLayoutEffect, useRef } from 'react'
 
 // Presentation lifecycle only. Keeping the dialog in the account subtree makes
 // unmount authoritative: no prompt, pending focus callback, or global draft survives.
-export function useAcademicDialog() {
+export function useAcademicDialog(active = true) {
   const ref = useRef<HTMLDialogElement>(null)
   useLayoutEffect(() => {
+    if (!active) return
     const dialog = ref.current!
     const previousOverflow = document.body.style.overflow
     if (!dialog.open) dialog.showModal()
@@ -31,6 +32,6 @@ export function useAcademicDialog() {
       if (dialog.open) dialog.close()
       document.body.style.overflow = previousOverflow
     }
-  }, [])
+  }, [active])
   return ref
 }

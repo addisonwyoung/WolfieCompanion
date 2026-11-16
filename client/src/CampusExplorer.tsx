@@ -1,3 +1,4 @@
+import { readableTimestampDate } from './dateTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CampusLocation, CampusLocationInput, CampusLocationsApi } from './campusLocations'
 import { campusCategories } from './campusLocations'
@@ -147,5 +148,5 @@ function ResourceIcon({ category }: { category: CampusCategory }) {
 }
 function Source({ item }: { item: CampusLocation }) {
   const source = item.source_url?.startsWith('https://') ? item.source_url : null
-  return <div className="campus-source">{item.source_note && <p>{item.source_note}</p>}{source && <a href={source} target="_blank" rel="noreferrer">Reference source</a>}{item.verified_at && <p>Verified {new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'America/New_York' }).format(new Date(item.verified_at))}</p>}</div>
+  return <div className="campus-source">{item.source_note && <p>{item.source_note}</p>}{source && <a href={source} target="_blank" rel="noreferrer">Reference source</a>}{item.verified_at && <p>Verified {readableTimestampDate(item.verified_at)}</p>}</div>
 }

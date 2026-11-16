@@ -1,3 +1,4 @@
+import { useExpandedScroll } from './useExpandedScroll'
 import { useRef, useState } from 'react'
 import { validateRows } from './account'
 import type { ClassRow } from './account'
@@ -5,13 +6,14 @@ import type { ProfessorCatalogState } from './courseProfessors'
 import ProfessorPicker from './ProfessorPicker'
 export default function ManualClasses({ onSave, catalog }: { onSave: (rows: ClassRow[]) => Promise<void>; catalog: ProfessorCatalogState }) {
   const [open, setOpen] = useState(false)
+  const expandedPanel = useExpandedScroll<HTMLFormElement>(open)
   const [rows, setRows] = useState<ClassRow[]>([{ code: '', section: '', professor_first_name: '', professor_last_name: '' }])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const saving = useRef(false)
   return <div className="manual-classes">
     <button aria-expanded={open} aria-controls="manual-classes" onClick={() => setOpen(!open)} disabled={busy}>Enter classes manually</button>
-    {open && <form id="manual-classes" onSubmit={async e => {
+    {open && <form ref={expandedPanel} id="manual-classes" onSubmit={async e => {
       e.preventDefault(); if (saving.current) return
       if (!validateRows(rows)) { setMessage('Enter a valid course code, section, professor first name, and professor last name for every class. Save 1 to 100 rows.'); return }
       saving.current = true; setBusy(true); setMessage('Saving classes…')

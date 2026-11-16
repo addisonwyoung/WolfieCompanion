@@ -1,3 +1,4 @@
+import { useExpandedScroll } from './useExpandedScroll'
 import { validateRows } from './account'
 import { useEffect, useRef, useState } from 'react'
 import type { ProfessorCatalogState } from './courseProfessors'
@@ -7,6 +8,7 @@ interface Row { id: number; code: string; section: string; professor_first_name:
 const maxBytes = 10 * 1024 * 1024
 export default function ScheduleImportPreview({ onAddClasses, catalog }: { onAddClasses?: (rows: { code: string; section: string; professor_first_name: string; professor_last_name: string }[]) => Promise<void> | void; catalog: ProfessorCatalogState }) {
   const [expanded, setExpanded] = useState(false)
+  const expandedPanel = useExpandedScroll<HTMLElement>(expanded)
   const [file, setFile] = useState<File | null>(null)
   const [url, setUrl] = useState('')
   const [layout, setLayout] = useState('class-list')
@@ -72,7 +74,7 @@ export default function ScheduleImportPreview({ onAddClasses, catalog }: { onAdd
   const validRows = validateRows(rows)
   return <div className="schedule-import">
     <button ref={trigger} disabled={saving} aria-expanded={expanded} aria-controls="schedule-import-panel" onClick={() => { if (expanded) clear(); setExpanded(!expanded) }}>Import schedule</button>
-    {expanded && <section id="schedule-import-panel" aria-labelledby="schedule-import-heading"><fieldset disabled={saving}><legend className="sr-only">Schedule import</legend>
+    {expanded && <section ref={expandedPanel} id="schedule-import-panel" aria-labelledby="schedule-import-heading"><fieldset disabled={saving}><legend className="sr-only">Schedule import</legend>
       <div className="section-top"><h3 id="schedule-import-heading">Preview your classes</h3><button onClick={() => { clear(); setExpanded(false); trigger.current?.focus() }}>Close</button></div>
       <p className="muted">Upload a SOLAR class list or weekly calendar. Extracting sends the image to Google to read it. Review the results, then explicitly save them to Your courses. Extraction and edits alone do not save classes. The screenshot is not saved.</p>
       <div className="import-inputs">

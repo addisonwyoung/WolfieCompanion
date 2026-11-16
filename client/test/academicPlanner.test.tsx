@@ -176,8 +176,8 @@ test('explicit deletion retry after failure uses the same item context', async (
 
 test('filters, prefill, readable dates and edited-row fallback preserve grouping', async () => {
   const api = fixture([first, { ...first, id: 'exam', title: 'Midterm', type: 'exam', due_time: '14:05:00', user_course_id: courses[1].databaseId }]); show(api)
-  await screen.findByRole('heading', { name: 'Midterm' }); expect(screen.getAllByText('Oct 21, 2026')).toHaveLength(2)
-  expect(screen.getByText(/2:05 PM/)).toHaveTextContent('America/New_York')
+  await screen.findByRole('heading', { name: 'Midterm' }); expect(screen.getAllByText('Wednesday, October 21, 2026')).toHaveLength(2)
+  expect(screen.getByText(/2:05 PM/)).toHaveTextContent('2:05 PM')
   fireEvent.change(screen.getByLabelText('Filter by course'), { target: { value: courses[1].databaseId } })
   expect(screen.queryByRole('heading', { name: 'Homework' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Add item' })); expect(within(screen.getByRole('dialog')).getByLabelText('Course', { exact: true })).toHaveValue(courses[1].databaseId)
@@ -273,7 +273,7 @@ test('date groups refresh across campus midnight without changing readable date-
   vi.useFakeTimers()
   try {
     vi.setSystemTime(new Date('2026-10-22T03:59:59Z')); show(fixture([first])); await act(async () => {})
-    expect(screen.getByRole('region', { name: 'Today' })).toHaveTextContent('Oct 21, 2026')
-    await act(async () => { vi.advanceTimersByTime(15000) }); expect(screen.getByRole('region', { name: 'Overdue' })).toHaveTextContent('Oct 21, 2026')
+    expect(screen.getByRole('region', { name: 'Today' })).toHaveTextContent('Wednesday, October 21, 2026')
+    await act(async () => { vi.advanceTimersByTime(15000) }); expect(screen.getByRole('region', { name: 'Overdue' })).toHaveTextContent('Wednesday, October 21, 2026')
   } finally { vi.useRealTimers() }
 })

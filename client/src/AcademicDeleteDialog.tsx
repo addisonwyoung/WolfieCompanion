@@ -1,11 +1,11 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useAcademicDialog } from './useAcademicDialog'
 
-export default function AcademicDeleteDialog({ title, course, busy, error, onCancel, onDelete }: {
+export default function AcademicDeleteDialog({ title, course, busy, error, onCancel, onDelete, active = true }: {
   title: string; course: string; busy: boolean; error: string | null
-  onCancel: () => void; onDelete: () => Promise<boolean>
+  onCancel: () => void; onDelete: () => Promise<boolean>; active?: boolean
 }) {
-  const ref = useAcademicDialog()
+  const ref = useAcademicDialog(active)
   const id = useId()
   const [attempted, setAttempted] = useState(false)
   const submitting = useRef(false)

@@ -1,3 +1,5 @@
+import { currentView, useAppNavigation } from './useAppNavigation'
+import type { AppView } from './useAppNavigation'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { supabase, configurationError } from './account'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -37,14 +39,14 @@ const CampusExplorer = lazy(() => import('./CampusExplorer'))
 function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const account = useAccount(client)
   const campus = useMemo(() => campusLocationsApi(client), [client])
-  const [explorerOpened, setExplorerOpened] = useState(false)
+  const [explorerOpened, setExplorerOpened] = useState(() => currentView() === 'explorer')
   const messaging = useMemo(() => messagingApi(client), [client])
   const [dmTarget, setDmTarget] = useState<Target | null>(null)
   const items = useMemo(() => academicItemsApi(client), [client])
   const reminderService=useMemo(()=>reminderApi(client),[client])
   const [reminderTarget,setReminderTarget]=useState<{id:string;nonce:string;user:string}|null>(null)
   const checkReminderItem=useCallback(async(id:string)=>(await items.load()).some(item=>item.id===id),[items])
-  const [plannerOpened, setPlannerOpened] = useState(false)
+  const [plannerOpened, setPlannerOpened] = useState(() => currentView() === 'academic')
   const reviews = useMemo(() => courseReviewApi(client), [client])
   const professorsApi = useMemo(() => professorCatalogApi(client), [client])
   const professorCatalog = useProfessorCatalog(professorsApi, account.status === 'ready' ? account.userId : null)
@@ -54,11 +56,12 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
   const recommend = useMemo(() => courseRecommendationApi(client), [client])
   const friendsApi = useMemo(() => friendApi(client), [client])
   const groupsApi = useMemo(() => studyGroupApi(client), [client])
-  const [view, setView] = useState('dashboard')
-  function openMessage(target: Target) { setPeer(null); setFriendProfileId(null); setDmTarget(target); setView('messages') }
-  function navigate(next: string) { setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null); setView(next) }
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [friendProfileId, setFriendProfileId] = useState<string | null>(null)
+  const restoreNavigation = useCallback(() => { setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null) }, [])
+  const [view, setView] = useAppNavigation(restoreNavigation)
+  function openMessage(target: Target) { setPeer(null); setFriendProfileId(null); setDmTarget(target); setView('messages') }
+  function navigate(next: AppView) { setReminderTarget(null); setDmTarget(null); setPeer(null); setFriendProfileId(null); setView(next) }
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [signingIn, setSigningIn] = useState(false)
   const [signOutFailed, setSignOutFailed] = useState(false)
@@ -93,13 +96,13 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
     </section>}
     {account.status === 'error' && <section className="auth-panel panel"><p role="alert">{account.message}</p><button onClick={() => void account.retry()}>Retry loading account</button></section>}
     {account.status === 'ready' && account.profile && <AcademicReminderProvider key={account.userId} api={reminderService}><MessagingNotifications client={client} userId={account.userId!}><div>
-      <nav className="app-nav" aria-label="Main navigation"><NotificationBell checkItem={checkReminderItem} onViewItem={id=>{setPlannerOpened(true);navigate('academic');setReminderTarget({id,nonce:crypto.randomUUID(),user:account.userId!})}}/><MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')} /><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'study-groups'} onClick={() => navigate('study-groups')}>Study buddies</button><button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
+      <nav className="app-nav" aria-label="Main navigation"><NotificationBell key={view} checkItem={checkReminderItem} onViewItem={id=>{setPlannerOpened(true);navigate('academic');setReminderTarget({id,nonce:crypto.randomUUID(),user:account.userId!})}}/><MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')} /><button aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>My dashboard</button><button aria-pressed={view === 'spaces'} onClick={() => navigate('spaces')}>Study spaces</button><button aria-pressed={view === 'study-groups'} onClick={() => navigate('study-groups')}>Study buddies</button><button aria-pressed={view === 'explorer'} onClick={() => { setExplorerOpened(true); navigate('explorer') }}>Campus Explorer</button><button aria-pressed={view === 'evaluations'} onClick={() => navigate('evaluations')}>Course evaluations</button><button aria-pressed={view === 'academic'} onClick={() => { setPlannerOpened(true); navigate('academic') }}>Assignments &amp; Exams</button></nav>
       {!!account.cleanupPaths.length && <div role="status" className="cleanup-notice"><p>An unused picture still needs cleanup. Your saved profile is safe.</p><button onClick={() => void account.retryCleanup()}>Retry picture cleanup</button></div>}
       <div hidden={view !== 'dashboard'}>
         <div className="welcome"><p className="eyebrow">YOUR CAMPUS, A LITTLE CLOSER</p><h1>Find your people.</h1><p>Shared courses. Common interests. Connections start here.</p></div>
         <div className="dashboard"><div className="profile-column"><Profile profile={account.profile} onSave={account.saveProfile} pictureUrl={account.api.pictureUrl} />
-          <Friends friends={friendState.friends} busyIds={friendState.busyIds} onRetry={friendState.retry} onViewProfile={setFriendProfileId} onUnfriend={id => { void friendState.unfriend(id) }} api={friendsApi} onOpenRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} relationshipById={friendState.relationshipById} />
-          <FriendRequests incoming={friendState.inbox.data} loading={friendState.inbox.status === 'loading'} error={friendState.inbox.status === 'error'} busyIds={friendState.busyIds} onRespond={(id, action) => { void friendState.respond(id, action) }} onViewProfile={setFriendProfileId} onRetry={friendState.retry} />
+          <Friends key={`friends-${view}`} friends={friendState.friends} busyIds={friendState.busyIds} onRetry={friendState.retry} onViewProfile={setFriendProfileId} onUnfriend={id => { void friendState.unfriend(id) }} api={friendsApi} onOpenRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} relationshipById={friendState.relationshipById} />
+          <FriendRequests key={`friend-requests-${view}`} incoming={friendState.inbox.data} loading={friendState.inbox.status === 'loading'} error={friendState.inbox.status === 'error'} busyIds={friendState.busyIds} onRespond={(id, action) => { void friendState.respond(id, action) }} onViewProfile={setFriendProfileId} onRetry={friendState.retry} />
         </div><CourseBrowser enrolledCourses={account.courses} onAddClasses={account.saveClasses} professorCatalog={professorCatalog} selectedId={selected} onSelect={id => { setPeer(null); setSelectedId(id) }} onViewProfile={id => { if (selectedCourse?.section && selectedCourse.professorFirstName && selectedCourse.professorLastName) setPeer({ id, user: account.userId, course: selectedCourse.code, section: selectedCourse.section, professorFirstName: selectedCourse.professorFirstName, professorLastName: selectedCourse.professorLastName }) }} roster={roster} onRetry={roster.retry} profile={account.profile} recommendations={recommendations} onRetryRecommendations={recommendations.retry}
           relationshipById={friendState.relationshipById} friendActionBusy={friendState.busyIds} onSendFriend={(id, code, section, firstName, lastName) => friendState.send(code, section, firstName, lastName, id)} onOpenFriendRequests={() => document.querySelector<HTMLButtonElement>('[aria-label="Friend requests"] .friend-requests-trigger')?.click()} />
         </div>
@@ -107,10 +110,10 @@ function AccountWorkspace({ client }: { client: SupabaseClient }) {
       {view === 'dashboard' && peer && peer.user === account.userId && peer.course === selectedCourse?.code && peer.section === selectedCourse?.section && peer.professorFirstName === selectedCourse?.professorFirstName && peer.professorLastName === selectedCourse?.professorLastName && <ClassmateProfile key={JSON.stringify([account.userId, selected, peer.id])} messaging={messaging} onMessage={openMessage} api={peers} course={peer.course} section={peer.section} professorFirstName={peer.professorFirstName} professorLastName={peer.professorLastName} student={peer.id} onClose={() => setPeer(null)} />}
       {view === 'dashboard' && friendProfileId && <FriendProfileDialog key={`${account.userId}-${friendProfileId}`} messaging={messaging} onMessage={openMessage} api={friendsApi} student={friendProfileId} onClose={() => setFriendProfileId(null)} />}
       {friendState.actionError && <div className="friend-action-error" role="alert">{friendState.actionError}<button type="button" onClick={() => friendState.retryAction?.()}>Retry action</button><button type="button" onClick={friendState.clearError}>Dismiss</button></div>}
-      {plannerOpened && <div hidden={view !== 'academic'}><AcademicItems reminderTarget={reminderTarget?.user===account.userId?reminderTarget:null} active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
+      {(plannerOpened || view === 'academic') && <div hidden={view !== 'academic'}><AcademicItems reminderTarget={reminderTarget?.user===account.userId?reminderTarget:null} active={view === 'academic'} api={items} courses={account.plannerCourses ?? account.courses} onAddCourses={() => navigate('dashboard')} /></div>}
       {view === 'messages' && <Messages key={account.userId} api={messaging} client={client} userId={account.userId!} initialTarget={dmTarget} />}
       {view === 'spaces' && <CrowdMeter />}{view === 'study-groups' && <StudyGroups userId={account.userId!} courses={account.courses} classmatesApi={discover} api={groupsApi} onGoToCourses={() => navigate('dashboard')} />}{view === 'evaluations' && <CourseEvaluations api={reviews} />}
-      {explorerOpened && (
+      {(explorerOpened || view === 'explorer') && (
         <div hidden={view !== 'explorer'}>
           <Suspense fallback={<p role="status">Loading Campus Explorer…</p>}>
             <CampusExplorer

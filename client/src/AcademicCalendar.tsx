@@ -26,7 +26,7 @@ export default function AcademicCalendar({ items, courses, now, month, selectedD
     return <ul className="calendar-events">{list.map(item => {
       const course = courses.find(saved => saved.databaseId === item.user_course_id)?.code ?? 'Saved course'
       const status = item.completed_at ? 'Completed' : itemGroup(item, now) === 'Overdue' ? 'Overdue' : 'Pending'
-      const time = item.due_time ? `${readableTime(item.due_time)} America/New_York` : ''
+      const time = item.due_time ? readableTime(item.due_time) : ''
       return <li key={item.id}><button type="button" data-calendar-item={item.id} className={`calendar-event calendar-event-${status.toLowerCase()}`} disabled={busy}
         aria-label={`Edit ${item.title}, ${course}, ${item.type}, ${readableDay(item.due_date)}${time ? `, ${time}` : ''}, ${status}`}
         onClick={event => onEdit(item, event.currentTarget)}>

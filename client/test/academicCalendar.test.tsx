@@ -64,7 +64,7 @@ test('all types, dense entries, status filters and empty months remain reachable
  const rows=Array.from({length:12},(_,index)=>({...item,id:String(index),title:`Deadline ${index}`,type:(['assignment','exam','quiz','project'] as const)[index%4],due_time:index===0?'14:30:00':null,completed_at:index===1?'2026-10-22T12:00:00Z':null}))
  show(fixture(rows));await calendar()
  expect(screen.getAllByRole('button',{name:/^Edit Deadline/})).toHaveLength(12)
- expect(event('Deadline 0')).toHaveAccessibleName(/2:30 PM America\/New_York/)
+ expect(event('Deadline 0')).toHaveAccessibleName(/2:30 PM/)
  expect(event('Deadline 1')).toHaveAccessibleName(/Completed$/)
  expect(screen.queryByText('Private notes')).not.toBeInTheDocument()
  fireEvent.change(screen.getByLabelText('Calendar completion status'),{target:{value:'pending'}});expect(screen.getAllByRole('button',{name:/^Edit Deadline/})).toHaveLength(11)
@@ -89,7 +89,7 @@ test('calendar editing preserves populated values, moves confirmed date once and
  expect(screen.getByRole('heading',{name:'October 2026'})).toBeInTheDocument()
  expect(screen.getByRole('button',{name:'October 23, 2026, 0 items'})).toHaveFocus()
  fireEvent.click(screen.getByRole('button',{name:'Next month'}));expect(screen.getAllByRole('button',{name:/^Edit Homework,/})).toHaveLength(1)
- fireEvent.click(screen.getByRole('tab',{name:'Agenda'}));expect(screen.getByText('Nov 3, 2026')).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('tab',{name:'Agenda'}));expect(screen.getByText('Tuesday, November 3, 2026')).toBeInTheDocument()
  expect(api.save).toHaveBeenCalledWith(expect.objectContaining({due_date:'2026-11-03',due_time:null}),item.id)
 })
 
