@@ -1,128 +1,124 @@
 # Wolfie Companion
-CSE 416 Project - Harvey Cao, Karen Elshemy, Mina Jaromy, Addison Young
 
-## Written Proposal
-Wolfie Companion is a social and utility platform for Stony Brook students. It provides a centralized application for students to connect with one another while promoting academic productivity. 
-## Problem Statement
-Stony Brook students often rely on multiple disconnected platforms (Navigate360, CampusGroups, SBEngaged Website, GroupMe, etc.) to manage their academic and campus lives. Existing student communities are scattered across messaging apps, social media, and university-supported platforms, making it difficult for students to connect with classmates and manage their productivity. In addition, these platforms lack the connection piece in that they don’t have algorithms to recommend students who you may get along with. This fragmentation can also make it harder to stay organized, manage time effectively, collaborate with classmates, make informed course decisions, and find suitable study spaces. Our app aims to improve student productivity and connection by centralizing these everyday needs into one student-focused platform that provides scheduling and planning tools, course-based student communities, campus study space information, real-time crowd reporting, and verified anonymous course evaluations.
-## Target Users
-### Stony Brook Students
-This application is specifically designed for students who want to improve their academic productivity, connect with classmates, and more easily navigate through campus resources. This application may be particularly useful for freshmen and transfer students who are transitioning into a new academic and social environment. Commuter students may also benefit from having an easier way to meet other classmates, discover study groups, and campus resources despite spending less time on campus. 
-## Why is it a semester-long project?
-* **Stony Brook student verification:** Users are required to log in using their Stony Brook email account and verify their email address before being granted access to the application. The application must securely authenticate users, maintain login sessions, and enforce the proper access permissions.
-* **Automatic class retrieval from uploaded schedule:** Users can upload an image of their schedule and the application will automatically retrieve their classes, help them connect with other students enrolled in the same courses, and display reviews for those courses. This requires the use of computer vision and data extraction to accurately detect the courses the student is enrolled in. 
-* **Student recommendations:** Users will be recommended to other students who share the same major, have similar interests, or are enrolled in the same courses. This requires us to design a ranking logic rather than displaying a simple list of users.
-* **Multiple workflows that are interconnected:** Student dashboard, group chats, individual student messaging, course assignment reminders, course evals, schedules, and study spot finder all share user and course data. Changes within one portion of the application may need to impact several other features. 
-* **Real-time functionality:**  Users can update their availability status and provide information about study spot availability, requiring real-time communication so that the application is able to update and retrieve data continuously and without delay. 
-* **User-friendly interface:** Due to the many features the application provides, significant testing is needed to ensure that each workflow functions effectively and that the platform is organized, cohesive, and easy for users to navigate. 
-* **Scalable and relational data management:**  The application must account for a large student user base and maintain relationships among users, courses, schedules, and connections. Therefore, we must be able to store many users, courses, and large amounts of shared data while maintaining reliable and efficient CRUD operations. 
-* **Maintenance of dynamic data:** Ensuring that data is well-maintained and free of unnecessary duplicates or overlapping user data as more users interact with the application, given the large amount of user-generated data that must be stored and managed.
-* **Safety and moderation:** Since users can message others and publish content, the platform requires blocking, reporting, permissions, and moderation tools that must be enforced throughout the application.
-* **Ongoing user-driven development:** Even after the core features are implemented, the team will gather student feedback, identify additional challenges students face, and improve or expand the platform accordingly. Evaluating and integrating these ideas adds further design, development, and testing work throughout the semester.
+CSE 416 — Harvey Cao, Karen Elshemy, Mina Jaromy, Addison Young.
 
-## Scope
-### Inside of Scope (V1)
-* User accounts and profiles
-* Schedule importing
-* Group profiles & meeting recommendations
-* Classmate discovery
-* Direct messaging
-* Study groups
-* Study-location reports
-* Anonymous course evaluations
-### Outside of Scope
-* "Who's Free Now" availability matching
-* Roommate & housing matching
-* Student marketplace
-* Discussion forums
-* Lost and found board
-* Not a replacement for Solar course registration and Brightspace
-  
-**These features may be added in future versions but are not part of the core functionality of the application.** 
-## Requirements
-### 1. Schedule upload & classmate discovery
-**What:** Students must be able to upload or enter their class schedule and identify other users who share the same classes.  
-**How:** The system should accurately extract course information to allow students to confirm or correct detected classes. This should only display profile information the student wishes to share.
-### 2. Student communication
-**What:** Students must be able to message classmates and create group chats for course-related or social communication.  
-**How:** Messages should persist across sessions, update reliably, and only be visible to the intended participants. 
-### 3. Student recommendations
-**What:** The application must recommend potential friends, study partners, or classmates based on shared characteristics such as courses, majors, interests, and academic goals.  
-**How:** Recommendations should be ranked using relevant profile and schedule information and should allow users to choose what information is considered.
-### 4. Study group formation & scheduling
-**What:** Students must be able to find classmates with compatible courses to form study groups, and compare group members’ schedules to find possible meeting availability.  
-**How:** The app should calculate overlapping availability between students who have different schedules and clearly display suitable time windows for the group.
-### 5. Study space discovery & crowd reporting
-**What:** Students must be able to browse campus study spaces and view student-reported crowd levels.  
-**How:** Crowd reports should include timestamps, recent reports should be prioritized, and users should be able to filter study spaces by characterization: location, noise level, and amenities. 
-### 6. Productivity & assignment management
-**What:** Students must be able to track upcoming assignments and receive reminders of important deadlines for exams, projects, and homeworks.  
-**How:** Deadlines should remain saved across sessions and reminders should be presented early enough to be helpful.
-### 7. Anonymous course evaluations
-**What:** Verified Stony Brook students must be able to view previous course evaluations and anonymously submit feedback for courses they have taken.  
-**How:** Evaluations should include structured information such as workload, difficulty, and overall experience, while the identity of the student will be hidden. 
-### 8. Student account verification & privacy
-**What:** Users must be able to create accounts and verify that they are affiliated with Stony Brook University.  
-**How:** Verification and authentication credentials must be stored securely and student-only functionality must be restricted to these verified accounts.
+Wolfie Companion provides student profiles, enrollment, classmates, friends, messaging, study groups, academic tasks/reminders, course reviews, and campus resources for Stony Brook students.
 
-## Roles
-* **AY- Frontend/UI:** Responsible for the React/TypeScript user interface, navigation, dashboard, responsive design, and integrating frontend components with backend APIs
-* **MJ- Backend & Database:** Responsible for the Node.js/Express backend, PostgreSQL/Prisma database schema, API endpoints, and core application logic
-* **KE- Social & Real-Time Features:** Responsible for message, group chats, user status, classmate connections, availability comparison, and Socket.IO integration
-* **HC- Campus Service & Intelligent Features:** Responsible for study space/crowd reporting, course evaluations, student recommendations, schedule-image extraction, and integrations with external APIs
+## M5 blockers and recommended setup
 
-**All developers will contribute to testing, debugging, code reviews, documentation, and integration across the whole application.**
+A clone contains no usable backend configuration. Google sign-in requires a verified `@stonybrook.edu` Google identity; personal Gmail/password accounts cannot substitute. There is no guest account or authenticated sample-data fallback. The owner must confirm deployed migrations, OAuth access, redirects, and demonstration data. Peer pictures and review publishing need server secrets; OCR and map backgrounds need separate services.
 
-**Branches & Pull Requests:** Developers work on individual feature branches to avoid disrupting the stable main branch. Completed features must be submitted through pull requests for the team to review and test before being merged into main.
+The simplest M5 path is a **dedicated hosted development Supabase project containing synthetic data**, with eligible reviewer accounts. Do not expose a backend containing private student data to external review. Repository inspection cannot establish the current hosted project's configuration, migration state, isolation, or availability. The [environment inventory and backend assessment](docs/m5-reproducibility.md) lists owner checks and remaining limitations.
 
-## Rough Architecture Sketch
-### Frontend: React + TypeScript
-* React builds the pages/components:
-    * Login
-    * Dashboard
-    * Classmate recommendations
-    * Messages
-    * Study spaces
-    * Course reviews
-* TypeScript is JS with type checking which helps catch mistakes earlier
-### Backend: Node.js + Express + TypeScript
-* Node.js lets us run JS and TypeScript on the server
-* Express is a good framework for creating API routes easily
-### Database: PostgreSQL
-* Database that will store our permanent app data, PostgreSQL is relational which fits our app perfectly because our data has many relationships
-  * Users, courses, schedules, friendships, messages, assignments, course evaluations, study spaces, crowd reports
-### ORM (object-relational mapping): Prisma
-* Prisma will sit between our backend and PostgreSQL
-* With Prisma we can write more TypeScript friendly queries rather than raw SQL
-### Auth: Firebase Auth for student verification
-* Use this to verify through their SBU email address before granting access 
-### Real-Time messaging/status: Socket.IO
-* Socket.IO keeps a live connection between the frontend and backend so messaging doesn’t have to constantly refresh to get live state 
-### File/image uploads: Firebase Storage
-* Store profile pictures, schedule screenshots
-### Resend/SendGrid: Email reminders 
-* Firebase Auth’s templates are designed for login and verification, so reminder emails are sent through Resend/SendGrid instead.
-### Maps/Location: Mapbox
-* Power the campus map/study-space portion 
-* Click location → crowd level, noise, amenities, etc
-* Maintain our own studyspace records in PostgreSQL and use mapbox to visualize them
-### AI/Vision service
-* Vision API for schedule extraction
-* Must be checked with our database 
+## Prerequisites and install
 
+- Git and access to this repository.
+- Node.js 22.13+ in the 22.x line (CI uses Node 22), or Node 24+, with npm.
+- Internet access to Supabase/Google, an eligible Stony Brook Google account, and owner-approved access to the selected backend.
 
+```sh
+git clone https://github.com/addisonwyoung/WolfieCompanion.git
+cd WolfieCompanion
+npm --prefix client ci
+npm --prefix server ci
+```
 
+There is no root package.json. Each package has a committed lockfile. Use the milestone commit/branch supplied by the team; these instructions do not require a historical feature branch.
 
+## Reviewer: existing development backend
 
+1. Obtain the development Supabase **project URL and publishable key** from the owner. Confirm that your eligible Google account can use the configured OAuth client.
+2. Copy `client/.env.example` to `client/.env.local` and `server/.env.example` to `server/.env`. Preserve any existing local files. PowerShell commands for new files:
 
+   ```powershell
+   Copy-Item client/.env.example client/.env.local
+   Copy-Item server/.env.example server/.env
+   ```
 
+3. Fill `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` in the client, and matching `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` in the server. Leave optional services blank/disabled unless provisioned. Restart both processes after changes.
+4. Do not run migrations or database tests on the shared project. The owner configures it once.
+5. Start two terminals from the repository root:
 
+   ```sh
+   cd server
+   npm run dev
+   ```
 
+   ```sh
+   cd client
+   npm run dev -- --host localhost --port 5173 --strictPort
+   ```
 
+Open **http://localhost:5173**. The API prints `Wolfie API ready`; `http://localhost:3000/api/health` returns health status. Vite proxies `/api` to `127.0.0.1:3000`. Keep these ports unless you also update the proxy and callback configuration. Run the server from `server/`: `npm run dev` invokes `tsx watch src/index.ts`, whose dotenv import loads `server/.env`. The client uses Vite and keeps `client/.env.local`. Preserve existing files; no rename or additional server env file is needed. Shell environment values take precedence over dotenv values. Restart the server after env edits.
 
+Public configuration supports the configured account/social/coursework backend and own-avatar uploads. Peer pictures and review publishing remain unavailable without server secrets. For a complete demo, the owner must securely provision secrets to a **trusted developer** on a disposable development project, or operate a separate API with matching frontend routing. A hosted API/proxy deployment is not provided here. Do not distribute privileged project-wide keys to untrusted reviewers or put them in Vite variables.
 
+## Developer: independent backend
 
+### Existing server and Prisma environment files
 
-## Teammate local setup
+Keep `server/.env` for Express runtime and `client/.env.local` for Vite. Keep any existing `server/.env.supabase` for separate Prisma tooling; it is not an Express runtime file. Prisma configuration defaults to `.env` and `DATABASE_URL`. To select `.env.supabase` and `DIRECT_URL`, set `PRISMA_ENV_FILE=.env.supabase` in the invoking shell **before** running a Prisma command from `server/`. Putting that selector only inside `.env.supabase` cannot select the file. Existing shell values are not overwritten by dotenv. The current Express app does not import the Prisma runtime module, and normal startup/build does not require a database connection. No database tooling is needed for the reviewer startup below.
 
-To pull the account feature branch and run the shared Google/Supabase experience, follow [the teammate setup guide](docs/teammate-setup.md). It includes environment files, two-terminal startup, account checks, optional screenshot extraction, and troubleshooting.
+An independent **hosted Supabase test project** is feasible with manual provisioning; it is not an automated fresh-clone setup.
+
+1. Create a dedicated test project. Review **all** `supabase/migrations/` files, their prerequisite comments and feature deployment documents. Manually apply reviewed SQL through the project's SQL Editor, starting with accounts and following full filename order after checking dependencies. Record complete filenames applied. Applying only the initial account migration is insufficient. A fresh replay of the entire chain was not validated in this documentation task.
+2. Several migrations share numeric version prefixes. Do not assume Supabase CLI push/reset can replay this directory unchanged. There is no checked-in `supabase/config.toml`, CLI dependency, complete local seed, or validated local Auth setup. Do not use Prisma migrations: its schema has no application models, and the Express routes do not import the Prisma scaffold.
+3. Configure a Google **Web OAuth client**, consent screen and audience. Add the callback copied from Supabase's Google provider settings to Google's authorized redirect URIs (hosted form: `https://YOUR_PROJECT.supabase.co/auth/v1/callback`). Store Google client ID/secret **in Supabase Auth**, not application env files. Enable Google and disable other providers per the account guide. Add eligible test users if the Google project's audience/testing settings require them. Institutional account restrictions can also block access.
+4. Set Supabase's development Site URL to `http://localhost:5173` and allow exact frontend redirect `http://localhost:5173/auth/callback`. Google's callback is Supabase; Supabase's callback is the frontend. Other hosts/ports require their own exact entries. PKCE must complete in the browser that started sign-in.
+5. Confirm the private `avatars` bucket/policies and current RPCs exist. Verify friendship/messaging publication membership in `supabase_realtime` where migrations conditionally configure it. Confirm current-term catalog offerings, professor/section data, enrollment verification workflow, and campus records for the demo. Some migrations seed data and later ones hide demo offerings; do not assume current-term data is ready. Pending enrollment does not grant verified-course functionality.
+6. Fill both env files with your project's settings and use the startup commands above. Provision optional services only when needed.
+
+See [accounts and policies](docs/supabase-accounts.md), [semester enrollment](docs/semester-aware-enrollments.md), [classmates](docs/classmate-discovery.md), [direct messaging](docs/direct-messaging.md), [group messaging](docs/group-messaging.md), and [campus explorer](docs/campus-explorer.md). This README supersedes historical branch-specific startup instructions; feature documents retain their owner-review requirements and historical limitations.
+
+A fully local Supabase stack is possible in principle with the [official CLI/Docker workflow](https://supabase.com/docs/guides/local-development/cli/getting-started). Missing stack configuration, duplicate migration versions, replay validation, seeds and local Google callback/eligibility configuration must be resolved first. Plain PostgreSQL and the SQL test bootstrap do **not** supply Auth, Storage, Realtime, or Google OAuth. Fully offline authenticated use is unsupported. No unverified local-stack commands are prescribed here.
+
+## Optional services and known limitations
+
+| Feature | Requirements / limitations |
+| --- | --- |
+| Peer pictures | Server-only `SUPABASE_SERVICE_ROLE_KEY`, authorized relationship/sharing and avatar resolver RPCs. Own uploads use the caller token and publishable key. |
+| Review publishing | Express API, matching Supabase public settings, service-role key, `OPENAI_API_KEY`, available external moderation and verified enrollment for the offering. Missing moderation fails publishing. Review text is sent to OpenAI. Reading existing reviews does not need OpenAI. |
+| Schedule extraction | Separate Google Vision API enablement, billing, permissions and ADC. OAuth sign-in credentials do not configure Vision. Set `ENABLE_SCHEDULE_PREVIEW=1` and use non-production mode and the exact localhost origin. Manual enrollment works without OCR. Images go to Google on extraction. Follow [OCR setup](server/README.md#schedule-ocr-experiment-cloud-setup) using your own authorized project ID instead of its historical example. |
+| Map background | Approved public MapTiler key/map ID, appropriate provider origin restrictions and quota. Without these, map background is unavailable; location browsing does not need a tile key. Optional feedback URL enables suggestion links. |
+| Social demonstration | Multiple eligible independent browser sessions and suitable enrollment/friendship data. Group chat creation needs the creator plus two accepted friends. New accounts start empty. |
+| Reminders | Persistent in-app reminders; no email or closed-app push implementation. |
+| Crowd reports | Anonymous Express endpoints, separate from Supabase campus records. JSON file defaults to `server/data/crowd-reports.json`. Requires one process and writable persistent disk. Separate local APIs do not share reports. |
+
+Current services are React/Vite, Express, Supabase Auth/Postgres/Storage/Realtime, optional Google Vision, OpenAI moderation and MapTiler. Firebase, Socket.IO, Resend/SendGrid and Mapbox are not required by the implementation. Prisma is a scaffold.
+
+## Checks and manual acceptance
+
+From the repository root:
+
+```sh
+npm --prefix client test
+npm --prefix client run lint
+npm --prefix client run build
+npm --prefix server test
+npm --prefix server run build
+git diff --check
+```
+
+Tests use mocks/injected services; passing them does not establish live OAuth, policies, Storage, Realtime, map tiles, moderation or OCR. Server build generates the ignored Prisma client before compilation without connecting to a database. CI runs client lint/build and server build/tests; run client tests locally too. No root script, server lint script or Markdown checker is defined.
+
+SQL tests under `supabase/tests/` are for **disposable isolated local PostgreSQL only**. The bootstrap provides Auth/Storage stand-ins. Never run it or SQL fixtures on a hosted/shared project. See the [test plan](docs/test-plan.md) and feature-specific prerequisites.
+
+Before M5, manually verify eligible sign-in, profile/enrollment persistence after reload, own-avatar upload, two-user access isolation, discovery opt-ins, friendship/messaging across browsers, group membership restrictions, reminders and catalog state. Separately exercise peer pictures, review publishing, maps and OCR when provisioned. Health success alone does not verify these integrations.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Account setup screen | Fill client Supabase settings and restart Vite. |
+| OAuth redirect mismatch | Google needs the Supabase callback; Supabase needs the frontend callback. |
+| Google blocked / ineligible | Owner checks audience/test users; use verified `@stonybrook.edu` Google identity. No bypass account is provided. |
+| Callback wrong or fails | Check Site URL, exact allowlist and localhost:5173. Begin a fresh sign-in in the same browser. |
+| Workspace/RPC/table errors | Confirm matching project/key, all required migrations and catalog configuration with the owner. Do not reset the shared database. |
+| Pictures unavailable | API must run with env loaded. Peer pictures also require its service-role key, sharing and relationship authorization. |
+| Review publishing unavailable | Check service-role/OpenAI configuration, provider availability and verified enrollment. Keep secret/provider payloads out of issues. |
+| OCR disabled / failing | Check opt-in, exact origin, non-production mode, ADC, API, billing, permissions and quota. |
+| Map background unavailable | Check approved MapTiler key/map ID and provider origin restrictions. |
+| Port occupied / API refused | Stop your own older process; keep UI 5173/API 3000. Strict port avoids silent OAuth port changes. |
+| Built site cannot reach API | Development proxy is not bundled. Production hosting must route `/api` to Express and serve the SPA for `/auth/callback`; deployment is not included. |
+
+Keep local env files, tokens, private images, database exports and Google credential JSON out of commits. Gitignore cannot protect arbitrarily named secrets or remove already tracked credentials. See the [audit record](docs/m5-reproducibility.md).
