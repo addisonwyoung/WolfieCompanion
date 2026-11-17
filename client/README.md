@@ -1,5 +1,7 @@
 # Wolfie Companion
 
+For current M5 prerequisites, reviewer versus independent-backend setup, service requirements and verification limits, use the [root setup guide](../README.md). Sections below include historical feature notes; current discovery uses live backend data rather than fictional classmates.
+
 Google sign-in opens your personal profile and saved current classes. Fictional classmates remain labeled demonstrations; saved classes do not prove official registration.
 
 ## Run locally
@@ -22,7 +24,7 @@ For a two-user demo, open a second independent browser session against the same 
 
 ## Schedule upload preview
 
-Run `npm ci`, then `npm run dev -- --host localhost --port 5173 --strictPort`. In a second terminal, start the API from `server` with `ENABLE_SCHEDULE_PREVIEW=1 npm run dev` and configured Google ADC credentials. Open http://localhost:5173 and select Import schedule beside Your courses.
+Run `npm ci`, then `npm run dev -- --host localhost --port 5173 --strictPort`. In a second terminal, set `ENABLE_SCHEDULE_PREVIEW=1` in `server/.env`, then start the API from `server/` with `npm run dev` and configured Google ADC credentials. Open http://localhost:5173 and select Import schedule beside Your courses.
 
 Choose one PNG/JPEG up to 10 MiB, pick SOLAR class list or weekly calendar, and press Extract classes. Selection alone stays local; extraction sends the image to Google. Edit Course code and Section, add/remove rows, or Clear/Close. Review the unverified results and click Add to Your courses to merge course codes and sections into your Supabase account. Existing courses stay, duplicate pairs are merged, and saved classes restore after reload/login. Extraction and edits alone remain temporary; screenshots are never saved. If preview is disabled, restart the API with the flag; for another frontend port, configure the server's exact `SCHEDULE_PREVIEW_ORIGIN` to match.
 

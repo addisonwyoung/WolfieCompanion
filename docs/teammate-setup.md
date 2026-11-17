@@ -1,5 +1,7 @@
 # Teammate setup for Wolfie Companion
 
+For M5, follow the [current root setup guide](../README.md) and [configuration assessment](m5-reproducibility.md). The branch-specific instructions and some feature limitations below are historical; do not push/switch that branch as a prerequisite for the current milestone.
+
 Follow these steps to run the same account-enabled app locally from `codex/supabase-accounts-and-enrollments`. Use the team's existing Supabase project for Google sign-in, saved profiles, pictures, and classes. Everyone gets the same interface, but each Google account has its own private profile and course list; new accounts start empty.
 
 ## 1. Get the branch
@@ -59,7 +61,7 @@ VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
-Create `server/.env.local` with the same two values and these variable names:
+Create `server/.env` with the same two values and these variable names:
 
 ```env
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
@@ -67,6 +69,8 @@ SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
 Quotes are not required. Do not put spaces around `=`. These local files are ignored by Git and do not arrive when you pull the branch. The checked-in `.env.example` files are templates. Existing local env files should be edited rather than overwritten. Restart the processes below after changing configuration.
+
+Keep `client/.env.local` for Vite and `server/.env` for Express. Preserve any existing `server/.env.supabase` for separate Prisma tooling; Express does not load it. Prisma defaults to `.env`/`DATABASE_URL`, or selects `.env.supabase`/`DIRECT_URL` when `PRISMA_ENV_FILE=.env.supabase` is set in the invoking shell. Normal app startup needs no Prisma database command.
 
 The SQL migration only needs to be applied once to the shared Supabase project. If Addison already applied it there, teammates should not create another project or run setup SQL again.
 
@@ -89,10 +93,10 @@ In terminal 1, from the repository root:
 
 ```sh
 cd server
-node --env-file=.env.local --import tsx src/index.ts
+npm run dev
 ```
 
-Wait for `Wolfie API ready`. Leave this terminal running. This command loads the server's env file; plain `npm run dev` does not explicitly load that file.
+Wait for `Wolfie API ready`. Leave this terminal running. The server entry point loads `.env` through dotenv when run from `server/`; the dev script also watches source changes. Restart after env edits.
 
 In terminal 2, from the repository root:
 
@@ -122,14 +126,14 @@ Google sign-in and manual class entry work without Google Vision. Screenshot ext
 
 For OCR, follow [the server's cloud setup](../server/README.md#schedule-ocr-experiment-cloud-setup) using your own authorized Google account. The project owner must grant the needed project access and ensure Vision and billing are enabled. Set up Application Default Credentials as documented there.
 
-Then stop terminal 1 and add these lines to `server/.env.local`:
+Then stop terminal 1 and add these lines to `server/.env`:
 
 ```env
 ENABLE_SCHEDULE_PREVIEW=1
 SCHEDULE_PREVIEW_ORIGIN=http://localhost:5173
 ```
 
-Restart terminal 1 using the same `node --env-file=.env.local --import tsx src/index.ts` command. Keep `NODE_ENV` unset or development for this local flow; the OCR endpoint is disabled in production.
+Restart terminal 1 using the same `npm run dev` command. Keep `NODE_ENV` unset or development for this local flow; the OCR endpoint is disabled in production.
 
 In the app, choose Import schedule, select a PNG/JPEG up to 10 MiB, select the layout, and press Extract classes. Review/correct the course codes and sections, then explicitly click Add to Your courses to save. Extraction sends the image to Google and uses the team's Google Vision quota/billing. Selection or draft edits alone do not save classes; screenshots and raw OCR text are not saved by the app.
 
@@ -143,12 +147,12 @@ In the app, choose Import schedule, select a PNG/JPEG up to 10 MiB, select the l
 | Sign-in returns to the wrong address | Check Supabase's Site URL and exact frontend Redirect URL; open the app using `http://localhost:5173`. |
 | Use a verified Stony Brook account | Select your verified `@stonybrook.edu` Google account; personal Gmail accounts are intentionally ineligible. |
 | Unable to load profile/classes | Check the project URL/key match the shared project, the migration was applied there, and try Retry loading account. |
-| Picture storage unavailable | Keep the API running with `--env-file=.env.local`; check its Supabase variables match the frontend project. |
+| Picture storage unavailable | Keep the API running with `npm run dev` from `server/`; check its Supabase variables match the frontend project. |
 | Schedule preview disabled | Complete the optional OCR setup, set `ENABLE_SCHEDULE_PREVIEW=1`, and restart the API. Manual class entry still works. |
 | `EADDRINUSE` or port already in use | Stop your older app process in its terminal, then restart on the documented ports. |
 | Different content from Addison | Compare branch/commit with `git branch --show-current` and `git log -1 --oneline`; each real account's personal data will differ. |
 
-For future updates, stop the two app terminals, pull with `git pull --ff-only`, rerun `npm --prefix client ci` and `npm --prefix server ci`, and start both terminals again. Keep your `.env.local` files. If an update adds a database migration, coordinate its application once to the shared project with the team.
+For future updates, stop the two app terminals, pull with `git pull --ff-only`, rerun `npm --prefix client ci` and `npm --prefix server ci`, and start both terminals again. Keep `client/.env.local`, `server/.env`, and any existing `server/.env.supabase`. If an update adds a database migration, coordinate its application once to the shared project with the team.
 
 ## Direct messaging
 
