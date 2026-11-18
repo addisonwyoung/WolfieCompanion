@@ -1,7 +1,11 @@
 # Wolfie API
 
-Run `npm ci` then `npm run dev` from server. Default port: 3000 (`PORT` overrides it).
+For current M5 installation, environment loading, service requirements and limitations, start with the [root setup guide](../README.md). The API now includes authenticated avatar, peer-picture and review routes in addition to the anonymous crowd prototype described below. Historical OCR examples use a team project ID; use your own authorized project instead. Current enrollment persistence is described in the client/root guides; the older browser-preview section's session-only behavior is historical.
+
+Preserve an existing `server/.env`; for a fresh clone, copy `server/.env.example` to `server/.env` and configure it as described in the root guide. Run `npm ci` then `npm run dev` from `server/`. The entry point imports `dotenv/config`, loading `.env` from that working directory; exported shell values take precedence. Vite separately loads `client/.env.local`. Restart the server after environment edits. Default port: 3000 (`PORT` overrides it).
 Reports persist in server/data/crowd-reports.json. `CROWD_REPORTS_PATH` can select another file (use an absolute path). Missing storage starts empty; invalid storage stops startup rather than discarding reports.
+
+Prisma tooling separately loads `PRISMA_ENV_FILE` or `.env` by default. Only `PRISMA_ENV_FILE=.env.supabase` selects `DIRECT_URL`; otherwise it uses `DATABASE_URL`. Set the selector in the invoking shell before running Prisma from `server/`, not only inside the file it is intended to select. Preserve any existing `.env.supabase`; Express does not load it or use this selector. No database command or connection is needed for normal API startup. Shell values take precedence over both dotenv loaders.
 
 Use one server process and persistent writable disk. This anonymous student prototype has no authentication or moderation; it is not intended for public production use.
 
@@ -69,7 +73,7 @@ Attached section labels such as `CSE 310-01` now yield section `01`, preserving 
 Start the API from `server`:
 
 ```sh
-ENABLE_SCHEDULE_PREVIEW=1 npm run dev
+npm run dev
 ```
 
 Start the UI from `client` in a second terminal:

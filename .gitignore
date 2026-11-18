@@ -21,7 +21,20 @@ Thumbs.db
 # Local crowd reports
 server/data/
 
-# Share placeholders, never local credentials
-!.env.example
+# Local credentials, database exports, and Supabase CLI state
+.secrets/
+secrets/
+credentials/
+*-credentials.json
+*service-account*.json
+application_default_credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+*.backup
+supabase/.temp/
+supabase/.branches/
 # Prisma generated client
 server/src/generated/

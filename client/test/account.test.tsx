@@ -159,7 +159,8 @@ test('direct planner links survive refresh and history restores the view and uns
 
 test('planner failures stay isolated and private drafts survive navigation but clear on signout',async()=>{
  mock.items={load:vi.fn().mockRejectedValueOnce(new Error('Academic storage unavailable')).mockResolvedValue([]),save:vi.fn(),complete:vi.fn(),remove:vi.fn()}
- vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[{id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}], plannerCourses:[]})
+ const course={id:'cse-310',databaseId:'10000000-0000-0000-0000-000000000021',code:'CSE 310'}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[course], plannerCourses:[course]})
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')
  navigateHeader('Assignments & Exams');await screen.findByText('Academic storage unavailable')
  fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));expect(screen.getByText('Student a')).toBeVisible()
