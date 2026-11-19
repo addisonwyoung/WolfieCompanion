@@ -39,65 +39,72 @@ Every eligible active messaging-group member SHALL have equal permission to add 
 - **WHEN** a member searches recipients with a private accepted friend and a private non-friend
 - **THEN** only the authorized friend can be returned through the relationship exception, including autocomplete and direct candidate calls
 
-### Requirement: Normal automatic admission and voluntary re-add consent
-Authorized first-time additions SHALL admit immediately, including private accepted friends, subject to independent group-addition consent, eligibility, visibility authorization, capacity and block checks. Private status alone SHALL NOT require acceptance. A person who previously voluntarily left that same group SHALL require explicit acceptance before re-addition, regardless of current public status or friendship. Former members SHALL NOT rejoin themselves or request rejoining through an application membership workflow. A former member SHALL be allowed to privately ask a current member for a new invitation only subject to normal DM authorization; no exception to mutual preferences or blocking SHALL be granted. Acceptance SHALL revalidate the inviter's active membership, recipient eligibility/visibility authorization, consent, capacity and blocks against all current members. Pending re-add invitations SHALL grant no group content.
+### Requirement: Automatic additions and re-additions
+Every addition, including re-addition after voluntary leave, SHALL be automatic and SHALL revalidate the caller's eligible active membership, target eligibility, public visibility or accepted friendship for a private target, independent `allow_group_additions` consent, capacity and blocks against every active member. Messaging groups SHALL have no pending invitations, accept/decline operations or rejoin-request functionality. Former members SHALL NOT rejoin independently; an active member must add them. Group membership SHALL NOT create friendship or authorize DMs.
 
-#### Scenario: Automatic public admission
-- **WHEN** an active member adds a public eligible first-time recipient with group consent enabled and no block conflict
-- **THEN** the recipient immediately joins without friendship or acceptance and sees only post-join messages
+#### Scenario: Private friend and returning public student
+- **WHEN** an active member adds an authorized private friend and an eligible public former member with all current checks satisfied
+- **THEN** both become active automatically without acceptance, receive fresh message boundaries and gain no additional DM permissions
 
-#### Scenario: Re-add after voluntary departure
-- **WHEN** an active member selects a public student who previously voluntarily left this group
-- **THEN** only a pending invitation is created, no membership/content access returns until valid acceptance, and decline reveals no private status
+#### Scenario: Consent disabled before re-addition
+- **WHEN** a former member disables group additions before another member attempts to add them
+- **THEN** re-addition is rejected without membership or message access
 
-#### Scenario: Inviter leaves before acceptance
-- **WHEN** a pending re-add invitation's inviter is no longer an active member
-- **THEN** that invitation cannot admit the recipient or revive the inviter's authority
+#### Scenario: Former member attempts self-rejoin
+- **WHEN** a former member invokes addition using a copied group identifier or seeks an application rejoin-request operation
+- **THEN** no membership is created and no rejoin-request workflow is available
 
 ### Requirement: No new blocked pairings
-Creation, additions and acceptance SHALL reject newly introduced blocked pairings across resulting active membership without identifying who blocked whom. Existing blocked co-members SHALL retain shared participation and SHALL NOT by themselves prevent an unrelated safe addition. Existing group access SHALL NOT grant direct contact or unrelated profile access.
+Creation and all additions SHALL reject newly introduced blocked pairings without identifying who blocked whom. Existing blocked co-members SHALL retain shared participation and contextual identity, and SHALL NOT by themselves prevent an unrelated safe addition. Shared-group access SHALL NOT grant direct contact or unrelated profile access.
 
-#### Scenario: Block by another current member
+#### Scenario: Block by another active member
 - **WHEN** a candidate has an either-direction block with any current member
-- **THEN** admission fails generically even if the inviter has no block with that candidate
+- **THEN** admission fails generically even if the adding member has no block with the candidate
 
-### Requirement: Voluntary departure and inactive groups
-Every eligible active messaging member SHALL be able to leave regardless of remaining count. Members SHALL be permitted to remove only themselves, not any other member. No administrator, owner, manager, succession, creator-authority or membership-removal role SHALL govern messaging groups. Current and legacy operations SHALL deny peer removal, including by the original creator. Final-member departure SHALL make the group inactive, retain historical data, cancel outstanding admissions and prevent further messages/invitations or self-rejoin. Creator attribution and stale receipts SHALL NOT grant access. Study Buddies' existing ownership for academic roles/tasks is separate from messaging groups and remains unchanged.
+### Requirement: Self-leave and inactive messaging groups
+Every eligible active messaging member SHALL be able to leave regardless of remaining count. Members SHALL NOT remove another member. No administrator, owner, manager or removal role SHALL exist; creator identity SHALL grant attribution only. Final-member departure SHALL make the messaging group inactive, retain historical messages without active client access and prohibit further messages/additions. Current and legacy operations SHALL enforce these boundaries.
 
-#### Scenario: Creator leaves a two-member group
-- **WHEN** the creator leaves a messaging group with one other member
-- **THEN** departure succeeds without transfer/succession and the remaining member retains equal membership rights
-
-#### Scenario: Final member leaves
-- **WHEN** the final active member leaves
-- **THEN** the group disappears from active inboxes, history is retained without client access, and former members cannot message, invite or resurrect it
-
-### Requirement: Membership history and historical attribution
-The system SHALL preserve durable internal membership history and voluntary-leave records across re-addition. Internal records SHALL NOT grant former-member access or expose private identities through general discovery. New and rejoining members SHALL receive a fresh message visibility boundary; pre-join and absence messages SHALL remain inaccessible through history, previews, counts, direct tables and realtime. Departure SHALL remove active membership/availability/selection entries without deleting historical messages or task attribution. Previous departure SHALL NOT permanently prevent an authorized active member from selecting a discoverable former member for a consent-based re-add.
-
-#### Scenario: Rejoin after absence
-- **WHEN** a former member accepts an authorized re-add after messages were sent during absence
-- **THEN** a new membership boundary starts and absence/pre-rejoin messages are not returned through any access path
-
-#### Scenario: Private study member leaves
-- **WHEN** a private student leaves Study Buddies
-- **THEN** active roster and availability omit them while authored tasks may remain attributed, and enrollment alone cannot rediscover their private profile
-
-### Requirement: Finalized automatic admission and self-leave boundaries
-First-time eligible private friends SHALL join automatically under normal admission checks. Every active member SHALL have equal invitation permissions and SHALL NOT remove another member. Former members SHALL have no in-application request-to-rejoin flow; readmission SHALL originate with an active member and require acceptance after voluntary leave.
-
-#### Scenario: Private friend first addition
-- **WHEN** any eligible active member adds an authorized private friend who has never joined this group and all consent, capacity and block checks pass
-- **THEN** membership begins automatically without acceptance, the profile remains private and only post-join messages are available
+#### Scenario: Creator leaves and final member follows
+- **WHEN** the creator leaves a two-member chat and the remaining member later leaves
+- **THEN** neither departure needs transfer or approval, and the empty group becomes inactive and inaccessible through inbox, RPC, table and event paths
 
 #### Scenario: Peer removal bypass
-- **WHEN** a creator or ordinary member attempts to remove someone else through a UI action, current or legacy RPC, direct table write or backend operation
-- **THEN** removal is denied and the target's membership remains unchanged
+- **WHEN** a creator or ordinary member tries to remove someone else through any supported or legacy path
+- **THEN** the target's membership remains unchanged
 
-#### Scenario: Private request is subject to DM permissions
-- **WHEN** a former member wants another invitation but either-direction blocking or mutual DM preferences prohibit contacting a current member
-- **THEN** no rejoin request or message bypass is available; permitted DMs can ask for an invitation but cannot create membership or skip acceptance
+### Requirement: Reused message visibility boundaries
+Every new or returning messaging member SHALL have a fresh admission boundary. Messages sent before that admission, including during absence, SHALL remain inaccessible through history, previews, unread, direct database reads and realtime. Leaving SHALL revoke current access while preserving historical messages and author attribution for remaining authorized readers. Separate membership-history or departure-reason infrastructure SHALL NOT be required unless necessary to enforce authorization; it SHALL NOT be introduced for removed acceptance rules.
 
-#### Scenario: Repeated voluntary departures
-- **WHEN** someone leaves, accepts a valid re-add invitation, leaves again and is invited once more
-- **THEN** durable leave history requires acceptance again and no stale invitation or retry restores access independently
+#### Scenario: Automatic re-add after absence
+- **WHEN** an active member adds someone who previously left after messages were sent during absence
+- **THEN** re-addition succeeds automatically if authorized, only post-readdition messages are available and earlier-tenure/absence messages are not restored
+
+#### Scenario: Send races with leave
+- **WHEN** a send or addition races with a membership departure
+- **THEN** a consistent authorization order prevents departed callers from sending/adding after their access is revoked and preserves the correct join floor
+
+### Requirement: Simple Study Buddy retention
+Study Buddy invitations SHALL still require acceptance and verified course-section authorization. Leaving SHALL delete active membership and availability. While members remain, their group and data SHALL be preserved. When the final member leaves, the group and associated data SHALL be allowed to be deleted. No historical Study Buddy membership tracking, archive, contribution recovery or additional retention infrastructure SHALL be introduced. Existing Study Buddy ownership for academic roles/tasks is separate from messaging groups.
+
+#### Scenario: Leave while others remain
+- **WHEN** a private student leaves a Study Buddy group with other accepted members
+- **THEN** active roster and availability omit them, remaining members retain their group/data and no historical membership record or recovery feature is required
+
+#### Scenario: Final Study Buddy departure
+- **WHEN** the final member leaves a Study Buddy group
+- **THEN** the group and associated data can be deleted without creating an archive or contribution recovery record
+
+### Requirement: Authorized group identity and pictures
+All active messaging-group members SHALL be able to see active co-members' display names, profile pictures and basic identity within that group, regardless of friendship or private status. Missing pictures SHALL use a fallback. This audience SHALL NOT require enabling general/classmate picture sharing and SHALL NOT expose emails, detailed schedules, unshared optional fields, full profiles or reusable private storage references. Group membership SHALL NOT make private students generally searchable. Historical messages SHALL retain appropriate author attribution after departure without granting unrelated profile or current private-picture access. Database authorization and backend APIs SHALL enforce the group context.
+
+#### Scenario: Private non-friend co-member
+- **WHEN** an authorized active member views an active private co-member to whom they are not a friend
+- **THEN** the group can show the private student's display name, picture and basic identity, but search/autocomplete and full-profile lookups remain unauthorized and DM rules remain independent
+
+#### Scenario: Outsider or departed viewer requests group picture
+- **WHEN** a nonmember or former member supplies a group and student identifier to identity/picture endpoints
+- **THEN** group-scoped private identity/picture access is denied server-side, including privileged backend resolver paths
+
+#### Scenario: Historical author leaves
+- **WHEN** a sender leaves and another active member reads an authorized historical message
+- **THEN** appropriate sender attribution remains, without using the historical sender identifier to retrieve unrelated private fields or their current private picture

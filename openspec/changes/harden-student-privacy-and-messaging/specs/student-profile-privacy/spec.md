@@ -18,7 +18,7 @@ The system SHALL persist an owner-controlled private-profile setting. Public eli
 - **THEN** subsequent authorized discovery may include them without restoring removed friendships or changing messaging preferences
 
 ### Requirement: Contextual identity and optional sharing
-Accepted friends SHALL retain authorized profile access subject to optional-field sharing and blocking. Existing conversation and group participation SHALL disclose only identity authorized within that context, not general profile access. Direct identifiers, avatar requests and legacy lookups SHALL NOT bypass privacy. Previously delivered data and historical authorship SHALL NOT be represented as erased.
+Accepted friends SHALL retain authorized profile access subject to optional-field sharing and blocking. Existing conversation and group participation SHALL disclose only identity authorized within that context, not general profile access. Active messaging co-members SHALL see display name, profile picture and basic identity regardless of friendship/private status; this scoped picture audience is independent of general/classmate sharing, while other optional fields remain protected. Direct identifiers, avatar requests and legacy lookups SHALL NOT bypass privacy. Previously delivered data and historical authorship SHALL NOT be represented as erased.
 
 #### Scenario: Copied private identifier
 - **WHEN** an unrelated eligible student requests a private student's details or picture using a copied identifier
@@ -29,7 +29,7 @@ Accepted friends SHALL retain authorized profile access subject to optional-fiel
 - **THEN** the friend sees only permitted profile fields and the member sees contextual identity without an unrelated profile grant
 
 ### Requirement: Privacy defaults and informed onboarding
-Existing profiles SHALL remain public during migration. Accounts created after migration SHALL default public. Subsequent upgrades SHALL NOT reset existing explicit private choices. Onboarding and profile settings SHALL explain discoverability, intentional identity disclosure through contact, retained group/history visibility, optional sharing and accessible switching between public and private. Failed saves SHALL retain drafts without claiming success.
+Existing profiles SHALL remain public during migration. Accounts created after migration SHALL default public. Subsequent upgrades SHALL NOT reset existing explicit private choices. Onboarding and profile settings SHALL explain discoverability, intentional identity disclosure through contact, group-specific name/picture visibility, retained message attribution and limited Study Buddy retention, optional sharing and accessible switching between public and private. Failed saves SHALL retain drafts without claiming success.
 
 #### Scenario: Existing versus new accounts
 - **WHEN** migration preserves an existing profile and a new account is subsequently created
@@ -52,3 +52,7 @@ Student search SHALL return only authorized identity and owner-shared optional f
 #### Scenario: Private friend autocomplete
 - **WHEN** a recipient picker combines public search with accepted-friend suggestions
 - **THEN** private friends can appear through friendship authorization, private non-friends do not appear even with shared enrollment, and blocked pairs are excluded
+
+#### Scenario: Group identity is not general discovery
+- **WHEN** a private student joins a group chat containing non-friends
+- **THEN** active co-members can see the student's name, picture and basic identity only in that authorized group context, without making the profile searchable or exposing full-profile fields, email or schedules

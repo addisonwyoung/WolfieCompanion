@@ -40,7 +40,7 @@ Eligible students SHALL be able to block and unblock specific students from auth
 - **THEN** no friendship is recreated and communication remains denied
 
 ### Requirement: Shared-context block exception
-Blocking SHALL preserve existing study/group memberships, authorized shared-group identity, messages and collaboration. Notices SHALL state that shared-group visibility and interaction continue and that voluntary leave is available. Shared-context access SHALL NOT authorize direct contact or unrelated profile access.
+Blocking SHALL preserve existing study/group memberships, authorized shared-group identity (including active chat co-members' names and pictures), messages and collaboration. Notices SHALL state that shared-group visibility and interaction continue and that voluntary leave is available. Shared-context access SHALL NOT authorize direct contact or unrelated profile access.
 
 #### Scenario: Existing shared group
 - **WHEN** one active member blocks another active member
@@ -73,4 +73,4 @@ University-wide search, automatic group admission and Study Buddies acceptance S
 
 #### Scenario: Asking for a new group invitation
 - **WHEN** a former group member privately asks a current member to invite them again
-- **THEN** the message requires the same contact basis, eligibility, mutual preferences and absence of blocks as any other DM; previous group membership grants no bypass, no in-app rejoin-request workflow and no automatic readmission
+- **THEN** the message requires the same contact basis, eligibility, mutual preferences and absence of blocks as any other DM; previous group membership grants no bypass, no in-app rejoin-request workflow and no independent readmission; a current active member can add them automatically only under the separate group-addition checks
