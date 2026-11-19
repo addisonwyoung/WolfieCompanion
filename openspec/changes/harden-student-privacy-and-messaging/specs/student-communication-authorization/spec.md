@@ -63,3 +63,14 @@ Migration SHALL map existing true to eligible-students and false to no-one, pres
 #### Scenario: Legacy false preference
 - **WHEN** an existing opt-out is migrated
 - **THEN** DM permission is no-one, group additions remain disabled, prior histories survive, and the changed existing-conversation behavior is explained
+
+### Requirement: Group eligibility does not grant DM authority
+University-wide search, automatic group admission and Study Buddies acceptance SHALL NOT create friendships or override mutual DM preferences. Blocks SHALL prevent new invitations and direct communication, preserving existing shared-group participation as the documented exception.
+
+#### Scenario: Non-friend addition with closed DMs
+- **WHEN** a public non-friend is automatically admitted to an authorized group while either student has no-one DM permission
+- **THEN** permitted group participation continues, no friendship is created, and direct messages remain denied
+
+#### Scenario: Asking for a new group invitation
+- **WHEN** a former group member privately asks a current member to invite them again
+- **THEN** the message requires the same contact basis, eligibility, mutual preferences and absence of blocks as any other DM; previous group membership grants no bypass, no in-app rejoin-request workflow and no automatic readmission

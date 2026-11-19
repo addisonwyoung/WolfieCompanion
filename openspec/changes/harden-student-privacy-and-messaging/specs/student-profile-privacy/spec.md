@@ -7,7 +7,7 @@ Give students reversible control over general discoverability while preserving a
 ## ADDED Requirements
 
 ### Requirement: Reversible private discoverability
-The system SHALL persist an owner-controlled private-profile setting. Private targets SHALL be omitted from general student searches, classmate lists, recommendations and general invitation candidates. Private callers SHALL remain able to discover authorized public students. Creating or joining a group SHALL NOT change profile privacy.
+The system SHALL persist an owner-controlled private-profile setting. Public eligible students SHALL be searchable university-wide regardless of major, course, section or friendship. Private targets SHALL be omitted from general searches, autocomplete, classmate lists, recommendations and general invitation candidates; an authorized friendship picker SHALL be allowed to return private accepted friends without treating enrollment alone as authority. Private callers SHALL remain able to discover authorized public students. Creating or joining a group SHALL NOT change profile privacy.
 
 #### Scenario: Private target and private caller
 - **WHEN** a private student searches authorized public classmates while another private student matches
@@ -29,11 +29,11 @@ Accepted friends SHALL retain authorized profile access subject to optional-fiel
 - **THEN** the friend sees only permitted profile fields and the member sees contextual identity without an unrelated profile grant
 
 ### Requirement: Privacy defaults and informed onboarding
-Existing profiles SHALL remain public during migration. Accounts created after migration SHALL default private. Onboarding and profile settings SHALL explain discoverability, intentional identity disclosure through contact, retained group/history visibility, optional sharing and easy switching to public. Failed saves SHALL retain drafts without claiming success.
+Existing profiles SHALL remain public during migration. Accounts created after migration SHALL default public. Subsequent upgrades SHALL NOT reset existing explicit private choices. Onboarding and profile settings SHALL explain discoverability, intentional identity disclosure through contact, retained group/history visibility, optional sharing and accessible switching between public and private. Failed saves SHALL retain drafts without claiming success.
 
 #### Scenario: Existing versus new accounts
 - **WHEN** migration preserves an existing profile and a new account is subsequently created
-- **THEN** the existing profile is public and the new account is private with an accessible explanation and public-mode control
+- **THEN** the existing profile is public and the new account is public with an accessible explanation and private-mode control
 
 ### Requirement: Independent academic and voluntary participation
 Private mode SHALL NOT disable personal enrollment, schedule import, assignments, exams, calendar, reminders, or voluntary authorized Study Buddies and messaging-group participation. Existing account eligibility and owner-only academic access SHALL remain enforced.
@@ -41,3 +41,14 @@ Private mode SHALL NOT disable personal enrollment, schedule import, assignments
 #### Scenario: Private voluntary collaboration
 - **WHEN** an eligible private student creates or accepts admission to a group with all applicable admission checks satisfied
 - **THEN** participation succeeds without switching to public and personal academic features remain available
+
+### Requirement: Public search limits and friendship exceptions
+Student search SHALL return only authorized identity and owner-shared optional fields. Public visibility SHALL NOT expose email, private messages, detailed schedules or unshared fields. Blocks SHALL override public and friendship discovery. Group identity SHALL NOT authorize unrelated profile lookup.
+
+#### Scenario: Cross-major university search
+- **WHEN** an eligible student searches for a public student outside their major and courses with no friendship
+- **THEN** the public student is discoverable without course or friendship prerequisites and sensitive fields remain absent
+
+#### Scenario: Private friend autocomplete
+- **WHEN** a recipient picker combines public search with accepted-friend suggestions
+- **THEN** private friends can appear through friendship authorization, private non-friends do not appear even with shared enrollment, and blocked pairs are excluded
