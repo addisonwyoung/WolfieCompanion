@@ -1,7 +1,7 @@
 import { groupApi, groupError, missingGroups, parseCombined } from './groupMessaging'
 import type { GroupApi, ConversationKind } from './groupMessaging'
 import type { SupabaseClient } from '@supabase/supabase-js'
-export interface Contact { history_floor?: number; student_id: string; name: string; conversation_id: string | null; can_send: boolean; reason: 'closed' | 'unavailable' | null }
+export interface Contact { history_floor?: number; student_id: string; name: string; conversation_id: string | null; can_send: boolean; reason: 'closed' | 'unavailable' | 'own_closed' | 'friendship_required' | null }
 export interface Message { id: string; conversation_id: string; sequence: number; sender_id: string | null; sender_name?: string; client_message_id: string; body: string; created_at: string }
 export interface Conversation { kind?: ConversationKind; conversation_id: string; student_id: string | null; name: string; last_message_at: string; message_time?: string | null; preview: string | null; member_count?: number }
 export interface Target { student: string; course?: string }
@@ -23,7 +23,7 @@ function date(value: unknown): value is string { return text(value) && Number.is
 export function parseContact(value: unknown, student: string): Contact | null {
  if (value === null) return null
  const row = object(value)
- if (!identifier(row.student_id) || row.student_id !== student || !text(row.name) || !row.name.trim() || !(row.conversation_id === null || identifier(row.conversation_id)) || typeof row.can_send !== 'boolean' || row.can_send !== (row.reason === null) || ![null,'closed','unavailable'].includes(row.reason as null)) throw new Error('Invalid messaging contact')
+ if (!identifier(row.student_id) || row.student_id !== student || !text(row.name) || !row.name.trim() || !(row.conversation_id === null || identifier(row.conversation_id)) || typeof row.can_send !== 'boolean' || row.can_send !== (row.reason === null) || ![null,'closed','unavailable','own_closed','friendship_required'].includes(row.reason as null)) throw new Error('Invalid messaging contact')
  return { student_id: row.student_id, name: row.name, conversation_id: row.conversation_id as string | null, can_send: row.can_send, reason: row.reason as Contact['reason'] }
 }
 export function parseMessage(value: unknown, conversation?: string): Message {
@@ -39,7 +39,9 @@ export function parseConversation(value: unknown): Conversation {
 }
 function rows<T>(value: unknown, parse: (value: unknown) => T): T[] { if (!Array.isArray(value) || value.length > 50) throw new Error('Invalid message page'); return value.map(parse) }
 function failure(error: { code?: string } | null) {
- return new Error(error?.code === 'P0001' ? 'This person has closed new direct messages.' : error?.code === '42501' ? 'Messaging is unavailable for this contact.' : ['PGRST202','42P01','42883'].includes(error?.code ?? '') ? 'Messaging is not set up yet. The project owner must apply the reviewed migration.' : 'Messaging could not be completed. Please retry.')
+ const failure = new Error(error?.code === 'P0001' ? 'Direct messaging is closed for this contact.' : error?.code === '42501' ? 'Messaging is unavailable for this contact.' : ['PGRST202','42P01','42883'].includes(error?.code ?? '') ? 'Messaging is not set up yet. The project owner must apply the reviewed migration.' : 'Messaging could not be completed. Please retry.') as Error & { code?: string }
+ failure.code = error?.code
+ return failure
 }
 export function messagingApi(client: SupabaseClient): MessagingApi {
  return {

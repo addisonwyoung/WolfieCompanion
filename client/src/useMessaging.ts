@@ -20,8 +20,8 @@ export function useMessagingRefresh(client: SupabaseClient | undefined) {
    if(typeof client?.channel==='function')channel=client.channel(`messages-${crypto.randomUUID()}`).on('postgres_changes',{event:'INSERT',schema:'public',table:'dm_messages'},refresh).on('postgres_changes',{event:'UPDATE',schema:'public',table:'dm_conversations'},refresh).on('postgres_changes',{event:'INSERT',schema:'public',table:'group_messages'},refresh).on('postgres_changes',{event:'UPDATE',schema:'public',table:'group_conversations'},refresh).subscribe(status=>{if(status==='SUBSCRIBED')refresh()})
   }
   const focus=()=>{if(document.visibilityState!=='hidden')refresh()}
-  start();document.addEventListener('visibilitychange',start);window.addEventListener('focus',focus);window.addEventListener('online',focus)
-  return()=>{stop();document.removeEventListener('visibilitychange',start);window.removeEventListener('focus',focus);window.removeEventListener('online',focus)}
+  start();document.addEventListener('visibilitychange',start);window.addEventListener('focus',focus);window.addEventListener('online',focus);window.addEventListener('student-communication-settings-changed',focus)
+  return()=>{stop();document.removeEventListener('visibilitychange',start);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);window.removeEventListener('student-communication-settings-changed',focus)}
  },[client,refresh])
  return {epoch,refresh}
 }
@@ -74,7 +74,7 @@ export function useDirectChat(api:MessagingApi,target:Target,userId:string,epoch
   // history polling can still reconcile a write whose acknowledgement was lost.
   const timeout=new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error('Sending took too long to confirm. It may already have been delivered. Retry safely or discard the draft.')),messageSendTimeoutMs);sendTimers.current.add(timer)})
   try{const row=await Promise.race([api.send({student,course},outgoing.body,outgoing.id),timeout]);if(!alive.current||groupVerified&&!currentContact.current)return;if(row.sender_id!==userId||row.client_message_id!==outgoing.id||row.body!==outgoing.body||(currentContact.current?.conversation_id&&currentContact.current.conversation_id!==row.conversation_id))throw new Error('Send could not be confirmed. Please retry.');merge([row]);setContact(old=>old?{...old,conversation_id:row.conversation_id}:old);currentContact.current=currentContact.current?{...currentContact.current,conversation_id:row.conversation_id}:null;onSent()}
-  catch(error){if(alive.current&&request.current?.id===outgoing.id){const failed={...outgoing,status:'failed' as const};request.current=failed;setAttempt(failed);setError(error instanceof Error?error.message:'Unable to send. Please retry.')}}
+  catch(error){if(alive.current&&request.current?.id===outgoing.id){const failed={...outgoing,status:'failed' as const};request.current=failed;setAttempt(failed);setError(error instanceof Error?error.message:'Unable to send. Please retry.');if(error instanceof Error&&'code' in error&&error.code==='42501')setRetryKey(value=>value+1)}}
   finally{if(timer!==undefined){clearTimeout(timer);sendTimers.current.delete(timer)}}
  }
  async function loadOlder(){const id=currentContact.current?.conversation_id,before=known.current[0]?.sequence;if(!id||!before||pageBusy.current)return false;pageBusy.current=true;setPaging(true);const controller=new AbortController();pageController.current=controller;try{const page=await api.history(id,controller.signal,before);if(alive.current){merge(page);setMore(page.length===50);setError('');return true}return false}catch{if(alive.current)setError('Unable to load older messages. Please retry.');return false}finally{pageBusy.current=false;if(alive.current)setPaging(false)}}

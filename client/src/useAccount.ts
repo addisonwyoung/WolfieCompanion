@@ -76,6 +76,7 @@ export function useAccount(client: SupabaseClient) {
       const result = await api.saveProfile(profile, picture)
       if (!mounted.current || run !== generation.current) return
       setState(previous => ({ ...previous, profile: result.profile }))
+        window.dispatchEvent(new Event('student-communication-settings-changed'))
       if (result.cleanupPath) setCleanupPaths(previous => [...new Set([...previous, result.cleanupPath!])])
     } catch (error) {
       if (run !== generation.current || !mounted.current) return

@@ -2,7 +2,7 @@ import { useExpandedScroll } from './useExpandedScroll'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { normalizeProfile, years } from './account'
-import type { StudentProfile, PictureChange } from './account'
+import type { StudentProfile, PictureChange, DmPermission } from './account'
 
 export function Interests({ interests }: { interests: string[] }) {
   return interests.length ? <ul className="tags">{interests.map((interest, index) => <li key={`${index}-${interest}`}>{interest}</li>)}</ul> : <p className="muted">No interests added yet.</p>
@@ -107,10 +107,15 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
           })}
           {normalizedSearch && interestCategories.every(category => category.interests.every(interest => !interest.toLowerCase().includes(normalizedSearch))) && <p className="field-help">No listed interests match your search. Clear the search to browse categories.</p>}
         </div>
-        <p className="field-help">Your name and major are always shared with eligible students who saved the same course. Choose which other details to share. Courses are self-reported.</p>
+        <p className="field-help">Profile visibility controls general discovery. Choose which additional details to share with authorized students. Courses are self-reported.</p>
         {([['share_year', 'year of study'], ['share_interests', 'interests'], ['share_residence_status', 'residence status'], ['share_avatar', 'profile picture']] as const).map(([key, label]) => <label className="sharing-choice" key={key}><input type="checkbox" checked={draft[key] === true} onChange={e => setDraft({ ...draft, [key]: e.target.checked })} /> Share my {label} with classmates</label>)}
-        <label className="sharing-choice"><input type="checkbox" checked={draft.allow_new_dms !== false} onChange={event => setDraft({ ...draft, allow_new_dms: event.target.checked })} /> Allow new direct messages</label>
-        <p className="field-help">New DMs are open by default. Turning this off prevents new direct conversations and new group additions. Existing direct and group chats stay available.</p>
+        <label htmlFor="dm-permission">Direct messaging</label>
+        <select id="dm-permission" value={draft.dm_permission ?? 'eligible_students'} aria-describedby="dm-permission-help" onChange={event => setDraft({ ...draft, dm_permission: event.target.value as DmPermission })}>
+          <option value="eligible_students">Eligible students</option><option value="friends_only">Friends only</option><option value="no_one">No one</option>
+        </select>
+        <p id="dm-permission-help" className="field-help">Both students must permit a DM exchange, including in existing conversations. Eligible students includes authorized classmates, friends, pending-request contacts and established conversations. Friends only requires an accepted friendship. No one prevents sending and receiving new DMs; saved messages remain readable. Blocking overrides these choices.</p>
+        <label className="sharing-choice"><input type="checkbox" checked={draft.allow_group_additions !== false} onChange={event => setDraft({ ...draft, allow_group_additions: event.target.checked })} /> Allow group additions</label>
+        <p className="field-help">Group additions are enabled independently by default. Turning them off prevents future additions without removing existing membership. DM choices do not restrict existing group participation. Previous DM opt-outs now apply to existing DMs too; review both settings.</p>
         <label htmlFor="picture">Profile picture (optional)</label><input id="picture" type="file" accept="image/png,image/jpeg" aria-describedby="picture-help profile-error" onChange={e => {
           const next = e.target.files?.[0]; if (!next) return
           if (!['image/png','image/jpeg'].includes(next.type) || !next.size || next.size > 5 * 1024 * 1024) { setError('Choose a nonempty PNG or JPEG up to 5 MiB.'); e.target.value = ''; return }

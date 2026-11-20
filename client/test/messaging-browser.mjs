@@ -1,4 +1,4 @@
-// Run: node client/test/academic-browser.mjs. Installed Chrome + local fixture only.
+// Run: node client/test/messaging-browser.mjs. Installed Chrome + local fixture only.
 // All persistence/delays/failures below are synthetic; no Supabase connection.
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -79,12 +79,12 @@ try {
   await click(button('Profiles'));await evaluate('window.messagingFixture.incoming()');await until(()=>evaluate('!!document.querySelector(".dm-nav-unread")'),'navigation unread badge');await click(button('Inbox'));await until(()=>evaluate('!!document.querySelector(".dm-conversation-unread")'),'conversation highlight');await screenshot(`unread-${width}.png`);await click('document.querySelector(".dm-conversation-unread")');await ready();await until(()=>evaluate('!document.querySelector(".dm-nav-unread")'),'read clears badge')
   await click(button('Recipient settings'));await click(button('Edit profile'))
   // Locate the actual setting by label; no synthetic direct mutation substitutes for Save.
-  await click(`Array.from(document.querySelectorAll('label')).find(e=>e.textContent.includes('Allow new direct messages')).querySelector('input')`);await click(button('Save'));await until(()=>evaluate(`!!${button('Edit profile')}`))
-  await profileChat();await fill('Existing continues');await click(button('Send'));await until(async()=>await count()===5)
+  await evaluate(`document.querySelector('#dm-permission').value='no_one';document.querySelector('#dm-permission').dispatchEvent(new Event('change',{bubbles:true}))`);await click(button('Save'));await until(()=>evaluate(`!!${button('Edit profile')}`))
+  await click(button('Inbox'));await click(`document.querySelector('.dm-inbox li button')`);await until(()=>evaluate(`!!${q('#dm-text')}&&${q('#dm-text')}.disabled`),'read-only composer');assert.equal(await count(),4,'restricted history retained')
   // A fresh fixture account has no established conversation with the closed recipient.
   await evaluate('window.messagingFixture.switchAccount()');await click(button('View classmate profile'));await until(()=>evaluate(`${button('Message')}?.disabled`),'new conversation closed');assert.equal(await evaluate(`${button('Message')}.disabled`),true)
   await key('Escape');await profileChat('friend');await fill('Friend first message');await click(button('Send'));await until(async()=>await count()===1);await screenshot(`friend-${width}.png`)
-  await evaluate('window.messagingFixture.switchAccount()');await profileChat();await until(async()=>await count()===5,'reopened saved history');await evaluate('window.messagingFixture.seed()');await until(async()=>await count()===65,'catch-up long history')
+  await evaluate('window.messagingFixture.switchAccount()');await click(button('Recipient settings'));await click(button('Edit profile'));await evaluate(`document.querySelector('#dm-permission').value='eligible_students';document.querySelector('#dm-permission').dispatchEvent(new Event('change',{bubbles:true}))`);await click(button('Save'));await until(()=>evaluate(`!!${button('Edit profile')}`));await profileChat();await until(async()=>await count()===4,'reopened saved history');await evaluate('window.messagingFixture.seed()');await until(async()=>await count()===65,'catch-up long history')
   await click(button('Back to conversations'));await click(`document.querySelector('.dm-inbox li button')`);await ready();await until(async()=>await count()===50)
   await evaluate(`${q('.dm-history')}.scrollTop=0;${q('.dm-history')}.dispatchEvent(new Event('scroll'))`)
   await click(button('Load older messages'));await until(async()=>await count()===65,'older page')

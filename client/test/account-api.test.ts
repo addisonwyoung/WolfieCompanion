@@ -38,9 +38,20 @@ test('profile sharing flags are explicit and saved atomically without deleting p
  f.single.mockResolvedValueOnce({data:null,error:new Error('offline')} as never)
  await expect(f.api.saveProfile({...profile,share_year:false})).rejects.toThrow('Profile could not be saved')
 })
-test('DM preference is allowlisted in owner update and confirmed response restores the saved choice',async()=>{
- const f=fake();f.single.mockResolvedValueOnce({data:{...profile,allow_new_dms:false},error:null})
- const saved=await f.api.saveProfile({...profile,allow_new_dms:false});expect(saved.profile.allow_new_dms).toBe(false)
- expect(f.update).toHaveBeenCalledWith(expect.objectContaining({allow_new_dms:false}))
- await f.api.saveProfile(profile);expect(f.update).toHaveBeenLastCalledWith(expect.objectContaining({allow_new_dms:true}))
+test('canonical DM and group preferences save independently without writing the deprecated boolean',async()=>{
+ const f=fake();f.single.mockResolvedValueOnce({data:{...profile,dm_permission:'friends_only',allow_group_additions:false},error:null})
+ const saved=await f.api.saveProfile({...profile,dm_permission:'friends_only',allow_group_additions:false,allow_new_dms:true})
+ expect(saved.profile).toMatchObject({dm_permission:'friends_only',allow_group_additions:false})
+ expect(f.update).toHaveBeenCalledWith(expect.objectContaining({dm_permission:'friends_only',allow_group_additions:false}))
+ expect(f.update.mock.calls[0][0]).not.toHaveProperty('allow_new_dms')
+ await f.api.saveProfile({...profile,dm_permission:'no_one',allow_group_additions:true,allow_new_dms:false})
+ expect(f.update).toHaveBeenLastCalledWith(expect.objectContaining({dm_permission:'no_one',allow_group_additions:true}))
+})
+
+test('invalid canonical settings fail before writing and obsolete-client errors are actionable',async()=>{
+ const f=fake()
+ await expect(f.api.saveProfile({...profile,dm_permission:'bad' as never})).rejects.toThrow('valid messaging')
+ expect(f.update).not.toHaveBeenCalled()
+ f.single.mockResolvedValueOnce({data:null,error:{code:'PDM01'}} as never)
+ await expect(f.api.saveProfile(profile)).rejects.toThrow('Refresh the application')
 })

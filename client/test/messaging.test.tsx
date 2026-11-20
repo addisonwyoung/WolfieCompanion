@@ -20,6 +20,33 @@ function fixture(seed:Message[]=[]){
  return {api,get rows(){return rows},setOpen:(value:boolean)=>{open=value},loseNext:()=>{lost=true},incoming:(body:string)=>{const next={...message(rows.length+1),body};rows.push(next)}}
 }
 afterEach(()=>vi.useRealTimers())
+test.each(['own_closed','friendship_required','closed','unavailable'] as const)('existing DM becomes read-only for %s and retains history/draft without automatic resend',async reason=>{
+ const store=fixture([message()])
+ render(<Messages api={store.api} userId={self} initialTarget={{student:peer}}/> )
+ const input=await screen.findByRole('textbox',{name:'Message'})
+ await screen.findByText(message().body,{selector:'.dm-message p'})
+ fireEvent.change(input,{target:{value:'Keep this unsent draft'}})
+ vi.mocked(store.api.contact).mockResolvedValue({student_id:peer,name:'Classmate Peer',conversation_id:thread,can_send:false,reason})
+ fireEvent.focus(window)
+ await waitFor(()=>expect(input).toBeDisabled())
+ expect(input).toHaveValue('Keep this unsent draft');expect(screen.getByText(message().body,{selector:'.dm-message p'})).toBeInTheDocument()
+ expect(store.api.send).not.toHaveBeenCalled()
+ vi.mocked(store.api.contact).mockResolvedValue({student_id:peer,name:'Classmate Peer',conversation_id:thread,can_send:true,reason:null})
+ fireEvent(window,new Event('online'))
+ await waitFor(()=>expect(input).toBeEnabled())
+ expect(input).toHaveValue('Keep this unsent draft');expect(store.api.send).not.toHaveBeenCalled()
+})
+test('a permission denial refreshes contact state while preserving the failed attempt',async()=>{
+ const store=fixture([message()])
+ render(<Messages api={store.api} userId={self} initialTarget={{student:peer}}/> )
+ const input=await screen.findByRole('textbox',{name:'Message'})
+ vi.mocked(store.api.send).mockRejectedValueOnce(Object.assign(new Error('Messaging is unavailable'),{code:'42501'}))
+ vi.mocked(store.api.contact).mockResolvedValue({student_id:peer,name:'Classmate Peer',conversation_id:thread,can_send:false,reason:'closed'})
+ fireEvent.change(input,{target:{value:'Retain failed draft'}});fireEvent.click(screen.getByRole('button',{name:'Send',exact:true}))
+ await waitFor(()=>expect(input).toBeDisabled())
+ expect(input).toHaveValue('Retain failed draft');expect(screen.getByRole('button',{name:'Retry send'})).toBeDisabled()
+ expect(store.api.send).toHaveBeenCalledTimes(1)
+})
 test('plain Unicode validation and strict projection parsers reject malformed identities and payloads',()=>{
  validateMessage('😀'.repeat(2000));validateMessage('<script>literal</script>\nhello')
  for(const body of ['','\n\t\u00a0\ufeff','😀'.repeat(2001),'\0'])expect(()=>validateMessage(body)).toThrow()
@@ -162,7 +189,7 @@ test('refresh combines events, visible polling and reconnect; hidden/unmounted v
  vi.useFakeTimers();let event!:()=>void;let subscribed!:(status:string)=>void
  const channel={on:vi.fn((_kind,_filter,callback)=>{event=callback;return channel}),subscribe:vi.fn(callback=>{subscribed=callback;return channel})}
  const client={channel:vi.fn(()=>channel),removeChannel:vi.fn()};const {result,unmount}=renderHook(()=>useMessagingRefresh(client as unknown as SupabaseClient))
- const initial=result.current.epoch;act(()=>{event();event();subscribed('SUBSCRIBED');vi.advanceTimersByTime(10_000);window.dispatchEvent(new Event('online'))});expect(result.current.epoch).toBe(initial+5)
+ const initial=result.current.epoch;act(()=>{event();event();subscribed('SUBSCRIBED');vi.advanceTimersByTime(10_000);window.dispatchEvent(new Event('online'));window.dispatchEvent(new Event('student-communication-settings-changed'))});expect(result.current.epoch).toBe(initial+6)
  Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});act(()=>document.dispatchEvent(new Event('visibilitychange')));expect(client.removeChannel).toHaveBeenCalledTimes(1)
  const hidden=result.current.epoch;act(()=>vi.advanceTimersByTime(20_000));expect(result.current.epoch).toBe(hidden)
  Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});act(()=>document.dispatchEvent(new Event('visibilitychange')));expect(result.current.epoch).toBeGreaterThan(hidden)

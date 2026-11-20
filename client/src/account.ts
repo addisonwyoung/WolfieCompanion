@@ -3,7 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Course } from './sampleData'
 
 export const years = ['First year', 'Second year', 'Third year', 'Fourth year', 'Graduate'] as const
+export const dmPermissions = ['eligible_students', 'friends_only', 'no_one'] as const
+export type DmPermission = typeof dmPermissions[number]
 export interface StudentProfile {
+  dm_permission?: DmPermission
+  allow_group_additions?: boolean
+  // Read-only legacy column retained by the database; never send it in an update.
   allow_new_dms?: boolean
   share_year?: boolean; share_interests?: boolean; share_residence_status?: boolean; share_avatar?: boolean
   id: string; name: string; major: string | null; year: string | null
@@ -29,7 +34,8 @@ export function duplicateCourseCode(rows: Pick<ClassRow, 'code'>[], existingCode
 }
 export function normalizeProfile(profile: StudentProfile): StudentProfile {
   const interests = [...new Map(profile.interests.map(s => s.trim()).filter(Boolean).map(s => [s.toLowerCase(), s])).values()]
-  const next = { ...profile, allow_new_dms: profile.allow_new_dms !== false, share_year: profile.share_year === true, share_interests: profile.share_interests === true, share_residence_status: profile.share_residence_status === true, share_avatar: profile.share_avatar === true, name: profile.name.trim(), major: profile.major?.trim() || null, interests }
+  const next = { ...profile, dm_permission: profile.dm_permission ?? 'eligible_students', allow_group_additions: profile.allow_group_additions ?? true, share_year: profile.share_year === true, share_interests: profile.share_interests === true, share_residence_status: profile.share_residence_status === true, share_avatar: profile.share_avatar === true, name: profile.name.trim(), major: profile.major?.trim() || null, interests }
+  if (!dmPermissions.includes(next.dm_permission) || typeof next.allow_group_additions !== 'boolean') throw new Error('Choose a valid messaging preference.')
   if (!next.name || next.name.length > 100) throw new Error('Enter a name of 1 to 100 characters.')
   if ((next.major?.length ?? 0) > 120) throw new Error('Major must be at most 120 characters.')
   if (next.year !== null && !years.includes(next.year as typeof years[number])) throw new Error('Choose a listed year or leave it unset.')
@@ -114,11 +120,11 @@ export function accountApi(client: SupabaseClient) {
         if (!response.ok) throw new Error(result.error || 'Picture upload failed. Please retry.')
         uploaded = result.path; next.avatar_path = uploaded
       } else if (picture.remove) next.avatar_path = null
-      const { data, error } = await client.from('profiles').update({ name: next.name, major: next.major, year: next.year, interests: next.interests, residence_status: next.residence_status, avatar_path: next.avatar_path, share_year: next.share_year, share_interests: next.share_interests, share_residence_status: next.share_residence_status, share_avatar: next.share_avatar, allow_new_dms: next.allow_new_dms }).eq('id', next.id).select().single()
+      const { data, error } = await client.from('profiles').update({ name: next.name, major: next.major, year: next.year, interests: next.interests, residence_status: next.residence_status, avatar_path: next.avatar_path, share_year: next.share_year, share_interests: next.share_interests, share_residence_status: next.share_residence_status, share_avatar: next.share_avatar, dm_permission: next.dm_permission, allow_group_additions: next.allow_group_additions }).eq('id', next.id).select().single()
       if (error) {
         let cleanupPath: string | null = null
         if (uploaded) { try { await removeObject(uploaded) } catch { cleanupPath = uploaded } }
-        const failure = new Error('Profile could not be saved. Your draft is still here; please retry.') as Error & { cleanupPath?: string }
+        const failure = new Error(error.code === 'PDM01' ? 'Refresh the application to update messaging preferences. Your draft has not been saved.' : 'Profile could not be saved. Your draft is still here; please retry.') as Error & { cleanupPath?: string }
         if (cleanupPath) failure.cleanupPath = cleanupPath
         throw failure
       }

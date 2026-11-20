@@ -28,6 +28,11 @@ An established conversation SHALL remain an authorized contact basis under `elig
 - **WHEN** a first-contact caller has only pending/rejected enrollment, another section/professor, a copied identifier or group co-membership
 - **THEN** new classmate-based contact is rejected without creating an empty conversation
 
+#### Scenario: Intentional private pending-request contact
+- **WHEN** a private student initiated a currently pending friend request to the caller
+- **THEN** the caller may use that DM-only relationship if both preferences, eligibility and blocking permit, without gaining general profile or avatar access
+- **AND** a request initiated only by the caller does not authorize first contact with the private recipient
+
 ### Requirement: Directed blocks with bilateral effect
 Eligible students SHALL be able to block and unblock specific students from authorized profile/message interfaces and manage their own blocks after targets become hidden. Either-direction blocking SHALL deny DMs, new friend requests and general discovery/profile access between the pair. Blocking SHALL atomically remove accepted friendship and invalidate pending friend requests. Unblocking SHALL remove only the caller's block and SHALL NOT restore friendships or requests. Blocks SHALL NOT notify the other student or expose block direction through peer errors.
 
@@ -63,6 +68,10 @@ Migration SHALL map existing true to eligible-students and false to no-one, pres
 #### Scenario: Legacy false preference
 - **WHEN** an existing opt-out is migrated
 - **THEN** DM permission is no-one, the independent group-addition preference is true, prior histories survive, and the changed existing-conversation and group-addition behavior is explained at authorization cutover
+
+#### Scenario: Canonical choice diverges after initial seeding
+- **WHEN** legacy and canonical settings differ before the authorization cutover
+- **THEN** the migration reports discrepancies without resetting canonical choices, future authorization uses `dm_permission`, and obsolete boolean updates fail with an actionable refresh instruction
 
 ### Requirement: Group eligibility does not grant DM authority
 University-wide search, automatic group admission and Study Buddies acceptance SHALL NOT create friendships or override mutual DM preferences. Blocks SHALL prevent new invitations and direct communication, preserving existing shared-group participation as the documented exception.

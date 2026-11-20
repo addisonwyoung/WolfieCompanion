@@ -12,6 +12,8 @@ Stage 2A runtime verification: a new loopback-only PostgreSQL 18 cluster reconst
 
 Stage 2A PostgreSQL 17 gate: the authorized official ZIP route extracted 17.12 without administrator privileges or installation changes. The same complete suite passed on 17.12 with identical checked outcomes, migration hash and audit inputs to 18.0; both servers stopped. The owner reports live 17.11 preflight blocks 2-7 passed. Same-major compatibility is verified for the scoped baseline; exact hosted patch/platform, managed services and later-stage work remain outside this pass. See the runtime report for ZIP provenance and remaining limits.
 
+Stage 2B prepared and locally verified: `202611200001_mutual_dm_authorization.sql` enforces common mutual DM rules on state/send/insertion, verified offering contacts, the private recipient-initiated pending-request exception, canonical settings, obsolete-write rejection and the independent group-consent cutover. React settings/contact parsing/read-only explanations and refresh are compatible; existing group authority/membership remains unchanged. Stage 1/2A migration bytes are unchanged. The complete disposable PostgreSQL 17.12 suite passed (108 direction/preference/context/visibility matrix cases plus denials, preservation, four new rejection/rollback cases and nine new observed-lock races, alongside the unchanged Stage 2A suite). Client/server, browser and deployment details are in `docs/student-mutual-dm-authorization.md`. The owner reports Stage 2A is live and structurally/application verified; live cross-account managed Auth/PostgREST/Storage/Realtime verification remains pending. Stage 2B is NOT deployed. No commit/push or Stage 3 work occurred.
+
 ## 1. Schema and authorization foundations
 
 - [ ] 1.1 Add owner-reviewed additive settings/block schema and existing/new-account backfill/default logic; verify fresh-install and populated-upgrade fixtures preserve profile data, existing public status, new public defaults, true/false DM mapping and independent group consent, including concurrent signup.
@@ -36,11 +38,11 @@ Stage 2A PostgreSQL 17 gate: the authorized official ZIP route extracted 17.12 w
 
 ## 4. Mutual direct messaging
 
-- [ ] 4.1 Replace first-send-only checks with common mutual preference/block authorization on every new insertion; verify all nine preference combinations for friend/non-friend and established/new pairs, public/private targets and either-direction blocks in SQL tests.
-- [ ] 4.2 Align new classmate DM contact with verified current course/section/professor and preserve established contacts under eligible-students; verify pending/rejected/wrong-offering and UUID-only denial plus course-loss continuation and friends-only unfriend freeze.
-- [ ] 4.3 Preserve participant history/read positions and exact committed replay semantics while rejecting uncommitted retries after revocation; verify no duplicate messages, empty threads, sequence/activity changes or unauthorized direct writes in SQL/concurrency tests.
-- [ ] 4.4 Update account adapters, settings, contact-state parsing and read-only composer explanations; verify mutual restrictions apply to existing chats, history remains openable, drafts never auto-send and old boolean writes fail actionably in client tests.
-- [ ] 4.5 Integrate permission refresh with existing visible polling/focus/reconnect and notifications; verify denied sends create no new alerts, historical unread remains coherent and account teardown clears state. Document mutual semantics and the false-to-no-one existing-chat behavior change.
+- [x] 4.1 Replace first-send-only checks with common mutual preference/block authorization on every new insertion; verify all nine preference combinations for friend/non-friend and established/new pairs, public/private targets and either-direction blocks in SQL tests.
+- [x] 4.2 Align new classmate DM contact with verified current course/section/professor and preserve established contacts under eligible-students; verify pending/rejected/wrong-offering and UUID-only denial plus course-loss continuation and friends-only unfriend freeze.
+- [x] 4.3 Preserve participant history/read positions and exact committed replay semantics while rejecting uncommitted retries after revocation; verify no duplicate messages, empty threads, sequence/activity changes or unauthorized direct writes in SQL/concurrency tests.
+- [x] 4.4 Update account adapters, settings, contact-state parsing and read-only composer explanations; verify mutual restrictions apply to existing chats, history remains openable, drafts never auto-send and old boolean writes fail actionably in client tests.
+- [x] 4.5 Integrate permission refresh with existing visible polling/focus/reconnect and notifications; verify denied sends create no new alerts, historical unread remains coherent and account teardown clears state. Document mutual semantics and the false-to-no-one existing-chat behavior change.
 
 ## 5. Section-based Study Buddies collaboration
 
