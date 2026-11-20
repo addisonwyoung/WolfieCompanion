@@ -27,9 +27,9 @@ export default function Friends({ friends, busyIds, onRetry, onViewProfile, onUn
     ? directory.data.filter(student => student.name.toLocaleLowerCase().includes(query))
     : []
   const displayedDirectory = filteredDirectory.flatMap(student => {
-    const relationship = relationshipById.get(student.student_id)?.relationship
-    if (relationship === 'accepted') return []
-    return [{ ...student, relationship: relationship ?? student.relationship }]
+    const relationship = relationshipById.get(student.student_id)?.relationship ?? student.relationship
+    if (student.relationship === 'accepted' || relationship === 'accepted') return []
+    return [{ ...student, relationship }]
   })
   function closeFriends() { setOpen(false); setAdding(false); setSearch(''); setSendError('') }
   function openAddFriend() {

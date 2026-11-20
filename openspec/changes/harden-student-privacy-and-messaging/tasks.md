@@ -1,8 +1,16 @@
 # Tasks
 
-Final group-chat rules are approved: automatic additions and re-additions including private friends, equal active-member permissions, self-leave only, fresh sequence floors and no pending group-chat invitations. All tasks remain unchecked; documentation validation does not authorize apply.
+Final group-chat rules are approved: automatic additions and re-additions including private friends, equal active-member permissions, self-leave only, fresh sequence floors and no pending group-chat invitations. The broad tasks below remain unchecked until their full implementation and verification criteria are satisfied; stage-specific progress is recorded separately.
 
-Stage 1 preparation: `202611190001_student_privacy_foundation.sql` and `docs/student-privacy-foundation.md` cover only settings/block storage and manual review. No SQL has been executed. Tasks 1.1 and 1.5 remain incomplete pending their specified database verification and later client-cutover behavior; all other tasks are outside this stage.
+Stage 1 preparation: `202611190001_student_privacy_foundation.sql` and `docs/student-privacy-foundation.md` cover only settings/block storage and manual review. The owner subsequently confirmed manual deployment and structural verification of Stage 1; the agent has executed no live SQL. Tasks 1.1 and 1.5 remain incomplete pending their specified database verification and later client-cutover behavior; all other tasks are outside this stage.
+
+Stage 2A implementation prepared: `202611190002_student_privacy_authorization.sql`, `docs/student-privacy-authorization.md`, SQL authorization fixtures, block API adapter and group-scoped picture API cover discovery/privacy, atomic blocking/friendship cleanup, block-only write/admission guards and minimal shared-group identity. At initial preparation/review time, no migration or SQL test had been executed by the agent; the later authorized disposable verification is recorded below. Mutual DM preferences, membership-model changes, Study Buddy feature changes and full settings/block UI remain outside this pass. Broad tasks 1.3/1.4, 2.2, 3.1/3.2 and 6.4 remain unchecked for their remaining full-change verification and/or later-stage portions. Task 2.1 is now verified by the authorized disposable runtime suite. Local check results are recorded in the deployment document.
+
+Stage 2A final review: explicit service-only resolver ACL resets and effective-grant assertions, private-avatar-bucket preflight, active-only Study acceptance guards, serialized authorized Study response/departure, client-first rollout guidance and additional security/compatibility tests are prepared. Database installation and two-session runtime tests were pending at that review; the subsequent disposable results are recorded below. No live SQL was executed.
+
+Stage 2A runtime verification: a new loopback-only PostgreSQL 18 cluster reconstructed the scoped audited baseline. Empty/populated installation, data preservation, authorization fixtures, six rejection/rollback cases and ten observed-lock concurrency cases passed; all test servers were stopped. Task 2.1 is complete. Full hosted integration, unrelated regressions and later-stage requirements remain pending. See `docs/student-privacy-runtime-verification.md`. No live credentials/connections, commit, push or Stage 2B work occurred.
+
+Stage 2A PostgreSQL 17 gate: the authorized official ZIP route extracted 17.12 without administrator privileges or installation changes. The same complete suite passed on 17.12 with identical checked outcomes, migration hash and audit inputs to 18.0; both servers stopped. The owner reports live 17.11 preflight blocks 2-7 passed. Same-major compatibility is verified for the scoped baseline; exact hosted patch/platform, managed services and later-stage work remain outside this pass. See the runtime report for ZIP provenance and remaining limits.
 
 ## 1. Schema and authorization foundations
 
@@ -14,7 +22,7 @@ Stage 1 preparation: `202611190001_student_privacy_foundation.sql` and `docs/stu
 
 ## 2. Blocking and friendship enforcement
 
-- [ ] 2.1 Implement block/unblock and owner-only block listing; verify atomic friendship removal, pending-request invalidation, reverse-block persistence, safe retries, no automatic restoration and no peer-readable block direction with SQL tests.
+- [x] 2.1 Implement block/unblock and owner-only block listing; verify atomic friendship removal, pending-request invalidation, reverse-block persistence, safe retries, no automatic restoration and no peer-readable block direction with SQL tests.
 - [ ] 2.2 Harden all friend send/respond/profile/directory/relationship overloads and direct SELECT grants/policies; verify stale accept cannot recreate friendship and legacy/direct identifier calls cannot bypass blocks or privacy.
 - [ ] 2.3 Add profile/DM block controls and independent block management; verify hidden targets can be unblocked, failures retain confirmed state, account changes discard stale results and no block notification is emitted in client tests.
 - [ ] 2.4 Document shared-group exceptions and generic peer-facing failure behavior; verify accessible notices explain retained identity/interaction and do not reveal which member blocked an invitee.

@@ -5,7 +5,7 @@ import type { ClassmateProfile } from './classmateProfile'
 export interface FriendRequest { request_id: string; sender_id: string; sender_name: string; sender_major: string | null; created_at: string }
 export interface FriendRelationship { student_id: string; relationship: 'none' | 'declined' | 'outgoing_pending' | 'incoming_pending' | 'accepted'; request_id: string | null }
 export type FriendStudent = ClassmateProfile
-export type DiscoverableStudent = FriendStudent & { relationship: Exclude<FriendRelationship['relationship'], 'accepted'> }
+export type DiscoverableStudent = FriendStudent & { relationship: FriendRelationship['relationship'] }
 export interface FriendApi {
   inbox(signal: AbortSignal): Promise<FriendRequest[]>
   relationships(course: string, section: string, professorFirstName: string, professorLastName: string, signal: AbortSignal): Promise<FriendRelationship[]>
@@ -68,7 +68,7 @@ export function friendApi(client: SupabaseClient): FriendApi {
       return rows(data, value => {
         const row = value as Record<string, unknown>
         const profile = parseFriend(row)
-        if (!['none', 'declined', 'outgoing_pending', 'incoming_pending'].includes(String(row.relationship))) throw new Error('Invalid student relationship')
+        if (!['none', 'declined', 'outgoing_pending', 'incoming_pending', 'accepted'].includes(String(row.relationship))) throw new Error('Invalid student relationship')
         return { ...profile, relationship: row.relationship as DiscoverableStudent['relationship'] }
       })
     },

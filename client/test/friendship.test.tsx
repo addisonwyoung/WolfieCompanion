@@ -50,6 +50,32 @@ describe('friend request inbox', () => {
 })
 
 describe('friends list', () => {
+  it.each([
+    ['accepted', 'none'],
+    ['none', 'accepted'],
+  ] as const)('hides an accepted friend when directory=%s and cache=%s', async (directoryRelationship, cachedRelationship) => {
+    const api = {
+      directory: vi.fn(async () => [
+        { ...peer, student_id: 'accepted-friend', name: 'Accepted Friend', has_shared_avatar: false, relationship: directoryRelationship },
+        { ...peer, student_id: 'available-student', name: 'Available Student', has_shared_avatar: false, relationship: 'none' },
+      ]),
+      sendToStudent: vi.fn(async () => 'request-id'),
+    } as unknown as FriendApi
+    const relationshipById = new Map<string, FriendRelationship>([
+      ['accepted-friend', { student_id: 'accepted-friend', relationship: cachedRelationship, request_id: null }],
+    ])
+    render(<Friends friends={{ status: 'success', data: [] }} busyIds={new Set()} onRetry={vi.fn()} onViewProfile={vi.fn()} onUnfriend={vi.fn()} api={api} onOpenRequests={vi.fn()} relationshipById={relationshipById} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Friends' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a Friend' }))
+    const addAvailable = await screen.findByRole('button', { name: 'Add Available Student as a friend' })
+    expect(screen.queryByText('Accepted Friend')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Accepted Friend as a friend' })).not.toBeInTheDocument()
+    expect(api.sendToStudent).not.toHaveBeenCalled()
+    fireEvent.click(addAvailable)
+    await waitFor(() => expect(api.sendToStudent).toHaveBeenCalledExactlyOnceWith('available-student'))
+    expect(await screen.findByRole('status', { name: 'Friend request sent to Available Student' })).toBeInTheDocument()
+  })
+
   it('shows accepted friends in a popup and opens their privacy-filtered profile', () => {
     const onViewProfile = vi.fn()
     const friend: FriendStudent = { ...peer, student_id: 'friend', name: 'Accepted Friend', has_shared_avatar: false }

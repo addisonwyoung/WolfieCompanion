@@ -9,7 +9,7 @@ export function createFriendPictureAccess(factory: typeof createClient = createC
     if (!url || !key) throw new Error('Configuration unavailable');
     const client=factory(url,key,{ global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false,autoRefreshToken:false} });
     const {data,error}=await client.auth.getUser(token); if(error || !data.user) return null;
-    const detail=await client.rpc('get_friend_profile',{p_student_id:peer});
+    const detail=await client.rpc('get_discoverable_profile',{p_student_id:peer});
     if(detail.error) { if(['42501','22023'].includes(detail.error.code)) return null; throw new Error('Profile unavailable'); }
     return detail.data?.has_shared_avatar===true ? data.user.id : null;
   },

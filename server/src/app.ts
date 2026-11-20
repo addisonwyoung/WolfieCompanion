@@ -1,5 +1,6 @@
 import express from 'express';
 import { classmatePictureRouter } from './classmatePicture.js';
+import { groupPictureRouter } from './groupPicture.js';
 import { friendPictureRouter } from './friendPicture.js';
 import { avatarRouter } from './avatar.js';
 import type { ErrorRequestHandler } from 'express';
@@ -11,6 +12,7 @@ export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   const app = express();
   app.use('/api/classmate-picture', classmatePictureRouter());
   app.use('/api/friend-picture', friendPictureRouter());
+  app.use('/api/group-picture', groupPictureRouter());
   app.use('/api/avatar', avatarRouter());
   app.use('/api/schedule-preview', schedulePreviewRouter(preview));
   app.use(express.json({ limit: '8kb' }));
