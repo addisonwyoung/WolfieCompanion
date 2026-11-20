@@ -2,6 +2,8 @@
 
 Final group-chat rules are approved: automatic additions and re-additions including private friends, equal active-member permissions, self-leave only, fresh sequence floors and no pending group-chat invitations. All tasks remain unchecked; documentation validation does not authorize apply.
 
+Stage 1 preparation: `202611190001_student_privacy_foundation.sql` and `docs/student-privacy-foundation.md` cover only settings/block storage and manual review. No SQL has been executed. Tasks 1.1 and 1.5 remain incomplete pending their specified database verification and later client-cutover behavior; all other tasks are outside this stage.
+
 ## 1. Schema and authorization foundations
 
 - [ ] 1.1 Add owner-reviewed additive settings/block schema and existing/new-account backfill/default logic; verify fresh-install and populated-upgrade fixtures preserve profile data, existing public status, new public defaults, true/false DM mapping and independent group consent, including concurrent signup.

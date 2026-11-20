@@ -58,11 +58,11 @@ Current and retained legacy RPCs, direct lookups, table policies, service-role p
 - **THEN** confirming its original participant-owned result does not insert another message or advance activity/unread counts
 
 ### Requirement: Migration and user explanations
-Migration SHALL map existing true to eligible-students and false to no-one, preserving histories, identifiers and read positions. Group-addition consent SHALL be migrated independently from the same old value and SHALL NOT depend on subsequent DM preferences. UI SHALL explain mutual restrictions, safe read-only reasons and the changed existing-chat behavior for previous opt-outs. Restricted sends SHALL NOT produce new-message notifications; retained historical unread state SHALL NOT generate fabricated new alerts.
+Migration SHALL map existing true to eligible-students and false to no-one, preserving histories, identifiers and read positions. Group-addition consent SHALL initialize true for all existing and new accounts independently of the legacy boolean and SHALL NOT depend on subsequent DM preferences. UI SHALL explain mutual restrictions, safe read-only reasons, the changed existing-chat behavior for previous opt-outs and the independently enabled group-addition preference when new authorization becomes operational. Restricted sends SHALL NOT produce new-message notifications; retained historical unread state SHALL NOT generate fabricated new alerts.
 
 #### Scenario: Legacy false preference
 - **WHEN** an existing opt-out is migrated
-- **THEN** DM permission is no-one, group additions remain disabled, prior histories survive, and the changed existing-conversation behavior is explained
+- **THEN** DM permission is no-one, the independent group-addition preference is true, prior histories survive, and the changed existing-conversation and group-addition behavior is explained at authorization cutover
 
 ### Requirement: Group eligibility does not grant DM authority
 University-wide search, automatic group admission and Study Buddies acceptance SHALL NOT create friendships or override mutual DM preferences. Blocks SHALL prevent new invitations and direct communication, preserving existing shared-group participation as the documented exception.
