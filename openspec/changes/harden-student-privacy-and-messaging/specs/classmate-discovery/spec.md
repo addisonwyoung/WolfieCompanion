@@ -30,13 +30,17 @@ The interface and documentation SHALL explain public versus private discoverabil
 
 ## ADDED Requirements
 
-### Requirement: Distinct general search and section candidates
-University-wide public-student search SHALL NOT require shared major, course, section or friendship. Course discovery SHALL NOT reveal private non-friends. Study Buddies candidates SHALL be scoped to verified current-semester course-section membership and include public classmates and private accepted friends through relationship authorization. Professor matching in classmate discovery SHALL NOT constrain university-wide search or impose a professor requirement on Study Buddies.
+### Requirement: Distinct general search and offering candidates
+University-wide public-student search SHALL NOT require shared major, course, section or friendship. Course discovery SHALL NOT reveal private non-friends. Initial and additional Study Buddies invitation candidates SHALL match the group's authoritative verified course, section, professor, semester and academic year and include public classmates and private accepted friends through the actual inviter's relationship authorization. The actual inviter SHALL be an eligible accepted group member for additional invitations. Bilateral inviter-invitee blocks SHALL exclude direct candidates; blocks solely between candidates or other co-members SHALL NOT veto an independent third-party invitation. Offering matching SHALL NOT constrain university-wide search.
 
 #### Scenario: Search across academic boundaries
 - **WHEN** two public eligible students have different majors, courses and sections
-- **THEN** university-wide search can find them while Study Buddies selection remains confined to the chosen section
+- **THEN** university-wide search can find them while Study Buddies selection remains confined to the group's exact verified offering
 
 #### Scenario: Course enrollment is not privacy consent
-- **WHEN** private friend and non-friend classmates share the caller's section
-- **THEN** only the friend can appear in the authorized section invitation picker and neither becomes generally searchable
+- **WHEN** private friend and non-friend classmates match the group's exact offering
+- **THEN** only the friend can appear through the actual inviter's authorized relationship and neither becomes generally searchable
+
+#### Scenario: Matching section but different offering context
+- **WHEN** a candidate shares the course and section but has a different professor, semester or academic year, or pending/rejected enrollment
+- **THEN** neither initial nor additional invitation lookup returns that candidate as eligible

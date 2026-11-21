@@ -56,3 +56,14 @@ Student search SHALL return only authorized identity and owner-shared optional f
 #### Scenario: Group identity is not general discovery
 - **WHEN** a private student joins a group chat containing non-friends
 - **THEN** active co-members can see the student's name, picture and basic identity only in that authorized group context, without making the profile searchable or exposing full-profile fields, email or schedules
+
+### Requirement: Private blocking management and safe admission explanations
+Profile Block/Unblock actions and Blocked Students settings SHALL expose only the viewer's own directed blocks and retain management access to hidden targets without granting general profile access. Group and Study invitation candidates and failed operations SHALL NOT disclose whether another student's privacy setting, block relationship or another authorization restriction caused unavailability. Private shared-group warnings SHALL be scoped to the blocker and their authorized active/accepted contexts, never included in another member's profile, roster or notification payload.
+
+#### Scenario: Generic failed group addition
+- **WHEN** a selected student cannot be added because of consent, privacy, blocking or account eligibility
+- **THEN** the operation fails atomically with a generic explanation such as "This student couldn't be added to the group chat," without exposing the restriction category or silently dropping that student
+
+#### Scenario: Warning is not general profile access
+- **WHEN** a blocker sees a private warning about an authorized co-member
+- **THEN** the warning reveals no unrelated private profile fields and grants neither general discovery nor a DM exception; no block-direction information is returned to other members

@@ -152,6 +152,7 @@ def main():
     parser.add_argument('--postgres-bin', type=Path, default=BIN, help='Complete PostgreSQL bin directory (default: installed 18)')
     parser.add_argument('--expected-major', type=int, help='Refuse mismatched/mixed binaries before initdb')
     parser.add_argument('--stage2b', action='store_true', help='Also verify the incremental mutual DM cutover after the unchanged Stage 2A suite')
+    parser.add_argument('--stage3a', action='store_true', help='Verify Stage 3A after the Stage 2A/2B gates in this new disposable cluster')
     options = parser.parse_args()
     db = Disposable(options.audit_directory, options.postgres_bin, options.expected_major)
     try:
@@ -177,9 +178,12 @@ def main():
         assert before == snapshot(db), 'Fixture rollback failed to preserve original data'
         db.report['fixture_rollback_verified'] = True
         concurrency(db)
-        if options.stage2b:
+        if options.stage2b or options.stage3a:
             from mutual_dm_runtime_checks import verify_stage2b
             verify_stage2b(db, REPO)
+        if options.stage3a:
+            from group_membership_runtime_checks import verify_stage3a
+            verify_stage3a(db, REPO)
         db.report['outcome'] = 'PASS'
     except Exception as error:
         db.report['outcome'] = 'FAIL'

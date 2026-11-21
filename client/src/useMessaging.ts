@@ -36,7 +36,7 @@ export function useMessageInbox(api:MessagingApi,epoch:number){
 generation.current++;controller.abort()
 }},[api,epoch,attempt])
  async function loadMore(){if(pageBusy.current||!rows.length)return;pageBusy.current=true;setPaging(true);const controller=new AbortController();pageController.current=controller;const run=generation.current;try{const data=await api.inbox(controller.signal,rows.at(-1));if(!controller.signal.aborted&&run===generation.current){setRows(old=>merge(old,data));setMore(data.length===50);setError('')}}catch{if(!controller.signal.aborted&&run===generation.current)setError('Unable to load more conversations. Please retry.')}finally{pageBusy.current=false;if(!controller.signal.aborted)setPaging(false)}}
- return{rows,error,loading,more,paging,loadMore,retry:()=>setAttempt(value=>value+1)}
+ return{rows,error,loading,more,paging,loadMore,retry:()=>setAttempt(value=>value+1),removeGroup:(id:string)=>setRows(old=>old.filter(row=>row.kind!=='group'||row.conversation_id!==id))}
 }
 type Attempt={id:string;body:string;status:'pending'|'failed'}
 export const messageSendTimeoutMs = 30_000
