@@ -296,7 +296,7 @@ test('classmate profile Message closes native dialog before focusing account cha
 
 test.each(['create','add','send','retry','reconnect'] as const)('group %s tears down private state on App account replacement',async mode=>{
  let release!:(value:unknown)=>void
- const detail={group_id:'group',name:'Private group title',creator_id:'a',joined_after_sequence:0,last_read_sequence:0,members:[{student_id:'a',name:'Owner'},{student_id:'peer',name:'Ada'},{student_id:'other',name:'Grace'}]}
+ const detail={group_id:'group',name:'Private group title',creator_id:'a',addition_permission:'all_members' as const,can_add:true,can_manage:true,can_send:true,joined_after_sequence:0,last_read_sequence:0,members:[{student_id:'a',name:'Owner'},{student_id:'peer',name:'Ada'},{student_id:'other',name:'Grace'}]}
  const candidates=[{student_id:'peer',name:'Ada',major:null,can_add:true,reason:null},{student_id:'other',name:'Grace',major:null,can_add:true,reason:null},{student_id:'later',name:'Later friend',major:null,can_add:true,reason:null}]
  const saved={id:'group-row',conversation_id:'group',sender_id:'peer',sender_name:'Ada',client_message_id:'request',sequence:1,body:'Private group text',created_at:'2026-10-25T15:00:00Z'}
 mock.dm.groups = {
@@ -311,7 +311,8 @@ mock.dm.groups = {
     release = value => resolve(value as Awaited<ReturnType<NonNullable<MessagingApi['groups']>['add']>>)
   })),
 
-  remove: vi.fn().mockResolvedValue(undefined),
+  leave: vi.fn().mockResolvedValue(undefined),
+  setPermission: vi.fn().mockResolvedValue(detail),
 
   history: vi.fn().mockResolvedValue([saved]),
 

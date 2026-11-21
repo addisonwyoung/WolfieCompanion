@@ -49,7 +49,26 @@ Blocking SHALL preserve existing study/group memberships, authorized shared-grou
 
 #### Scenario: Existing shared group
 - **WHEN** one active member blocks another active member
-- **THEN** existing shared participation remains available while direct communication and new blocked-pair admission remain restricted
+- **THEN** shared membership and authorized interaction remain available subject to ordinary group-send eligibility, while direct communication and direct actor-target invitations remain restricted; an independent third party can admit either student if all other checks pass
+
+### Requirement: Private shared-group block warnings and controls
+Eligible students SHALL have Block/Unblock actions in authorized profile interfaces and owner-only Blocked Students management that reuses existing blocking semantics and remains available after targets become hidden. In active group chats and accepted Study Buddies membership, only a viewer who initiated a block SHALL receive a warning about that blocked co-member through the notification interface and a dismissible group-view banner with a voluntary leave action. Non-blockers, unrelated members and pending Study invitees SHALL NOT receive that warning or block-direction metadata. Warnings SHALL be deduplicated by viewer, group, blocked student and block episode. Repeated polling/reconnect within that episode SHALL NOT duplicate delivery; a new block episode or membership episode SHALL allow reappearance. Dismissal SHALL NOT unblock anyone or change membership.
+
+#### Scenario: Independent third party admits a blocked pair
+- **WHEN** Sally independently adds or invites Alice and Bob with valid actor-target authorization and Alice has blocked Bob
+- **THEN** permitted co-membership succeeds, only Alice receives her private warning after active/accepted membership, and Sally and Bob receive no blocking warning or direction disclosure; Alice and Bob still cannot DM each other
+
+#### Scenario: Repeat refresh and private dismissal
+- **WHEN** Alice acknowledges or dismisses that shared-context warning and the client refreshes or reconnects with the same membership and block relationship
+- **THEN** no repeated notification is produced, Bob cannot read or acknowledge Alice's warning, and dismissal does not remove the block or leave the group
+
+#### Scenario: Same blocked relationship across multiple groups
+- **WHEN** Alice and Bob share multiple authorized group contexts while Alice's block remains in effect
+- **THEN** the notification interface deduplicates each group/block episode for Alice, contextual private banners remain available and may reappear on a new block or membership episode, and other members receive no blocking metadata
+
+#### Scenario: Unblock a hidden student
+- **WHEN** an eligible blocker opens Blocked Students after the target is no longer generally discoverable
+- **THEN** they can remove only their own block without restoring friendship, erasing a reverse block or notifying the target
 
 ### Requirement: Authoritative boundaries and safe revocation
 Current and retained legacy RPCs, direct lookups, table policies, service-role picture delivery, inbox/unread projections and event delivery SHALL enforce their approved audience. Message writes SHALL remain protected from direct-table bypass. Revocation and mutations SHALL use a consistent serialized authorization order. An exact replay of a committed attempt SHALL NOT create a new message; uncommitted retries SHALL require current authorization. Account changes and revocation refresh SHALL prevent obsolete private state or automatic draft delivery.
@@ -74,7 +93,7 @@ Migration SHALL map existing true to eligible-students and false to no-one, pres
 - **THEN** the migration reports discrepancies without resetting canonical choices, future authorization uses `dm_permission`, and obsolete boolean updates fail with an actionable refresh instruction
 
 ### Requirement: Group eligibility does not grant DM authority
-University-wide search, automatic group admission and Study Buddies acceptance SHALL NOT create friendships or override mutual DM preferences. Blocks SHALL prevent new invitations and direct communication, preserving existing shared-group participation as the documented exception.
+University-wide search, automatic group admission and Study Buddies acceptance SHALL NOT create friendships or override mutual DM preferences. Blocks SHALL prevent direct invitations between the actual inviter and invitee in either direction and prevent direct communication. Independent third-party admission and existing shared-group participation SHALL remain permitted under their own privacy/eligibility/consent rules and SHALL NOT confer DM or general profile permission.
 
 #### Scenario: Non-friend addition with closed DMs
 - **WHEN** a public non-friend is automatically admitted to an authorized group while either student has no-one DM permission
