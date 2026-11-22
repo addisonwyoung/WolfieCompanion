@@ -1,3 +1,5 @@
+import { SharedGroupWarningBanner } from './StudentPrivacyControls'
+import type { StudentPrivacyApi } from './studentPrivacy'
 import { readableTimestampDate } from './dateTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -10,6 +12,10 @@ import { studyDays } from './studyGroupApi'
 import type { StudyDay, StudyGroup, StudyGroupApi, StudyWindow } from './studyGroupApi'
 import StudyInvitationPicker from './StudyInvitationPicker'
 import './StudyGroups.css'
+
+const invitationDate = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+const invitationTime = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
+function invitationExpiration(value: string) { const date = new Date(value); return `${invitationDate.format(date)} ${invitationTime.format(date)}` }
 
 const studyRoleOptions = ['Coordinator', 'Researcher', 'Note-taker', 'Presenter', 'Editor', 'Designer', 'Timekeeper']
 
@@ -35,9 +41,9 @@ function windowsFor(group: StudyGroup, userId: string): WeeklyAvailability[] {
   return uniqueWindows(group.availability.filter(window => window.user_id === userId).map(({ day, start_minute, end_minute }) => ({ day, start: start_minute, end: end_minute })))
 }
 
-export default function StudyGroups({ userId, courses, api, onGoToCourses }: {
+export default function StudyGroups({ userId, courses, api, onGoToCourses, privacyApi }: {
   userId: string; courses: SavedCourse[]; classmatesApi: ClassmateApi
-  api: StudyGroupApi; onGoToCourses: () => void
+  api: StudyGroupApi; onGoToCourses: () => void; privacyApi?: StudentPrivacyApi
 }) {
   const [groups, setGroups] = useState<StudyGroup[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -126,7 +132,8 @@ export default function StudyGroups({ userId, courses, api, onGoToCourses }: {
       if (document.visibilityState === 'visible') refreshGroups()
     }
     const timer = window.setInterval(refreshVisibleGroups, 15_000)
-    return () => window.clearInterval(timer)
+    window.addEventListener('student-communication-settings-changed', refreshVisibleGroups)
+    return () => { window.clearInterval(timer); window.removeEventListener('student-communication-settings-changed', refreshVisibleGroups) }
   }, [refreshGroups])
 
   const members = useMemo(() => selectedGroup?.members.filter(member => member.status === 'accepted') ?? [], [selectedGroup])
@@ -178,6 +185,11 @@ export default function StudyGroups({ userId, courses, api, onGoToCourses }: {
     catch (reason) { if(alive.current)setError(reason instanceof Error ? reason.message : 'That change could not be saved. Please retry.') }
     finally { operationPending.current=false;if(alive.current)setBusy(false) }
   }
+  function leaveSelectedGroup() {
+    if (!selectedGroup || busy || attempt) return
+    if (selectedGroup.owner_id === userId && members.length === 1 && !window.confirm('You are the only accepted member. Leaving will permanently delete this group. Continue?')) return
+    invitation(request => api.leave(selectedGroup.group_id, request), () => setSelectedGroupId(null))
+  }
   function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!course || !selectedPeers.length || !groupName.trim()) return
@@ -219,7 +231,7 @@ export default function StudyGroups({ userId, courses, api, onGoToCourses }: {
 
     {!!pendingInvites.length && <section className="study-invitations panel" aria-labelledby="study-invitations-title">
       <p className="eyebrow">YOU HAVE AN INVITATION</p><h2 id="study-invitations-title">Group invitations</h2>
-      {pendingInvites.map(group => <article className="study-invitation" key={group.group_id}><div><h3>{group.name}</h3><p>{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''} · invited by {group.inviter?.name ?? 'a classmate'}{group.invitation_state==='pending'&&group.expires_at?` - Expires ${new Date(group.expires_at).toLocaleString()}`:group.invitation_state==='expired'?' - Expired':' - Invitation unavailable'}</p></div><div className="study-actions"><button type="button" disabled={busy||!!attempt||group.invitation_state!=='pending'} onClick={() => invitation(request => api.respond(group.group_id,group.invitation_id,true,request))}>Accept</button><button type="button" disabled={busy||!!attempt} onClick={() => invitation(request => api.respond(group.group_id,group.invitation_id,false,request))}>Decline</button></div></article>)}
+      {pendingInvites.map(group => <article className="study-invitation" key={group.group_id}><div><h3>{group.name}</h3><p>{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''} · invited by {group.inviter?.name ?? 'a classmate'}{group.invitation_state==='pending'&&group.expires_at?` - Expires ${invitationExpiration(group.expires_at)}`:group.invitation_state==='expired'?' - Expired':' - Invitation unavailable'}</p></div><div className="study-actions"><button type="button" disabled={busy||!!attempt||group.invitation_state!=='pending'} onClick={() => invitation(request => api.respond(group.group_id,group.invitation_id,true,request))}>Accept</button><button type="button" disabled={busy||!!attempt} onClick={() => invitation(request => api.respond(group.group_id,group.invitation_id,false,request))}>Decline</button></div></article>)}
     </section>}
 
     <div className="study-groups-grid">
@@ -244,14 +256,15 @@ export default function StudyGroups({ userId, courses, api, onGoToCourses }: {
 
       <section className="panel study-groups-list" aria-labelledby="study-groups-list-title">
         <div className="study-section-heading"><span className="study-step">02</span><div><p className="eyebrow">YOUR STUDY TEAMS</p><h2 id="study-groups-list-title">Your groups</h2></div></div>
-        {!activeGroups.length ? <div className="study-empty"><h3>No joined groups yet</h3><p>Create a group or accept an invitation to start comparing times.</p></div> : <ul className="study-saved-groups">{activeGroups.map(group => <li key={group.group_id}><button type="button" className="study-group-card" aria-pressed={selectedGroupId === group.group_id} onClick={() => { setSelectedGroupId(group.group_id); setDraft(fromGroup(group, userId)) }}><span className="eyebrow">{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''}</span><strong>{group.name}</strong><span>{group.members.filter(member => member.status === 'accepted').length} members · {group.members.filter(member => member.status === 'pending').length} pending</span></button></li>)}</ul>}
+        {!activeGroups.length ? <div className="study-empty"><h3>No joined groups yet</h3><p>Create a group or accept an invitation to start comparing times.</p></div> : <ul className="study-saved-groups">{activeGroups.map(group => <li key={group.group_id}><button type="button" className="study-group-card" aria-pressed={selectedGroupId === group.group_id} onClick={() => { setSelectedGroupId(group.group_id); setDraft(fromGroup(group, userId)) }}><span className="eyebrow">{group.course_code}{group.course_section ? ` · Section ${group.course_section}` : ''}</span><strong>{group.name}</strong><span className="study-membership-counts"><span className="study-status-badge">{group.members.filter(member => member.status === 'accepted').length} members</span> <span className="study-status-badge is-pending">{group.pending_count} pending</span></span></button></li>)}</ul>}
       </section>
     </div>
 
     {selectedGroup?.my_status === 'accepted' && <section ref={groupPanel} className="panel study-detail" aria-labelledby="study-detail-heading">
-      <header className="study-detail-header"><div><p className="eyebrow">{selectedGroup.course_code}{selectedGroup.course_section ? ` · Section ${selectedGroup.course_section}` : ''} · GROUP SCHEDULE</p><h2 id="study-detail-heading">{selectedGroup.name}</h2><p>{members.length} accepted member{members.length === 1 ? '' : 's'}{selectedGroup.pending_count ? ` - ${selectedGroup.pending_count} invitation pending` : ''}</p></div><button type="button" disabled={busy||!!attempt} onClick={() => { if (selectedGroup.owner_id === userId && members.length === 1 && !window.confirm('You are the only accepted member. Leaving will permanently delete this group. Continue?')) return; invitation(request => api.leave(selectedGroup.group_id,request), () => setSelectedGroupId(null)) }}>Leave group</button></header>
-      {selectedGroup.can_invite?<details><summary>Invite additional classmates</summary><StudyInvitationPicker key={selectedGroup.group_id} api={api} group={selectedGroup} disabled={busy||!!attempt} onInvite={ids=>invitation(request=>api.invite(selectedGroup.group_id,ids,request))}/></details>:<p>New invitations are unavailable for this group. Accepted members can continue collaborating.</p>}
-      {selectedGroup.outgoing_invitations.length>0&&<details><summary>Your sent invitations</summary><ul>{selectedGroup.outgoing_invitations.map(row=><li key={row.invitation_id}>{row.name} - {row.state}{row.expires_at?` - Expires ${new Date(row.expires_at).toLocaleString()}`:''}</li>)}</ul></details>}
+      <header className="study-detail-header"><div><p className="eyebrow">{selectedGroup.course_code}{selectedGroup.course_section ? ` · Section ${selectedGroup.course_section}` : ''} · GROUP SCHEDULE</p><h2 id="study-detail-heading">{selectedGroup.name}</h2><div className="study-membership-counts"><span className="study-status-badge">{members.length} accepted member{members.length === 1 ? '' : 's'}</span><span className="study-status-badge is-pending">{selectedGroup.pending_count} pending invitation{selectedGroup.pending_count === 1 ? '' : 's'}</span></div></div><button type="button" disabled={busy||!!attempt} onClick={leaveSelectedGroup}>Leave group</button></header>
+      <SharedGroupWarningBanner api={privacyApi} userId={userId} context="study" groupId={selectedGroup.group_id} onLeave={leaveSelectedGroup} leaveDisabled={busy||!!attempt} />
+      {selectedGroup.can_invite?<details className="study-invitation-management"><summary>Invite additional classmates</summary><StudyInvitationPicker key={selectedGroup.group_id} api={api} group={selectedGroup} disabled={busy||!!attempt} onInvite={ids=>invitation(request=>api.invite(selectedGroup.group_id,ids,request))}/></details>:<p>New invitations are unavailable for this group. Accepted members can continue collaborating.</p>}
+      {selectedGroup.outgoing_invitations.length>0&&<details className="study-invitation-management"><summary>Your sent invitations</summary><ul className="study-sent-invitations">{selectedGroup.outgoing_invitations.map(row=><li key={row.invitation_id}><div><strong>{row.name}</strong><p>{row.expires_at?`Expires ${invitationExpiration(row.expires_at)}`:'Expiration unavailable'}</p></div><span className={`study-status-badge is-${row.state}`}>{row.state==='pending'?'Pending':row.state==='expired'?'Expired':'Unavailable'}</span></li>)}</ul></details>}
       {selectedGroup.semester&&selectedGroup.academic_year&&selectedGroup.professor_first_name&&selectedGroup.professor_last_name&&<p>{selectedGroup.professor_first_name} {selectedGroup.professor_last_name} - {selectedGroup.semester} {selectedGroup.academic_year}</p>}
       <p className="study-schedule-guidance">Add recurring free windows you are comfortable sharing. Course codes and sections do not include meeting times, so the app cannot infer schedules from them.</p>
       <div className="study-members">

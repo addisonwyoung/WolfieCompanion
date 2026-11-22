@@ -8,7 +8,7 @@ import type { ProfessorCatalogState } from '../src/courseProfessors'
 import type { FriendRelationship } from '../src/friendshipApi'
 
 const profile: StudentProfile = {
-  id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: ['Music'], residence_status: 'dormer', avatar_path: null,
+  id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: ['Music'], residence_status: 'dormer', is_private:false,avatar_path: null,
   share_year: true, share_interests: true, share_residence_status: true,
 }
 const candidate = { student_id: 'peer', name: 'Peer', major: 'Computer Science', year: null, interests: null, residence_status: null, shared_courses: ['CSE 310'] }

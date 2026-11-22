@@ -6,6 +6,11 @@ export type ClassmateState = { status: 'idle' | 'loading' | 'success' | 'error';
 
 export function useClassmates(api: ClassmateApi, userId: string | null, courseCode: string | null, section: string | null, professorFirstName: string | null = null, professorLastName: string | null = null) {
   const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const refresh = () => setAttempt(value => value + 1)
+    window.addEventListener('student-communication-settings-changed', refresh)
+    return () => window.removeEventListener('student-communication-settings-changed', refresh)
+  }, [])
   const [result, setResult] = useState<{ key: string | null; api: ClassmateApi; state: ClassmateState } | null>(null)
   const key = userId && courseCode && section && professorFirstName?.trim() && professorLastName?.trim()
     ? JSON.stringify([userId, courseCode, section, professorFirstName.trim().toLowerCase(), professorLastName.trim().toLowerCase(), attempt])

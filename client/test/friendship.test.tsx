@@ -11,7 +11,7 @@ import type { StudentProfile } from '../src/account'
 import { useFriendships } from '../src/useFriendships'
 
 const incoming: FriendRequest[] = [{ request_id: 'request-1', sender_id: 'student-1', sender_name: 'Avery Student', sender_major: 'Computer Science', created_at: '2026-10-22T12:00:00Z' }]
-const profile: StudentProfile = { id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: [], residence_status: null, avatar_path: null }
+const profile: StudentProfile = { id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: [], residence_status: null, is_private:false,avatar_path: null }
 const peer = { student_id: 'peer', name: 'Peer Student', major: 'Computer Science', year: null, interests: null, residence_status: null, shared_courses: ['CSE 310'] }
 const baseBrowser = { enrolledCourses: [{ id: 'cse-310', code: 'CSE 310', section: '01', professorFirstName: 'Ada', professorLastName: 'Lovelace', verificationStatus: 'verified' }], selectedId: 'cse-310' as const, onSelect: vi.fn(), onAddClasses: vi.fn(), onRetry: vi.fn(), profile, roster: { status: 'success' as const, classmates: [] } }
 

@@ -11,7 +11,7 @@ const mock=vi.hoisted(()=>({api:{} as AccountApi,items:{} as AcademicApi,dm:{} a
 vi.mock('../src/account',async original=>({...await original<typeof import('../src/account')>(),accountApi:()=>mock.api}))
 vi.mock('../src/academicItems',async original=>({...await original<typeof import('../src/academicItems')>(),academicItemsApi:()=>mock.items}))
 vi.mock('../src/messaging',async original=>({...await original<typeof import('../src/messaging')>(),messagingApi:()=>mock.dm}))
-const profile=(id='a'):StudentProfile=>({id,name:`Student ${id}`,major:null,year:null,interests:[],residence_status:null,avatar_path:null})
+const profile=(id='a'):StudentProfile=>({id,name:`Student ${id}`,major:null,year:null,interests:[],residence_status:null,is_private:false,avatar_path:null})
 const session=(id:string)=>({user:{id},access_token:`token-${id}`}) as Session
 function fake(initial:Session|null=null){
  let current=initial;let listener:(event:string,s:Session|null)=>void=()=>{}

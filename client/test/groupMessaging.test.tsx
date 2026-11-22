@@ -1,5 +1,5 @@
 import './academicDialogSupport'
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Messages from '../src/Messages'
@@ -68,7 +68,7 @@ test('committed creation with a lost response retries exactly and opens the grou
  await screen.findByText('Retry creation');expect(screen.getByRole('textbox',{name:'Group name (optional)'})).toBeDisabled();fireEvent.click(screen.getByText('Retry creation'))
  await waitFor(()=>expect(screen.getByRole('heading',{name:'Study group'})).toHaveFocus());expect(document.querySelector('dialog[open]')).toBeNull();expect(vi.mocked(f.groups.create).mock.calls[0]).toEqual(vi.mocked(f.groups.create).mock.calls[1])
  const input=screen.getByRole('textbox',{name:'Message'});fireEvent.change(input,{target:{value:'<b>Literal</b>\n😀'}});fireEvent.keyDown(input,{key:'Enter'});await waitFor(()=>expect(input).toHaveValue(''));expect(f.rows).toHaveLength(1);expect(document.querySelector('.dm-message b')).toBeNull()
- fireEvent.click(screen.getByText('Add members'));fireEvent.click(await screen.findByRole('checkbox',{name:/Later Friend/}));fireEvent.click(screen.getByText('Add selected members'));await waitFor(()=>expect(document.querySelector('dialog[open]')).toBeNull());await screen.findByText('Members (4)')
+ fireEvent.click(screen.getByRole('button',{name:'Group Settings'}));fireEvent.click(screen.getByRole('button',{name:'Add members'}));fireEvent.click(await screen.findByRole('checkbox',{name:/Later Friend/}));fireEvent.click(screen.getByText('Add selected members'));await waitFor(()=>expect(document.querySelector('dialog[open]')).toBeNull());await screen.findByText('Members (4)')
 })
 test('late members only see post-join text and cannot add in Creator Only mode',async()=>{
  const f=fixture();f.seed(6);f.setDetail({...initial,addition_permission:'creator_only',can_add:false,can_manage:false,joined_after_sequence:5,last_read_sequence:5,members:[...initial.members,{student_id:c,name:names[c]}]})
@@ -113,7 +113,7 @@ test('a native group picker does not mark covered incoming history read',async()
  const f=fixture();f.seed(2);const notifications={load:vi.fn(async()=>({})),read:vi.fn(async()=>{})}
  render(<MessagingNotifications userId={self} api={notifications}><Messages api={f.api} userId={self} initialTarget={null}/></MessagingNotifications>)
  fireEvent.click(await screen.findByRole('button',{name:/Study group/}));await screen.findByRole('textbox',{name:'Message'});await waitFor(()=>expect(notifications.read).toHaveBeenCalledWith('group:'+id,2));notifications.read.mockClear()
- fireEvent.click(screen.getByText('Add members'));await screen.findByRole('dialog');act(()=>{f.incoming();window.dispatchEvent(new Event('focus'))})
+ fireEvent.click(screen.getByRole('button',{name:'Group Settings'}));fireEvent.click(screen.getByRole('button',{name:'Add members'}));await screen.findByRole('dialog');act(()=>{f.incoming();window.dispatchEvent(new Event('focus'))})
  await waitFor(()=>expect(document.querySelectorAll('.dm-message')).toHaveLength(3));expect(notifications.read).not.toHaveBeenCalled()
  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));await waitFor(()=>expect(notifications.read).toHaveBeenCalledWith('group:'+id,3))
 })
@@ -135,7 +135,7 @@ test('self-leave replaces peer removal, safely retries and clears the active con
  render(<Messages api={f.api} userId={self} initialTarget={null}/> )
  fireEvent.click(await screen.findByRole('button',{name:/Study group/}));await screen.findByText('Group text 1',{selector:'.dm-message p'})
  expect(screen.queryByRole('button',{name:'Remove Ada'})).toBeNull()
- fireEvent.click(screen.getByRole('button',{name:'Leave Group'}));await screen.findByText('Offline')
+ fireEvent.click(screen.getByRole('button',{name:'Group Settings'}));fireEvent.click(screen.getByRole('button',{name:'Leave Group'}));await screen.findByText('Offline')
  fireEvent.click(screen.getByRole('button',{name:'Retry group change'}))
  await waitFor(()=>expect(screen.queryByRole('textbox',{name:'Message'})).toBeNull())
  expect(f.groups.leave).toHaveBeenCalledTimes(2);expect(vi.mocked(f.groups.leave).mock.calls[0]).toEqual(vi.mocked(f.groups.leave).mock.calls[1])
@@ -184,7 +184,7 @@ test('only unrevoked active creator gets settings and failed settings retry pres
  await screen.findByText('Offline');expect(screen.getByRole('combobox')).toBeDisabled();fireEvent.click(screen.getByText('Retry group change'))
  await waitFor(()=>expect(changed).toHaveBeenCalledOnce());expect(vi.mocked(f.groups.setPermission).mock.calls[0]).toEqual(vi.mocked(f.groups.setPermission).mock.calls[1])
  rerender(<GroupMembershipControls api={f.groups} group={{...initial,can_manage:false}} onChanged={changed} onLeft={vi.fn()}/> )
- expect(screen.queryByRole('combobox')).toBeNull();expect(screen.getByText('Leave Group')).toBeEnabled()
+ expect(screen.queryByRole('combobox')).toBeNull();expect(screen.getByRole('button',{name:'Leave Group'})).toBeEnabled()
 })
 
 test('small groups keep history and draft read-only, and regain sending after eligibility is restored',async()=>{
@@ -198,4 +198,23 @@ test('small groups keep history and draft read-only, and regain sending after el
 test('legacy group projections fail closed until the matching database migration is installed',()=>{
  const {can_send: omitted,...legacy}=initial;void omitted
  expect(()=>parseGroup(legacy)).toThrow()
+})
+
+
+test('group settings disclose authorized controls, preserve drafts when closed and do not refetch conversation data',async()=>{
+ const f=fixture();f.seed(0);render(<Messages api={f.api} userId={self} initialTarget={null}/>)
+ fireEvent.click(await screen.findByRole('button',{name:/Study group/}));await screen.findByRole('textbox',{name:'Message'})
+ const toggle=screen.getByRole('button',{name:'Group Settings'})
+ expect(toggle).toHaveAttribute('aria-expanded','false');expect(screen.queryByRole('region',{name:'Group Settings'})).not.toBeInTheDocument()
+ expect(screen.getByText('No messages yet.').closest('.dm-group-empty')).toBeVisible()
+ const detailCalls=vi.mocked(f.groups.detail).mock.calls.length,historyCalls=vi.mocked(f.groups.history).mock.calls.length
+ fireEvent.click(toggle);expect(toggle).toHaveAttribute('aria-expanded','true')
+ const panel=screen.getByRole('region',{name:'Group Settings'});expect(panel.id).toBe(toggle.getAttribute('aria-controls'))
+ expect(within(panel).getByRole('region',{name:'Group members'})).toHaveTextContent('Ada')
+ const permission=within(panel).getByRole('combobox',{name:'Who can add members'})
+ fireEvent.change(permission,{target:{value:'creator_only'}})
+ fireEvent.click(within(panel).getByRole('button',{name:'Close group settings'}))
+ expect(toggle).toHaveFocus();expect(toggle).toHaveAttribute('aria-expanded','false');expect(panel).not.toBeVisible()
+ fireEvent.click(toggle);expect(permission).toHaveValue('creator_only');expect(f.groups.setPermission).not.toHaveBeenCalled()
+ expect(f.groups.detail).toHaveBeenCalledTimes(detailCalls);expect(f.groups.history).toHaveBeenCalledTimes(historyCalls)
 })

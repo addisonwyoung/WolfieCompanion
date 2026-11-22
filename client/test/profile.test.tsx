@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest'
 import Profile from '../src/Profile'
 import { normalizeProfile } from '../src/account'
 import type { StudentProfile } from '../src/account'
-const profile:StudentProfile={id:'a',name:'Student',major:null,year:null,interests:[],residence_status:null,avatar_path:null}
+const profile:StudentProfile={id:'a',name:'Student',major:null,year:null,interests:[],residence_status:null,is_private:false,avatar_path:null}
 test('profile validates, normalizes all fields and retains draft on failure then saves',async()=>{
  const save=vi.fn().mockRejectedValueOnce(new Error('Offline; retry')).mockResolvedValue(undefined)
  render(<Profile profile={profile} onSave={save}/>);fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
@@ -47,24 +47,24 @@ test('sharing choices default private, cancel discards them and failed save reta
  const save=vi.fn().mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(undefined)
  const {rerender}=render(<Profile profile={{...profile,year:'Graduate',interests:['Listening to Music']}} onSave={save}/> )
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
- const year=screen.getByRole('checkbox',{name:'Share my year of study with classmates'})
+ const year=screen.getByRole('switch',{name:'Share my year of study with classmates'})
  expect(year).not.toBeChecked()
- expect(screen.getAllByRole('checkbox')).toHaveLength(5)
+ expect(screen.getAllByRole('switch')).toHaveLength(6)
  fireEvent.click(year);fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
- expect(screen.getByRole('checkbox',{name:/year of study/})).not.toBeChecked()
- fireEvent.click(screen.getByRole('checkbox',{name:/interests/}))
+ expect(screen.getByRole('switch',{name:/year of study/})).not.toBeChecked()
+ fireEvent.click(screen.getByRole('switch',{name:/interests/}))
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('Offline'))
- expect(screen.getByRole('checkbox',{name:/interests/})).toBeChecked()
+ expect(screen.getByRole('switch',{name:/interests/})).toBeChecked()
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await screen.findByRole('button',{name:'Edit profile'})
  const saved=save.mock.calls[1][0]
  expect(saved).toMatchObject({major:null,share_year:false,share_interests:true,share_residence_status:false,share_avatar:false,year:'Graduate',interests:['Listening to Music']})
  rerender(<Profile profile={saved} onSave={save}/> )
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}))
- expect(screen.getByRole('checkbox',{name:/interests/})).toBeChecked()
- fireEvent.click(screen.getByRole('checkbox',{name:/interests/}))
+ expect(screen.getByRole('switch',{name:/interests/})).toBeChecked()
+ fireEvent.click(screen.getByRole('switch',{name:/interests/}))
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await screen.findByRole('button',{name:'Edit profile'})
  expect(save.mock.calls[2][0]).toMatchObject({share_interests:false,interests:['Listening to Music']})
@@ -81,7 +81,7 @@ test('canonical mutual DM choices and independent group consent retain failed dr
  fireEvent.change(preference(),{target:{value:'friends_only'}});fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
  fireEvent.click(screen.getByRole('button',{name:'Edit profile'}));expect(preference()).toHaveValue('eligible_students')
  fireEvent.change(preference(),{target:{value:'no_one'}})
- const consent=()=>screen.getByRole('checkbox',{name:'Allow group additions'})
+ const consent=()=>screen.getByRole('switch',{name:'Allow group additions'})
  expect(consent()).toBeChecked();fireEvent.click(consent())
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}));await screen.findByRole('alert');expect(preference()).toHaveValue('no_one');expect(consent()).not.toBeChecked()
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}));await screen.findByRole('button',{name:'Edit profile'})

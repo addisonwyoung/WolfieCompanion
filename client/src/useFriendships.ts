@@ -62,7 +62,8 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
     if (!userId) return
     const refreshOnFocus = () => refresh()
     window.addEventListener('focus', refreshOnFocus)
-    if (typeof client.channel !== 'function') return () => window.removeEventListener('focus', refreshOnFocus)
+    window.addEventListener('student-communication-settings-changed', refreshOnFocus)
+    if (typeof client.channel !== 'function') return () => { window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('student-communication-settings-changed', refreshOnFocus) }
     const channel = client.channel(`friend-state-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'friend_requests' }, payload => {
         const row = (payload.new ?? payload.old) as Record<string, unknown>
@@ -72,7 +73,7 @@ export function useFriendships(api: FriendApi, client: SupabaseClient, userId: s
         const row = (payload.new ?? payload.old) as Record<string, unknown>
         if (row.user_id === userId || row.friend_id === userId) refresh()
       }).subscribe()
-    return () => { window.removeEventListener('focus', refreshOnFocus); void client.removeChannel(channel) }
+    return () => { window.removeEventListener('focus', refreshOnFocus); window.removeEventListener('student-communication-settings-changed', refreshOnFocus); void client.removeChannel(channel) }
   }, [client, userId, refresh])
   const incomingCount = visibleInbox.data.length
   async function act(id: string, operation: () => Promise<void>, confirmed?: () => void) {

@@ -24,6 +24,10 @@ function cleanInterestDraft(interests: string[]) {
   return [...new Map(interests.map(interest => interest.trim()).filter(interest => interest && catalogInterests.has(interest.toLowerCase())).map(interest => [interest.toLowerCase(), interest])).values()]
 }
 
+function ProfileToggle({ label, checked, onChange, disabled, describedBy }: { label: string; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean; describedBy?: string }) {
+  return <label className="profile-toggle"><span>{label}</span><span className="profile-toggle-control"><span aria-hidden="true" className="profile-toggle-state">{checked ? 'On' : 'Off'}</span><input type="checkbox" role="switch" checked={checked} disabled={disabled} aria-describedby={describedBy} onChange={event => onChange(event.target.checked)} /><span className="profile-toggle-track" aria-hidden="true" /></span></label>
+}
+
 export default function Profile({ profile, onSave, pictureUrl }: { profile: StudentProfile; onSave: (profile: StudentProfile, picture?: PictureChange) => Promise<void>; pictureUrl?: (path: string) => Promise<string> }) {
   const [editing, setEditing] = useState(false)
   const expandedPanel = useExpandedScroll<HTMLFormElement>(editing)
@@ -31,6 +35,7 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
   const [interestSearch, setInterestSearch] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [remove, setRemove] = useState(false)
   const [preview, setPreview] = useState('')
@@ -52,7 +57,7 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
     return () => { clearTimeout(timer); URL.revokeObjectURL(url) }
   }, [file])
   function beginEdit() {
-    setDraft({ ...profile, interests: cleanInterestDraft(profile.interests) }); setInterestSearch(''); setFile(null); setRemove(false); setError(''); setEditing(true)
+    setDraft({ ...profile, interests: cleanInterestDraft(profile.interests) }); setInterestSearch(''); setFile(null); setRemove(false); setError(''); setSaved(false); setEditing(true)
   }
   function closeEditor() { setEditing(false); setInterestSearch(''); setFile(null); setRemove(false); requestAnimationFrame(() => editButton.current?.focus()) }
   function toggleInterest(interest: string) {
@@ -70,7 +75,7 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
     let next: StudentProfile
     try { next = normalizeProfile(draft) } catch (error) { setError((error as Error).message); nameInput.current?.focus(); return }
     saving.current = true; setBusy(true)
-    try { await onSave(next, { file: file ?? undefined, remove }); closeEditor() }
+    try { await onSave(next, { file: file ?? undefined, remove }); setSaved(true); closeEditor() }
     catch (error) { setError(error instanceof Error ? error.message : 'Unable to save. Please retry.') }
     finally { saving.current = false; setBusy(false) }
   }
@@ -78,9 +83,9 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
   const selectedCount = draft.interests.length
   const normalizedSearch = interestSearch.trim().toLowerCase()
   return <section className="panel profile" aria-labelledby="profile-heading">
-    <div className="section-top"><h2 id="profile-heading">Your profile</h2></div>
+    <div className="section-top profile-header"><h2 id="profile-heading">Your profile</h2><span className="profile-visibility-badge" role="status" aria-label="Profile visibility">{typeof profile.is_private !== 'boolean' ? 'Unavailable' : profile.is_private ? 'Private' : 'Public'}</span><span className="profile-save-status" role="status" aria-label="Profile save status">{saved ? 'Profile saved.' : ''}</span></div>
     <div className="profile-identity"><Avatar name={profile.name} url={avatarUrl} /><h3>{profile.name}</h3><p className="muted">A little about you. A place to connect.</p></div>
-    {editing ? <form ref={expandedPanel} onSubmit={save}>
+    {editing ? <form ref={expandedPanel} onSubmit={save} aria-busy={busy}>
       <fieldset disabled={busy}>
         <legend className="eyebrow">Make it your own</legend>
         <label htmlFor="name">Name</label><input id="name" ref={nameInput} autoFocus maxLength={100} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} aria-describedby="profile-error" />
@@ -108,20 +113,22 @@ export default function Profile({ profile, onSave, pictureUrl }: { profile: Stud
           {normalizedSearch && interestCategories.every(category => category.interests.every(interest => !interest.toLowerCase().includes(normalizedSearch))) && <p className="field-help">No listed interests match your search. Clear the search to browse categories.</p>}
         </div>
         <p className="field-help">Profile visibility controls general discovery. Choose which additional details to share with authorized students. Courses are self-reported.</p>
-        {([['share_year', 'year of study'], ['share_interests', 'interests'], ['share_residence_status', 'residence status'], ['share_avatar', 'profile picture']] as const).map(([key, label]) => <label className="sharing-choice" key={key}><input type="checkbox" checked={draft[key] === true} onChange={e => setDraft({ ...draft, [key]: e.target.checked })} /> Share my {label} with classmates</label>)}
+        {([['share_year', 'year of study'], ['share_interests', 'interests'], ['share_residence_status', 'residence status'], ['share_avatar', 'profile picture']] as const).map(([key, label]) => <ProfileToggle key={key} label={`Share my ${label} with classmates`} checked={draft[key] === true} onChange={checked => setDraft({ ...draft, [key]: checked })} />)}
+        <ProfileToggle label="Private Mode" checked={draft.is_private === true} disabled={typeof draft.is_private !== 'boolean'} onChange={checked => setDraft({ ...draft, is_private: checked })} describedBy="private-mode-help" />
+        <p id="private-mode-help" className="field-help">Private Mode hides you from general student search and non-friend classmate discovery. Existing friends and authorized group members may still see your identity. It does not remove friendships, group memberships, past messages or academic features. You can switch back to Public at any time.</p>
         <label htmlFor="dm-permission">Direct messaging</label>
         <select id="dm-permission" value={draft.dm_permission ?? 'eligible_students'} aria-describedby="dm-permission-help" onChange={event => setDraft({ ...draft, dm_permission: event.target.value as DmPermission })}>
           <option value="eligible_students">Eligible students</option><option value="friends_only">Friends only</option><option value="no_one">No one</option>
         </select>
         <p id="dm-permission-help" className="field-help">Both students must permit a DM exchange, including in existing conversations. Eligible students includes authorized classmates, friends, pending-request contacts and established conversations. Friends only requires an accepted friendship. No one prevents sending and receiving new DMs; saved messages remain readable. Blocking overrides these choices.</p>
-        <label className="sharing-choice"><input type="checkbox" checked={draft.allow_group_additions !== false} onChange={event => setDraft({ ...draft, allow_group_additions: event.target.checked })} /> Allow group additions</label>
-        <p className="field-help">Group additions are enabled independently by default. Turning them off prevents future additions without removing existing membership. DM choices do not restrict existing group participation. Previous DM opt-outs now apply to existing DMs too; review both settings.</p>
+        <ProfileToggle label="Allow group additions" checked={draft.allow_group_additions !== false} onChange={checked => setDraft({ ...draft, allow_group_additions: checked })} describedBy="group-additions-help" />
+        <p id="group-additions-help" className="field-help">Group additions are enabled independently by default. Turning them off prevents future additions without removing existing membership. DM choices do not restrict existing group participation. Previous DM opt-outs now apply to existing DMs too; review both settings.</p>
         <label htmlFor="picture">Profile picture (optional)</label><input id="picture" type="file" accept="image/png,image/jpeg" aria-describedby="picture-help profile-error" onChange={e => {
           const next = e.target.files?.[0]; if (!next) return
           if (!['image/png','image/jpeg'].includes(next.type) || !next.size || next.size > 5 * 1024 * 1024) { setError('Choose a nonempty PNG or JPEG up to 5 MiB.'); e.target.value = ''; return }
           setFile(next); setRemove(false); setError('')
         }} />
-        <p id="picture-help" className="field-help">PNG or JPEG, up to 5 MiB. Pictures stay private unless you choose to share them with classmates.</p>
+        <p id="picture-help" className="field-help">PNG or JPEG, up to 5 MiB. Active group-chat members can see your picture within that group. Your optional sharing controls apply to other authorized profile views.</p>
         {file && preview && <img className="picture-preview" src={preview} alt="New profile picture preview" onError={() => { setFile(null); setError('This picture could not be opened. Choose a readable PNG or JPEG.') }} />}
         {(file || profile.avatar_path) && <button type="button" onClick={() => { setFile(null); setRemove(true) }}>Remove picture</button>}
         {remove && <p className="field-help">Your picture will be removed when you save.</p>}

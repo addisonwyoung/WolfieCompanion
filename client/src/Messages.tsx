@@ -1,3 +1,7 @@
+import { SharedGroupWarningBanner, StudentBlockAction } from './StudentPrivacyControls'
+import type { StudentPrivacyApi } from './studentPrivacy'
+import type { StudentPrivacyController } from './useStudentPrivacy'
+import type { ReactNode } from 'react'
 import { readableTimestampTime } from './dateTime'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import GroupPicker from './GroupPicker'
@@ -5,13 +9,12 @@ import GroupMembershipControls from './GroupMembershipControls'
 import { useGroupChat } from './useGroupChat'
 import { conversationKey } from './groupMessaging'
 import type { GroupApi, GroupDetail } from './groupMessaging'
-import type { ReactNode } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MessagingApi, Target } from './messaging'
 import { unreadCount, useMessageNotifications } from './messagingUnread'
 import { useDirectChat, useMessageInbox, useMessagingRefresh } from './useMessaging'
 
-function ChatView({chat,userId,onClose,group,headerActions}:{chat:ReturnType<typeof useDirectChat>;userId:string;onClose:()=>void;group?:GroupDetail|null;headerActions?:ReactNode}){
+function ChatView({chat,userId,onClose,group,headerActions,privacyNotice,settingsPanel}:{chat:ReturnType<typeof useDirectChat>;userId:string;onClose:()=>void;group?:GroupDetail|null;headerActions?:ReactNode;privacyNotice?:ReactNode;settingsPanel?:ReactNode}){
  const {markRead}=useMessageNotifications()
  const heading=useRef<HTMLHeadingElement>(null),history=useRef<HTMLDivElement>(null),nearBottom=useRef(true),oldHeight=useRef<{height:number;top:number}|null>(null),lastSequence=useRef(0)
  const [newMessages,setNewMessages]=useState(false)
@@ -25,12 +28,14 @@ function ChatView({chat,userId,onClose,group,headerActions}:{chat:ReturnType<typ
   lastSequence.current=sequence
  },[chat.messages])
  return <section className="dm-chat" aria-labelledby="dm-chat-heading"><header className="dm-chat-header"><h2 id="dm-chat-heading" tabIndex={-1} ref={heading}>{chat.contact?.name??'Conversation'}</h2>{headerActions}<button onClick={onClose}>Back to conversations</button></header>
+  {privacyNotice}
+  {settingsPanel}
   {chat.loading&&<p role="status">Loading chat…</p>}
   {chat.contact===null&&<p role="status">This contact is unavailable.</p>}
   {chat.error&&<div role="alert"><p>{chat.error}</p>{chat.attempt?.status!=='failed'&&<button onClick={chat.retry}>Retry chat</button>}</div>}
   <div ref={history} className="dm-history" role="region" aria-label="Message history" tabIndex={0} onScroll={()=>{const node=history.current!;nearBottom.current=node.scrollHeight-node.scrollTop-node.clientHeight<60;if(nearBottom.current){setNewMessages(false);markVisible()}}}>
    {chat.more&&<button disabled={chat.paging} onClick={()=>{const node=history.current!;oldHeight.current={height:node.scrollHeight,top:node.scrollTop};void chat.loadOlder().then(loaded=>{if(!loaded)oldHeight.current=null})}}>{chat.paging?'Loading older…':'Load older messages'}</button>}
-   {!chat.loading&&chat.contact&&chat.messages.length===0&&<p>{group&&group.joined_after_sequence>0?'No messages since you joined. Earlier messages are private.':'No messages yet.'}</p>}
+   {!chat.loading&&chat.contact&&chat.messages.length===0&&(group?<div className="dm-group-empty"><svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 4h14v12H9l-4 4V4Z"/></svg><p>{group.joined_after_sequence>0?'No messages since you joined. Earlier messages are private.':'No messages yet.'}</p><span>Messages shared here will appear in this conversation.</span></div>:<p>No messages yet.</p>)}
    <ol className="dm-message-list">{chat.messages.map(row=><li key={row.id} className={`dm-message ${row.sender_id===userId?'dm-sent':'dm-received'}`}><span className="dm-author">{row.sender_id===userId?'You':row.sender_name??chat.contact?.name??'Other participant'}</span><p>{row.body}</p><time dateTime={row.created_at}>{readableTimestampTime(row.created_at)}</time></li>)}</ol>
   </div>
   {newMessages&&<button className="dm-new-messages" onClick={bottom}>New messages — jump to latest</button>}
@@ -45,16 +50,17 @@ function ChatView({chat,userId,onClose,group,headerActions}:{chat:ReturnType<typ
   </form>}
  </section>
 }
-function DirectChat({api,target,userId,epoch,onSent,onClose}:{api:MessagingApi;target:Target;userId:string;epoch:number;onSent:()=>void;onClose:()=>void}){
+function DirectChat({api,target,userId,epoch,onSent,onClose,privacy}:{api:MessagingApi;target:Target;userId:string;epoch:number;onSent:()=>void;onClose:()=>void;privacy?:StudentPrivacyController}){
  const chat=useDirectChat(api,target,userId,epoch,onSent)
- return <ChatView chat={chat} userId={userId} onClose={onClose}/>
+ return <ChatView chat={chat} userId={userId} onClose={onClose} headerActions={chat.contact&&<StudentBlockAction privacy={privacy} student={target.student} name={chat.contact.name}/>}/>
 }
-function GroupChat({api,id,userId,epoch,onSent,onClose,onLeft}:{api:GroupApi;id:string;userId:string;epoch:number;onSent:()=>void;onClose:()=>void;onLeft:()=>void}){
- const chat=useGroupChat(api,id,userId,epoch,onSent),[adding,setAdding]=useState(false)
+function GroupChat({api,id,userId,epoch,onSent,onClose,onLeft,privacyApi}:{api:GroupApi;id:string;userId:string;epoch:number;onSent:()=>void;onClose:()=>void;onLeft:()=>void;privacyApi?:StudentPrivacyApi}){
+ const chat=useGroupChat(api,id,userId,epoch,onSent),[adding,setAdding]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),settingsButton=useRef<HTMLButtonElement>(null)
  useEffect(()=>{if(!chat.loading&&chat.contact===null)onLeft()},[chat.loading,chat.contact,onLeft])
- return <><ChatView chat={chat} group={chat.detail} userId={userId} onClose={onClose} headerActions={chat.detail&&<div className="group-actions"><details><summary>Members ({chat.detail.members.length})</summary><ul>{chat.detail.members.map(member=><li key={member.student_id}>{member.name}{member.student_id===chat.detail?.creator_id?' - Original creator':''}</li>)}</ul></details>{chat.detail.can_add&&<button disabled={chat.detail.members.length>=50} onClick={()=>setAdding(true)}>Add members</button>}<GroupMembershipControls api={api} group={chat.detail} onChanged={onSent} onLeft={onLeft}/></div>}/>{adding&&chat.detail&&<GroupPicker api={api} group={chat.detail} onClose={()=>setAdding(false)} onDone={()=>{setAdding(false);onSent()}}/>}</>
+ const view=(controls?:ReactNode,notice?:ReactNode,feedback?:ReactNode)=><ChatView chat={chat} group={chat.detail} userId={userId} onClose={onClose} privacyNotice={notice} headerActions={chat.detail&&<div className="group-header-tools"><span className="group-member-count">Members ({chat.detail.members.length})</span><button ref={settingsButton} aria-expanded={settingsOpen} aria-controls={`group-settings-${id}`} onClick={()=>setSettingsOpen(open=>!open)}>Group Settings</button></div>} settingsPanel={chat.detail&&<><section hidden={!settingsOpen} id={`group-settings-${id}`} className="group-settings-panel" aria-labelledby={`group-settings-heading-${id}`}><div className="section-top"><h3 id={`group-settings-heading-${id}`}>Group Settings</h3><button onClick={()=>{setSettingsOpen(false);settingsButton.current?.focus()}}>Close group settings</button></div><section className="group-settings-members" aria-label="Group members"><h4>Members</h4><ul>{chat.detail.members.map(member=><li key={member.student_id}>{member.name}{member.student_id===chat.detail?.creator_id?' - Original creator':''}</li>)}</ul></section>{chat.detail.can_add&&<section className="group-settings-add"><h4>Add Members</h4><p>Add eligible students using the existing student picker.</p><button disabled={chat.detail.members.length>=50} onClick={()=>setAdding(true)}>Add members</button></section>}{controls}</section>{!settingsOpen&&feedback}</>}/>
+ return <>{chat.detail?<GroupMembershipControls api={api} group={chat.detail} onChanged={onSent} onLeft={onLeft}>{(controls,leaveControl,leaveDisabled,feedback)=>view(controls,<SharedGroupWarningBanner api={privacyApi} userId={userId} context="messaging" groupId={chat.detail?.members.some(member=>member.student_id===userId)&&chat.contact?id:null} leaveControl={leaveControl} leaveDisabled={leaveDisabled}/>,feedback)}</GroupMembershipControls>:view()}{adding&&chat.detail&&<GroupPicker api={api} group={chat.detail} onClose={()=>setAdding(false)} onDone={()=>{setAdding(false);onSent()}}/>}</>
 }
-export default function Messages({api,client,userId,initialTarget}:{api:MessagingApi;client?:SupabaseClient;userId:string;initialTarget:Target|null}){
+export default function Messages({api,client,userId,initialTarget,privacy,privacyApi}:{api:MessagingApi;client?:SupabaseClient;userId:string;initialTarget:Target|null;privacy?:StudentPrivacyController;privacyApi?:StudentPrivacyApi}){
  const [target,setTarget]=useState<Target|{group:string}|null>(initialTarget)
  const {counts}=useMessageNotifications()
  const {epoch,refresh}=useMessagingRefresh(client),inbox=useMessageInbox(api,epoch)
@@ -65,5 +71,5 @@ export default function Messages({api,client,userId,initialTarget}:{api:Messagin
   {!inbox.loading&&!inbox.error&&!inbox.rows.length&&<p>No conversations yet. Open a student's profile to send a message.</p>}
   <ul>{inbox.rows.map(row=>{const kind=row.kind??'direct',count=unreadCount(counts,row.conversation_id,kind),selected=target&&('group' in target?kind==='group'&&target.group===row.conversation_id:kind==='direct'&&target.student===row.student_id);return <li key={conversationKey(row.conversation_id,kind)}><button className={count?'dm-conversation-unread':undefined} aria-pressed={!!selected} onClick={()=>{if(kind==='group')setTarget({group:row.conversation_id});else if(row.student_id)setTarget({student:row.student_id})}}><strong>{row.name}{count>0&&<span className="dm-unread-badge" aria-label={`${count} unread messages`}>{count>99?'99+':count}</span>}</strong>{kind==='group'&&<small>Group · {row.member_count} members</small>}<span>{row.preview??'No messages since you joined.'}</span>{row.message_time!==null&&<time dateTime={row.message_time??row.last_message_at}>{readableTimestampTime(row.message_time??row.last_message_at)}</time>}</button></li>})}</ul>
   {inbox.more&&<button disabled={inbox.paging} onClick={()=>void inbox.loadMore()}>{inbox.paging?'Loading…':'Load more conversations'}</button>}
- </aside>{target?('group' in target?(api.groups?<GroupChat key={`${userId}:group:${target.group}`} api={api.groups} id={target.group} userId={userId} epoch={epoch} onSent={refresh} onClose={close} onLeft={()=>{inbox.removeGroup(target.group);refresh();close()}}/>:<p role="status">Group messaging is unavailable.</p>):<DirectChat key={`${userId}:direct:${target.student}:${target.course??''}`} api={api} target={target} userId={userId} epoch={epoch} onSent={refresh} onClose={close}/>):<p className="dm-no-selection">Choose a conversation, or open a profile to start a new one.</p>}</div>{creating&&api.groups&&<GroupPicker api={api.groups} onClose={()=>setCreating(false)} onDone={group=>{setCreating(false);setTarget({group:group.group_id});refresh()}}/>}</section>
+ </aside>{target?('group' in target?(api.groups?<GroupChat key={`${userId}:group:${target.group}`} privacyApi={privacyApi} api={api.groups} id={target.group} userId={userId} epoch={epoch} onSent={refresh} onClose={close} onLeft={()=>{inbox.removeGroup(target.group);refresh();close()}}/>:<p role="status">Group messaging is unavailable.</p>):<DirectChat key={`${userId}:direct:${target.student}:${target.course??''}`} privacy={privacy} api={api} target={target} userId={userId} epoch={epoch} onSent={refresh} onClose={close}/>):<p className="dm-no-selection">Choose a conversation, or open a profile to start a new one.</p>}</div>{creating&&api.groups&&<GroupPicker api={api.groups} onClose={()=>setCreating(false)} onDone={group=>{setCreating(false);setTarget({group:group.group_id});refresh()}}/>}</section>
 }

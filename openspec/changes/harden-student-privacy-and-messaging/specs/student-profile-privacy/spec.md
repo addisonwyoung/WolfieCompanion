@@ -58,7 +58,7 @@ Student search SHALL return only authorized identity and owner-shared optional f
 - **THEN** active co-members can see the student's name, picture and basic identity only in that authorized group context, without making the profile searchable or exposing full-profile fields, email or schedules
 
 ### Requirement: Private blocking management and safe admission explanations
-Profile Block/Unblock actions and Blocked Students settings SHALL expose only the viewer's own directed blocks and retain management access to hidden targets without granting general profile access. Group and Study invitation candidates and failed operations SHALL NOT disclose whether another student's privacy setting, block relationship or another authorization restriction caused unavailability. Private shared-group warnings SHALL be scoped to the blocker and their authorized active/accepted contexts, never included in another member's profile, roster or notification payload.
+Profile Block/Unblock actions and Blocked Students settings SHALL expose only the viewer's own directed blocks and retain management access to hidden targets without granting general profile access. Management labels SHALL be server-captured only from identity legitimately available at initial block creation; otherwise a privacy-safe fallback SHALL be used. Existing blocks without a label SHALL NOT be backfilled from current profiles. Repeated block calls SHALL NOT refresh labels or create a new episode. Unblocking SHALL restore no friendship or permission and SHALL leave reverse blocks effective. Group and Study invitation candidates and failed operations SHALL NOT disclose whether another student's privacy setting, block relationship or another authorization restriction caused unavailability. Private shared-group warnings SHALL be scoped to the blocker and their authorized active/accepted contexts, never included in another member's profile, roster or notification payload.
 
 #### Scenario: Generic failed group addition
 - **WHEN** a selected student cannot be added because of consent, privacy, blocking or account eligibility
@@ -68,9 +68,24 @@ Profile Block/Unblock actions and Blocked Students settings SHALL expose only th
 - **WHEN** a blocker sees a private warning about an authorized co-member
 - **THEN** the warning reveals no unrelated private profile fields and grants neither general discovery nor a DM exception; no block-direction information is returned to other members
 
+#### Scenario: Known hidden identifier cannot reveal an identity
+- **WHEN** a student blocks a known identifier without authorized identity access, or lists a legacy block without an authorized snapshot
+- **THEN** management returns a privacy-safe fallback rather than looking up a hidden name, avatar, email, schedule or full profile
+
+#### Scenario: Authorized label remains a management snapshot
+- **WHEN** a legitimately labelled block continues while the target changes name or privacy or the blocker repeats the block call
+- **THEN** the saved creation-time label is not refreshed from current private data, and it grants no profile or DM authority
+
 ### Requirement: Verified Study invitation is contextual consent
 A legitimately issued unexpired Study invitation SHALL remain acceptable after recipient privacy/friendship changes, subject to eligibility, exact offering and original-inviter blocks. It SHALL NOT authorize general discovery, profiles, DMs or renewal after expiry. Newly issued invitations SHALL still enforce current private-friend visibility.
 
 #### Scenario: Expired invitation to a now-private non-friend
 - **WHEN** an inviter attempts fresh issuance to a now-private non-friend using an expired invitation or copied UUID
 - **THEN** current visibility authorization denies the operation generically
+
+### Requirement: Reversible private-mode settings integration
+Students SHALL be able to change their own public/private setting through accessible account/privacy controls. Onboarding SHALL explain the public default and voluntary private mode. Notices SHALL explain retained friendship/context identity, group-picture visibility and historical contributions without claiming private mode disables academic participation. Privacy saves SHALL preserve independent DM/group-addition and per-field sharing settings, retain confirmed state on failure and invalidate affected discovery/profile/relationship caches. Account/context changes SHALL discard obsolete private responses and warning state.
+
+#### Scenario: Private mode save and account replacement
+- **WHEN** a student switches private mode or a save fails, then the active account changes while a response is outstanding
+- **THEN** only a successful authorized save updates confirmed settings, independent preferences remain unchanged, and the old account's cached identities, block labels and warnings are not shown to the replacement account

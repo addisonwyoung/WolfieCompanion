@@ -514,3 +514,66 @@ button.academic-destructive:hover { background: #861a2a; }
 @media (prefers-reduced-motion: reduce) {
   .header-chevron { transition: none; }
 }
+
+/* Profile booleans retain native keyboard and form behavior beneath the switch. */
+.profile .profile-toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 48px; margin: 12px 0 0; padding: 10px 0; border-bottom: 1px solid #ededee; cursor: pointer; line-height: 1.45; }
+.profile-toggle > span:first-child { min-width: 0; }
+.profile-toggle-control { position: relative; display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; min-height: 28px; }
+.profile-toggle-state { min-width: 22px; font-size: 11px; color: #65656e; font-weight: 500; }
+.profile .profile-toggle input { position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 1; width: 44px; height: 28px; min-height: 0; padding: 0; margin: 0; opacity: 0; cursor: pointer; }
+.profile-toggle-track { display: block; position: relative; width: 44px; height: 26px; border: 1px solid #94949e; border-radius: 20px; background: #e2e2e6; transition: background .15s; }
+.profile-toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #25252a33; transition: transform .15s; }
+.profile-toggle input:checked + .profile-toggle-track { background: #a82032; border-color: #a82032; }
+.profile-toggle input:checked + .profile-toggle-track::after { transform: translateX(18px); }
+.profile-toggle input:focus-visible + .profile-toggle-track { outline: 3px solid #2466b0; outline-offset: 4px; }
+.profile-toggle:has(input:disabled) { cursor: not-allowed; }
+.profile-toggle input:disabled { cursor: not-allowed; }
+.profile-toggle:has(input:disabled) .profile-toggle-control { opacity: .55; }
+.group-actions { align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #e2e2e4; border-radius: 9px; background: #fafafa; min-width: 0; }
+.group-actions summary { font-size: 12px; font-weight: 600; }
+.group-actions > button, .group-membership-controls button { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+.group-membership-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.group-membership-controls > p { font-size: 11px; color: #65656e; }
+.group-membership-controls > label, .group-membership-controls > label select { margin: 0; }
+.group-membership-controls > label select { width: auto; min-height: 36px; font-size: 12px; padding: 5px 8px; }
+@media (max-width: 600px) {
+  .dm-chat-header .group-actions { flex-basis: 100%; }
+  .group-membership-controls { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .profile-toggle-track, .profile-toggle-track::after { transition: none; } }
+@media (forced-colors: active) {
+  .profile-toggle-track { border-color: ButtonText; }
+  .profile-toggle input:checked + .profile-toggle-track { background: Highlight; border-color: Highlight; }
+  .profile-toggle-track::after { background: ButtonText; }
+  .profile-toggle input:checked + .profile-toggle-track::after { background: HighlightText; }
+}
+
+.profile-header { justify-content: flex-start; flex-wrap: wrap; gap: 8px 10px; }
+.profile-visibility-badge { display: inline-flex; align-items: center; padding: 3px 9px; border: 1px solid #ead6da; border-radius: 20px; background: #fcf1f1; color: #962333; font-size: 11px; font-weight: 600; line-height: 1.5; }
+.profile-save-status { margin-left: auto; color: #65656e; font-size: 11px; }
+
+.group-header-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.group-member-count { font-size: 12px; color: #65656e; }
+.group-header-tools button, .group-settings-panel button { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+.group-settings-panel { margin: 14px 0; padding: 18px; border: 1px solid #e2e2e4; border-radius: 10px; background: #fafafa; }
+.group-settings-panel h3 { font-size: 16px; }
+.group-settings-panel h4 { color: #50505a; font-size: 12px; margin: 0 0 8px; }
+.group-settings-panel p { font-size: 12px; color: #65656e; line-height: 1.6; }
+.group-settings-panel > section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e2e4; }
+.group-settings-members ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.group-settings-members li { font-size: 12px; background: #fff; border: 1px solid #e2e2e4; border-radius: 6px; padding: 5px 9px; }
+.group-settings-add button { margin-top: 8px; }
+.group-membership-controls { display: block; width: 100%; }
+.group-policy-settings, .group-leave-settings { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e2e4; }
+.group-policy-settings label { margin: 10px 0 6px; }
+.group-policy-settings label select { display: block; width: 100%; max-width: 280px; margin-top: 6px; font-size: 12px; min-height: 36px; }
+.group-leave-settings > button { color: #962333; border-color: #dcb8bf; }
+.group-leave-settings p { margin-top: 8px; font-size: 11px; }
+.dm-group-empty { display: grid; justify-items: center; gap: 8px; margin: 24px auto; padding: 24px 18px; max-width: 440px; border: 1px dashed #e2d5d8; border-radius: 10px; background: #fcf9f9; text-align: center; }
+.dm-group-empty svg { color: #a82032; }
+.dm-group-empty p { font-size: 14px; font-weight: 600; color: #55505a; }
+.dm-group-empty span { font-size: 12px; color: #74747d; }
+@media (max-width: 600px) { .group-header-tools { flex-basis: 100%; } .group-settings-panel { padding: 14px; } .group-settings-panel .section-top { align-items: flex-start; flex-wrap: wrap; } }
+
+.group-membership-feedback { margin-top: 12px; padding: 12px; border: 1px solid #e4bec5; border-radius: 8px; background: #fcf1f1; font-size: 12px; }
+.group-membership-feedback button { min-height: 36px; padding: 6px 10px; font-size: 12px; margin: 8px 6px 0 0; }

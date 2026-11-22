@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import MessageProfileAction from './MessageProfileAction'
 import type { MessagingApi, Target } from './messaging'
 import { Avatar, Interests } from './Profile'
+import { StudentBlockAction } from './StudentPrivacyControls'
+import type { StudentPrivacyController } from './useStudentPrivacy'
 import type { FriendApi, FriendStudent } from './friendshipApi'
 
-export default function FriendProfileDialog({ api, student, onClose, messaging, onMessage }: { api: FriendApi; student: string; onClose: () => void; messaging?: MessagingApi; onMessage?: (target: Target) => void }) {
+export default function FriendProfileDialog({ api, student, onClose, messaging, onMessage, privacy }: { api: FriendApi; student: string; onClose: () => void; messaging?: MessagingApi; onMessage?: (target: Target) => void; privacy?: StudentPrivacyController }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [loadedProfile, setLoadedProfile] = useState<{ key: string; value: FriendStudent | null } | null>(null)
   const [failedKey, setFailedKey] = useState<string | null>(null)
@@ -47,6 +49,7 @@ export default function FriendProfileDialog({ api, student, onClose, messaging, 
         {'residence_status' in profile && <><dt>Residence</dt><dd>{profile.residence_status === 'commuter' ? 'Commuter' : profile.residence_status === 'dormer' ? 'Dormer' : 'Not added'}</dd></>}
       </dl>{'interests' in profile && <><h4>Interests</h4><Interests interests={profile.interests ?? []} /></>}
       {messaging && onMessage && <MessageProfileAction api={messaging} target={{ student }} onMessage={onMessage} />}
+      <StudentBlockAction privacy={privacy} student={student} name={profile.name} onBlocked={onClose} />
       <p className="field-help">Only details this student has chosen to share appear here.</p></>}
   </dialog>
 }

@@ -52,23 +52,43 @@ Blocking SHALL preserve existing study/group memberships, authorized shared-grou
 - **THEN** shared membership and authorized interaction remain available subject to ordinary group-send eligibility, while direct communication and direct actor-target invitations remain restricted; an independent third party can admit either student if all other checks pass
 
 ### Requirement: Private shared-group block warnings and controls
-Eligible students SHALL have Block/Unblock actions in authorized profile interfaces and owner-only Blocked Students management that reuses existing blocking semantics and remains available after targets become hidden. In active group chats and accepted Study Buddies membership, only a viewer who initiated a block SHALL receive a warning about that blocked co-member through the notification interface and a dismissible group-view banner with a voluntary leave action. Non-blockers, unrelated members and pending Study invitees SHALL NOT receive that warning or block-direction metadata. Warnings SHALL be deduplicated by viewer, group, blocked student and block episode. Repeated polling/reconnect within that episode SHALL NOT duplicate delivery; a new block episode or membership episode SHALL allow reappearance. Dismissal SHALL NOT unblock anyone or change membership.
+Eligible students SHALL have Block/Unblock actions in authorized profile interfaces and owner-only Blocked Students management reusing existing blocking semantics and remaining available after targets become hidden. Only an eligible outgoing blocker sharing active messaging membership or accepted Study membership with the blocked student SHALL retrieve or dismiss contextual warnings. Warnings SHALL use dismissible inline banners with voluntary leave actions, not modals or notification delivery. A minimal private current-state table SHALL persist dismissal for the outgoing block and both current membership episodes. A new outgoing block or either participant's new membership episode SHALL rearm a fresh warning identifier. Dismissal SHALL NOT change blocks, membership or communication authorization. Pending Study invitees, blocked targets and other members SHALL NOT learn warning data or block direction through RPCs, tables, events, shared payloads or stale client state.
 
 #### Scenario: Independent third party admits a blocked pair
 - **WHEN** Sally independently adds or invites Alice and Bob with valid actor-target authorization and Alice has blocked Bob
-- **THEN** permitted co-membership succeeds, only Alice receives her private warning after active/accepted membership, and Sally and Bob receive no blocking warning or direction disclosure; Alice and Bob still cannot DM each other
+- **THEN** permitted co-membership succeeds, only Alice receives her private banner after both are active/accepted co-members, and Sally and Bob receive no warning or direction disclosure; Alice and Bob still cannot DM each other
 
-#### Scenario: Repeat refresh and private dismissal
-- **WHEN** Alice acknowledges or dismisses that shared-context warning and the client refreshes or reconnects with the same membership and block relationship
-- **THEN** no repeated notification is produced, Bob cannot read or acknowledge Alice's warning, and dismissal does not remove the block or leave the group
+#### Scenario: Persisted contextual dismissal
+- **WHEN** Alice dismisses a warning and refreshes, reconnects or logs in again with the same block and both membership episodes
+- **THEN** the banner remains dismissed, including after duplicate block calls, settings edits or Study owner transfer; dismissal neither unblocks Bob nor leaves the group
 
-#### Scenario: Same blocked relationship across multiple groups
-- **WHEN** Alice and Bob share multiple authorized group contexts while Alice's block remains in effect
-- **THEN** the notification interface deduplicates each group/block episode for Alice, contextual private banners remain available and may reappear on a new block or membership episode, and other members receive no blocking metadata
+#### Scenario: Independent shared contexts
+- **WHEN** Alice and Bob share multiple authorized group contexts while Alice's outgoing block continues
+- **THEN** each context has independently persisted warning dismissal with no bell item, academic reminder, message unread increment or peer-readable warning count
+
+#### Scenario: Either membership or outgoing block episode restarts
+- **WHEN** Alice unblocks then blocks Bob again, or either Alice or Bob leaves and later rejoins the shared context
+- **THEN** cascading parent deletion invalidates the old warning state and the next authorized retrieval creates a fresh warning identifier, even if a timestamp or sequence floor repeats
+
+#### Scenario: Old or forged dismissal identifier
+- **WHEN** a caller submits a foreign, missing or previous-episode warning identifier, including a delayed dismissal racing with rejoining
+- **THEN** the operation returns a safe generic/no-op outcome without revealing existence and cannot dismiss a replacement warning or change any block/membership
+
+#### Scenario: Pending invitation does not authorize warnings
+- **WHEN** either Study participant is pending, expired or unverifiable, including a pending row retained or replaced by fresh invitation issuance
+- **THEN** no contextual warning can be retrieved or dismissed through that membership key; first accepted co-membership enables a warning without exposing pending identities
+
+#### Scenario: Group deletion and final departure
+- **WHEN** a Study group is deleted or the final messaging member leaves
+- **THEN** warning state is removed through membership cascades, no abandoned context is retrievable, and retained messaging history follows existing authorization
+
+#### Scenario: Concurrent warning initialization and relationship change
+- **WHEN** retrieval or dismissal races with another retrieval, unblock, departure or rejoining
+- **THEN** group-before-pair serialization and post-lock checks retain at most one current state per context/blocked student, preserve a continuing dismissal and prevent stale identifiers from affecting a new episode
 
 #### Scenario: Unblock a hidden student
-- **WHEN** an eligible blocker opens Blocked Students after the target is no longer generally discoverable
-- **THEN** they can remove only their own block without restoring friendship, erasing a reverse block or notifying the target
+- **WHEN** an eligible blocker opens Blocked Students after the target becomes hidden
+- **THEN** only the block-creation-time authorized label or a privacy-safe fallback is shown, and they can remove only their own block without restoring friendship, erasing a reverse block or notifying the target
 
 ### Requirement: Authoritative boundaries and safe revocation
 Current and retained legacy RPCs, direct lookups, table policies, service-role picture delivery, inbox/unread projections and event delivery SHALL enforce their approved audience. Message writes SHALL remain protected from direct-table bypass. Revocation and mutations SHALL use a consistent serialized authorization order. An exact replay of a committed attempt SHALL NOT create a new message; uncommitted retries SHALL require current authorization. Account changes and revocation refresh SHALL prevent obsolete private state or automatic draft delivery.

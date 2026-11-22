@@ -6,6 +6,7 @@ export const years = ['First year', 'Second year', 'Third year', 'Fourth year', 
 export const dmPermissions = ['eligible_students', 'friends_only', 'no_one'] as const
 export type DmPermission = typeof dmPermissions[number]
 export interface StudentProfile {
+  is_private: boolean
   dm_permission?: DmPermission
   allow_group_additions?: boolean
   // Read-only legacy column retained by the database; never send it in an update.
@@ -33,6 +34,7 @@ export function duplicateCourseCode(rows: Pick<ClassRow, 'code'>[], existingCode
   return null
 }
 export function normalizeProfile(profile: StudentProfile): StudentProfile {
+  if (typeof profile.is_private !== 'boolean') throw new Error('Privacy settings are unavailable. Reload your account before saving.')
   const interests = [...new Map(profile.interests.map(s => s.trim()).filter(Boolean).map(s => [s.toLowerCase(), s])).values()]
   const next = { ...profile, dm_permission: profile.dm_permission ?? 'eligible_students', allow_group_additions: profile.allow_group_additions ?? true, share_year: profile.share_year === true, share_interests: profile.share_interests === true, share_residence_status: profile.share_residence_status === true, share_avatar: profile.share_avatar === true, name: profile.name.trim(), major: profile.major?.trim() || null, interests }
   if (!dmPermissions.includes(next.dm_permission) || typeof next.allow_group_additions !== 'boolean') throw new Error('Choose a valid messaging preference.')
@@ -83,6 +85,7 @@ export function accountApi(client: SupabaseClient) {
           grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
         }
       }
+      if (typeof (p.data as StudentProfile).is_private !== 'boolean') throw new Error('Privacy settings are unavailable. Reload your account before saving.')
       return { profile: p.data as StudentProfile, courses: [...grouped.values()], plannerCourses: (planner.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
     },
     async saveClasses(rows: ClassRow[]): Promise<{ courses: SavedCourse[]; plannerCourses: SavedCourse[] }> {
@@ -108,29 +111,48 @@ export function accountApi(client: SupabaseClient) {
       const plannerCourses: SavedCourse[] = (planner ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() }))
       return { courses: [...grouped.values()], plannerCourses }
     },
-    async saveProfile(profile: StudentProfile, picture: PictureChange = {}) {
+    async saveProfile(profile: StudentProfile, picture: PictureChange = {}, isCurrent: () => boolean = () => true) {
       const next = normalizeProfile(profile)
+      function assertCurrent() { if (!isCurrent()) throw new Error('Your session changed. Reload before saving your profile.') }
+      async function currentSession() {
+        assertCurrent()
+        const { data: { session }, error } = await client.auth.getSession()
+        assertCurrent()
+        if (error || !session || session.user.id !== next.id) throw new Error('Sign in again before saving your profile.')
+        return session
+      }
+      async function cleanupWhenCurrent(path: string): Promise<string | null> {
+        // Never start cleanup in a replacement session. An already completed
+        // upload may remain unreferenced; cancellation is not server rollback.
+        try { await currentSession() } catch { return null }
+        if (!isCurrent()) return null
+        try { await removeObject(path); return null } catch { return isCurrent() ? path : null }
+      }
+      const session = await currentSession()
+      assertCurrent()
       let uploaded: string | null = null
       if (picture.file) {
         if (!['image/png', 'image/jpeg'].includes(picture.file.type) || !picture.file.size || picture.file.size > 5 * 1024 * 1024) throw new Error('Choose a nonempty PNG or JPEG up to 5 MiB.')
-        const { data: { session } } = await client.auth.getSession()
-        if (!session) throw new Error('Sign in again before saving.')
         const response = await fetch('/api/avatar', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': picture.file.type }, body: picture.file })
         const result = await response.json()
+        assertCurrent()
         if (!response.ok) throw new Error(result.error || 'Picture upload failed. Please retry.')
         uploaded = result.path; next.avatar_path = uploaded
       } else if (picture.remove) next.avatar_path = null
-      const { data, error } = await client.from('profiles').update({ name: next.name, major: next.major, year: next.year, interests: next.interests, residence_status: next.residence_status, avatar_path: next.avatar_path, share_year: next.share_year, share_interests: next.share_interests, share_residence_status: next.share_residence_status, share_avatar: next.share_avatar, dm_permission: next.dm_permission, allow_group_additions: next.allow_group_additions }).eq('id', next.id).select().single()
+      const commitSession = await currentSession()
+      assertCurrent()
+      const { data, error } = await client.from('profiles').update({ name: next.name, major: next.major, year: next.year, interests: next.interests, residence_status: next.residence_status, avatar_path: next.avatar_path, share_year: next.share_year, share_interests: next.share_interests, share_residence_status: next.share_residence_status, share_avatar: next.share_avatar, dm_permission: next.dm_permission, allow_group_additions: next.allow_group_additions, is_private: next.is_private }).eq('id', next.id).select().setHeader('Authorization', `Bearer ${commitSession.access_token}`).single()
       if (error) {
         let cleanupPath: string | null = null
-        if (uploaded) { try { await removeObject(uploaded) } catch { cleanupPath = uploaded } }
+        if (uploaded) cleanupPath = await cleanupWhenCurrent(uploaded)
         const failure = new Error(error.code === 'PDM01' ? 'Refresh the application to update messaging preferences. Your draft has not been saved.' : 'Profile could not be saved. Your draft is still here; please retry.') as Error & { cleanupPath?: string }
         if (cleanupPath) failure.cleanupPath = cleanupPath
         throw failure
       }
+      if (!data || typeof (data as StudentProfile).is_private !== 'boolean') throw new Error('Profile save could not be verified. Reload your account to confirm your privacy settings.')
       let cleanupPath: string | null = null
       if (profile.avatar_path && profile.avatar_path !== next.avatar_path) {
-        try { await removeObject(profile.avatar_path) } catch { cleanupPath = profile.avatar_path }
+        cleanupPath = await cleanupWhenCurrent(profile.avatar_path)
       }
       return { profile: data as StudentProfile, cleanupPath }
     },

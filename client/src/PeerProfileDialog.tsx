@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import MessageProfileAction from './MessageProfileAction'
 import type { MessagingApi, Target } from './messaging'
 import { Avatar, Interests } from './Profile'
+import { StudentBlockAction } from './StudentPrivacyControls'
+import type { StudentPrivacyController } from './useStudentPrivacy'
 import type { ClassmateProfile as Peer, PeerApi } from './classmateProfile'
 
-type Props = { api: PeerApi; course: string; section: string; professorFirstName: string; professorLastName: string; student: string; onClose: () => void; messaging?: MessagingApi; onMessage?: (target: Target) => void }
-function ProfileDialog({ api, course, section, professorFirstName, professorLastName, student, onClose, messaging, onMessage }: Props) {
+type Props = { api: PeerApi; course: string; section: string; professorFirstName: string; professorLastName: string; student: string; onClose: () => void; messaging?: MessagingApi; onMessage?: (target: Target) => void; privacy?: StudentPrivacyController }
+function ProfileDialog({ api, course, section, professorFirstName, professorLastName, student, onClose, messaging, onMessage, privacy }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState<{ status: 'success' | 'error' | 'unavailable'; profile?: Peer } | null>(null)
@@ -52,6 +54,7 @@ function ProfileDialog({ api, course, section, professorFirstName, professorLast
       </dl>
       {'interests' in peer && <><h4>Interests</h4><Interests interests={peer.interests ?? []} /></>}
       {messaging && onMessage && <MessageProfileAction api={messaging} target={{ student, course }} onMessage={onMessage} />}
+      <StudentBlockAction privacy={privacy} student={student} name={peer.name} onBlocked={onClose} />
       <p className="field-help">Only details this student has chosen to share appear here.</p>
     </>}
   </dialog>

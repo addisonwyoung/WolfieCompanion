@@ -4,7 +4,7 @@ import type { StudentProfile } from '../src/account'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const profile = (overrides: Partial<StudentProfile> = {}): StudentProfile => ({
-  id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: ['Music', 'Hiking'], residence_status: 'dormer', avatar_path: null,
+  id: 'caller', name: 'Caller', major: 'Computer Science', year: 'Third year', interests: ['Music', 'Hiking'], residence_status: 'dormer', is_private:false,avatar_path: null,
   share_year: true, share_interests: true, share_residence_status: true, ...overrides,
 })
 const candidate = (overrides: Record<string, unknown> = {}) => ({

@@ -2,16 +2,17 @@ import { expect, test, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { accountApi, duplicateCourseCode } from '../src/account'
 import type { StudentProfile } from '../src/account'
-const profile:StudentProfile={id:'a',name:'Ada',major:null,year:null,interests:[],residence_status:null,avatar_path:'a/old.png'}
+const profile:StudentProfile={id:'a',name:'Ada',major:null,year:null,interests:[],residence_status:null,is_private:false,avatar_path:'a/old.png'}
 test('course-code duplicate check ignores section and professor and normalizes spacing/case',()=>{
  expect(duplicateCourseCode([{code:'cse416'}],['CSE 416'])).toBe('CSE 416')
  expect(duplicateCourseCode([{code:'BIO201'},{code:'bio 201'}])).toBe('BIO 201')
  expect(duplicateCourseCode([{code:'CSE 416'}],['BIO 201'])).toBeNull()
 })
 function fake(){
- const remove=vi.fn().mockResolvedValue({error:null});const single=vi.fn().mockResolvedValue({data:{...profile,avatar_path:null},error:null});const update=vi.fn(()=>({eq:()=>({select:()=>({single})})}));const rpc=vi.fn().mockResolvedValue({data:[],error:null})
- const client={storage:{from:()=>({remove,createSignedUrl:vi.fn().mockResolvedValue({data:{signedUrl:'private-url'},error:null})})},auth:{getSession:async()=>({data:{session:{access_token:'token'}}})},from:()=>({update,select:()=>({order:async()=>({data:[],error:null})})}),rpc} as unknown as SupabaseClient
- return {api:accountApi(client),remove,single,update,rpc}
+ const remove=vi.fn().mockResolvedValue({error:null});const single=vi.fn().mockResolvedValue({data:{...profile,avatar_path:null},error:null});const update=vi.fn(()=>({eq:()=>({select:()=>({single,setHeader:()=>({single})})})}));const rpc=vi.fn().mockResolvedValue({data:[],error:null})
+ const getSession=vi.fn(async()=>({data:{session:{user:{id:profile.id},access_token:'token'}}}))
+ const client={storage:{from:()=>({remove,createSignedUrl:vi.fn().mockResolvedValue({data:{signedUrl:'private-url'},error:null})})},auth:{getSession},from:()=>({update,select:()=>({order:async()=>({data:[],error:null})})}),rpc} as unknown as SupabaseClient
+ return {api:accountApi(client),remove,single,update,rpc,getSession}
 }
 test('commit reference before deleting old picture; cleanup failure is retryable',async()=>{
  const f=fake();f.remove.mockResolvedValueOnce({error:new Error('offline')});const r=await f.api.saveProfile(profile,{remove:true});expect(r.profile.avatar_path).toBeNull();expect(r.cleanupPath).toBe('a/old.png');expect(f.single.mock.invocationCallOrder[0]).toBeLessThan(f.remove.mock.invocationCallOrder[0]);await f.api.removeObject(r.cleanupPath!);expect(f.remove).toHaveBeenCalledTimes(2)
@@ -54,4 +55,47 @@ test('invalid canonical settings fail before writing and obsolete-client errors 
  expect(f.update).not.toHaveBeenCalled()
  f.single.mockResolvedValueOnce({data:null,error:{code:'PDM01'}} as never)
  await expect(f.api.saveProfile(profile)).rejects.toThrow('Refresh the application')
+})
+
+test('profile privacy is explicit and server-confirmed without overwriting independent choices',async()=>{
+ const f=fake();f.single.mockResolvedValue({data:{...profile,is_private:true},error:null})
+ const result=await f.api.saveProfile({...profile,is_private:true,dm_permission:'friends_only',allow_group_additions:false,share_year:true})
+ expect(f.update).toHaveBeenCalledWith(expect.objectContaining({is_private:true,dm_permission:'friends_only',allow_group_additions:false,share_year:true}))
+ expect(result.profile.is_private).toBe(true)
+ await expect(f.api.saveProfile({...profile,is_private:undefined} as unknown as StudentProfile)).rejects.toThrow('Privacy settings are unavailable')
+})
+
+test('a save response missing authoritative privacy is a compatibility failure',async()=>{
+ const f=fake();f.single.mockResolvedValue({data:{...profile,is_private:undefined},error:null} as never)
+ await expect(f.api.saveProfile(profile)).rejects.toThrow('Reload your account to confirm')
+})
+
+test('owner privacy loading rejects a missing server flag, and old sessions cannot save another profile',async()=>{
+ const rpc=vi.fn((name:string)=>name==='ensure_profile'?{single:async()=>({data:{...profile,is_private:undefined},error:null})}:Promise.resolve({data:[],error:null}))
+ const client={rpc,storage:{from:()=>({})},from:()=>({select:()=>({order:async()=>({data:[],error:null})})})} as unknown as SupabaseClient
+ await expect(accountApi(client).load()).rejects.toThrow('Privacy settings are unavailable')
+ const f=fake();f.getSession.mockResolvedValue({data:{session:{user:{id:'another-student'},access_token:'other-token'}}})
+ await expect(f.api.saveProfile(profile)).rejects.toThrow('Sign in again')
+ expect(f.update).not.toHaveBeenCalled()
+})
+
+
+test.each(['logout','replacement','generation'])('avatar upload completing after %s cannot dispatch UPDATE or cleanup',async(kind)=>{
+ const f=fake();let resolve!:(value:unknown)=>void,current=true
+ const upload=new Promise(yes=>{resolve=yes}),fetcher=vi.fn(()=>upload);vi.stubGlobal('fetch',fetcher)
+ const save=f.api.saveProfile(profile,{file:new File(['png'],'pic.png',{type:'image/png'})},()=>current)
+ const rejected=expect(save).rejects.toThrow(/session changed|Sign in again/)
+ await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce())
+ if(kind==='generation')current=false
+ else f.getSession.mockResolvedValue({data:{session:kind==='logout'?null:{user:{id:'other'},access_token:'other'}}} as never)
+ resolve({ok:true,json:async()=>({path:'a/new.png'})});await rejected
+ expect(f.update).not.toHaveBeenCalled();expect(f.remove).not.toHaveBeenCalled()
+})
+
+test('session invalidation during the final session check prevents UPDATE',async()=>{
+ const f=fake();let resolve!:(value:unknown)=>void,current=true
+ f.getSession.mockImplementationOnce(async()=>({data:{session:{user:{id:'a'},access_token:'token'}}})).mockImplementationOnce(()=>new Promise(yes=>{resolve=yes}) as never)
+ const save=f.api.saveProfile(profile,{},()=>current),rejected=expect(save).rejects.toThrow('session changed')
+ await vi.waitFor(()=>expect(f.getSession).toHaveBeenCalledTimes(2));current=false
+ resolve({data:{session:{user:{id:'a'},access_token:'token'}}});await rejected;expect(f.update).not.toHaveBeenCalled()
 })

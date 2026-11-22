@@ -73,7 +73,7 @@ export function useAccount(client: SupabaseClient) {
   async function saveProfile(profile: StudentProfile, picture?: PictureChange) {
     const run = generation.current
     try {
-      const result = await api.saveProfile(profile, picture)
+      const result = await api.saveProfile(profile, picture, () => mounted.current && run === generation.current && identity.current === profile.id)
       if (!mounted.current || run !== generation.current) return
       setState(previous => ({ ...previous, profile: result.profile }))
         window.dispatchEvent(new Event('student-communication-settings-changed'))

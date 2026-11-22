@@ -10,10 +10,10 @@ export default function StudyInvitationPicker({api,group,disabled,onInvite}:{api
   void api.candidates(null,group.group_id,search).then(value=>{if(alive){setRows(value);setError('');setLoading(false)}},()=>{if(alive){setError('Classmates are unavailable. Please retry.');setLoading(false)}})
   return()=>{alive=false}
  },[api,group.group_id,search,retry])
- return <section aria-label="Invite additional classmates"><p>{remaining} places available. Invitations require acceptance and expire after 7 days.</p>
+ return <section className="study-additional-picker" aria-label="Invite additional classmates"><div className="study-capacity-note"><span className="study-status-badge">{remaining} places available</span><p>Invitations require acceptance and expire after 7 days. Accepted members and active pending invitations reserve places.</p></div>
   <label>Find classmates in this offering<input value={search} disabled={disabled} maxLength={100} onChange={event=>{setSearch(event.target.value);setLoading(true)}}/></label>
   {loading&&<p role="status">Loading classmates...</p>}{error&&<p role="alert">{error}<button onClick={()=>setRetry(n=>n+1)}>Retry classmates</button></p>}
   <ul className="study-peer-list">{rows.map(row=><li key={row.student_id}><label className="study-peer-choice"><input type="checkbox" disabled={disabled||loading||!selected.includes(row.student_id)&&selected.length>=remaining} checked={selected.includes(row.student_id)} onChange={event=>setSelected(old=>event.target.checked?[...old,row.student_id]:old.filter(id=>id!==row.student_id))}/><span>{row.name}</span></label></li>)}</ul>
-  <button disabled={disabled||loading||!selected.length||selected.length>remaining} onClick={()=>{onInvite([...selected].sort());setSelected([])}}>Send invitations</button>
+  <div className="study-invite-footer"><span>{selected.length} selected</span><button disabled={disabled||loading||!selected.length||selected.length>remaining} onClick={()=>{onInvite([...selected].sort());setSelected([])}}>Send invitations</button></div>
  </section>
 }

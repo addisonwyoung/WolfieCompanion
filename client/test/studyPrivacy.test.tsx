@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SavedCourse } from '../src/account'
@@ -64,4 +64,65 @@ test('old account response cannot open a private invitation in a replacement acc
  let finish!:(rows:StudyGroup[])=>void;const api=apiFixture();vi.mocked(api.list).mockReturnValueOnce(new Promise(resolve=>{finish=resolve}))
  const view=mount(api);view.rerender(<StudyGroups key="replacement" userId={id(8)} courses={[]} api={apiFixture([])} classmatesApi={vi.fn(async()=>[])} onGoToCourses={vi.fn()}/>);finish([pending])
  await waitFor(()=>expect(screen.queryByText('Safe pending invitation')).toBeNull())
+})
+
+
+test('accepted-only roster and independent pending count survive API mapping',async()=>{
+ const rpc=vi.fn().mockResolvedValue({data:[{...group,pending_count:3}],error:null})
+ const rows=await studyGroupApi({rpc} as unknown as SupabaseClient).list()
+ expect(rows[0].members).toHaveLength(2);expect(rows[0].pending_count).toBe(3)
+ expect(rows[0].outgoing_invitations).toEqual([])
+ expect(rpc).toHaveBeenCalledWith('my_study_groups',undefined)
+})
+
+test('cards use authorized pending_count without pending identities and follow refreshed membership data',async()=>{
+ const api=apiFixture([{...group,pending_count:2}]);vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');mount(api)
+ const card=await screen.findByRole('button',{name:/Shared workspace/})
+ expect(card).toHaveTextContent('2 members');expect(card).toHaveTextContent('2 pending')
+ expect(screen.queryByText('Accepted peer')).not.toBeInTheDocument()
+ vi.mocked(api.list).mockResolvedValue([{...group,pending_count:1,members:[...group.members,{user_id:id(3),name:'New member',status:'accepted',role:'member',study_role:null}]}])
+ act(()=>window.dispatchEvent(new Event('student-communication-settings-changed')))
+ await waitFor(()=>expect(card).toHaveTextContent('3 members'));expect(card).toHaveTextContent('1 pending')
+ vi.mocked(api.list).mockResolvedValue([{...group,pending_count:0}])
+ act(()=>window.dispatchEvent(new Event('student-communication-settings-changed')))
+ await waitFor(()=>expect(card).toHaveTextContent('0 pending'));expect(card).toHaveTextContent('2 members')
+})
+
+test('confirmed additional invitation refreshes card pending count without optimistic changes',async()=>{
+ const api=apiFixture();let resolve!:()=>void
+ vi.mocked(api.invite).mockImplementationOnce(()=>new Promise<void>(yes=>{resolve=yes}))
+ mount(api);const card=await screen.findByRole('button',{name:/Shared workspace/});fireEvent.click(card)
+ fireEvent.click(screen.getByText('Invite additional classmates'))
+ const picker=await screen.findByRole('region',{name:'Invite additional classmates'})
+ fireEvent.click(await within(picker).findByRole('checkbox',{name:'Public classmate'}))
+ fireEvent.click(within(picker).getByRole('button',{name:'Send invitations'}))
+ expect(card).toHaveTextContent('0 pending')
+ vi.mocked(api.list).mockResolvedValue([{...group,pending_count:1}]);await act(async()=>resolve())
+ await waitFor(()=>expect(card).toHaveTextContent('1 pending'));expect(card).toHaveTextContent('2 members')
+})
+
+test('received and sent invitation expiration uses month names and omits seconds',async()=>{
+ const expires=new Date(2026,10,28,19,12,38).toISOString()
+ const api=apiFixture([{...pending,expires_at:expires},{...group,pending_count:1,outgoing_invitations:[{student_id:id(3),name:'Known invitee',invitation_id:id(32),expires_at:expires,state:'pending'}]}]);mount(api)
+ expect(await screen.findByText(/Expires November 28, 2026 7:12 PM/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:/Shared workspace/}));fireEvent.click(screen.getByText('Your sent invitations'))
+ expect(screen.getAllByText(/Expires November 28, 2026 7:12 PM/)).toHaveLength(2)
+ expect(screen.queryByText(/7:12:38/)).not.toBeInTheDocument()
+})
+
+
+test('invitation management displays authorized sent rows, states and server-backed capacity',async()=>{
+ const expires='2026-11-28T10:00:00Z'
+ const api=apiFixture([{...group,pending_count:1,outgoing_invitations:[{student_id:id(3),name:'Known pending invitee',invitation_id:id(34),expires_at:expires,state:'pending'},{student_id:id(4),name:'Known expired invitee',invitation_id:id(35),expires_at:expires,state:'expired'}]}]);mount(api)
+ fireEvent.click(await screen.findByRole('button',{name:/Shared workspace/}))
+ expect(screen.getByText('2 accepted members')).toBeInTheDocument();expect(screen.getByText('1 pending invitation')).toBeInTheDocument()
+ fireEvent.click(screen.getByText('Invite additional classmates'))
+ const picker=await screen.findByRole('region',{name:'Invite additional classmates'})
+ expect(within(picker).getByText('5 places available')).toBeVisible();expect(within(picker).getByText(/expire after 7 days/)).toBeVisible()
+ fireEvent.click(screen.getByText('Your sent invitations'))
+ const pendingRow=screen.getByText('Known pending invitee').closest('li')!,expiredRow=screen.getByText('Known expired invitee').closest('li')!
+ expect(pendingRow).toBeVisible();expect(within(pendingRow).getByText('Pending')).toBeVisible();expect(within(pendingRow).getByText(/Expires November/)).toBeVisible()
+ expect(within(expiredRow).getByText('Expired')).toBeVisible()
+ expect(screen.queryByText('Withdraw invitation')).not.toBeInTheDocument()
+ fireEvent.click(screen.getByText('Your sent invitations'));expect(pendingRow).not.toBeVisible()
 })

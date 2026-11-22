@@ -18,7 +18,7 @@ const peer=uid(2),other=uid(3)
 const name=(id:string)=>id===peer?'Classmate Ada':'Friend Grace'
 const state={lost:false,hold:false,release:undefined as undefined|(()=>void),incoming:()=>{},switchAccount:()=>{},seed:()=>{}}
 Object.assign(window,{messagingFixture:state})
-const owner:StudentProfile={id:peer,name:'Classmate Ada',major:'Computer Science',year:null,interests:[],residence_status:null,avatar_path:null}
+const owner:StudentProfile={id:peer,name:'Classmate Ada',major:'Computer Science',year:null,interests:[],residence_status:null,is_private:false,avatar_path:null}
 export function Fixture(){
  const [account,setAccount]=useState(uid(1)),[target,setTarget]=useState<Target|null>(null),[dialog,setDialog]=useState<'friend'|'classmate'|null>(null),[view,setView]=useState('profiles'),[profile,setProfile]=useState<StudentProfile>(()=>({...owner,dm_permission:localStorage.getItem('dm-fixture-open')==='false'?'no_one':'eligible_students'}))
  const api=useMemo<MessagingApi>(()=>{

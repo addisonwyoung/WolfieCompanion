@@ -1,0 +1,38 @@
+.blocked-students { padding: 0; margin-top: 18px; }
+.blocked-students > summary { cursor: pointer; padding: 16px 20px; font-weight: 700; }
+.blocked-students summary h2 { display: inline; font-size: 15px; letter-spacing: -.2px; }
+.blocked-students-summary-hint { float: right; margin-left: 10px; color: #65656e; font-size: 11px; font-weight: 500; }
+.blocked-students[open] > summary { border-bottom: 1px solid #ededee; }
+.blocked-students-content { padding: 16px 20px; }
+.blocked-students-explanation { color: #65656e; font-size: 12px; line-height: 1.6; }
+.blocked-students-empty { margin-top: 14px; padding: 14px; border: 1px dashed #d7d7dc; border-radius: 8px; font-size: 12px; color: #65656e; background: #fafafa; }
+.blocked-students ul { list-style: none; padding: 0; margin: 12px 0 0; }
+.blocked-students ul:empty { display: none; }
+.blocked-students li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid #ededee; font-size: 13px; }
+.blocked-students li:last-child { border-bottom: 0; padding-bottom: 0; }
+.blocked-students li > span { font-weight: 600; }
+.student-block-action { margin-top: .6rem; }
+.student-block-action p { font-size: 12px; line-height: 1.5; }
+.student-block-action button { margin: .25rem .5rem .25rem 0; white-space: normal; }
+.blocked-students .student-block-action { margin: 0; }
+.blocked-students button { min-height: 36px; padding: 6px 10px; font-size: 12px; }
+.group-privacy-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin: 12px 0; padding: 12px 14px; border: 1px solid #e5cf9d; border-radius: 9px; background: #fff8e8; color: #60491f; }
+.group-privacy-copy { flex: 1 1 260px; min-width: 0; }
+.group-privacy-copy p { font-size: 12px; line-height: 1.5; margin: 0; }
+.group-privacy-copy .group-privacy-label { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+.group-privacy-copy [role='alert'] { margin-top: 5px; }
+.group-privacy-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.group-privacy-actions button { min-height: 36px; padding: 6px 10px; border-color: #d9c7a3; font-size: 11px; white-space: normal; background: #fffdfa; color: #60491f; }
+.group-privacy-actions button:hover { background: #f8edda; }
+.group-privacy-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.group-privacy-help { flex-basis: 100%; font-size: 11px; }
+.group-privacy-notices { min-width: 0; }
+.blocked-students, .group-privacy-banner { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .blocked-students > summary, .blocked-students-content { padding: 14px; }
+  .group-privacy-actions { width: 100%; }
+  .group-privacy-actions button { flex: 1 1 120px; }
+}
+@media (pointer: coarse) {
+  .group-privacy-actions button, .blocked-students button { min-height: 44px; }
+}

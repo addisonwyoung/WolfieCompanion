@@ -8,7 +8,7 @@ import type { StudentProfile } from '../src/account'
 import type { PeerApi } from '../src/classmateProfile'
 import '../src/index.css'
 import '../src/App.css'
-const base:StudentProfile={id:'peer',name:'Classmate Ada',major:'Computer Science',year:'Graduate',interests:['Music','Hiking'],residence_status:'commuter',avatar_path:null}
+const base:StudentProfile={id:'peer',name:'Classmate Ada',major:'Computer Science',year:'Graduate',interests:['Music','Hiking'],residence_status:'commuter',is_private:false,avatar_path:null}
 export function Fixture(){
  const [profile,setProfile]=useState<StudentProfile>(()=>JSON.parse(localStorage.getItem('profile-sharing-fixture')??'null')??base)
  const [open,setOpen]=useState(false)

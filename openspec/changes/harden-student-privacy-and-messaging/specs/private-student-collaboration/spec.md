@@ -132,7 +132,7 @@ Every new or returning messaging member SHALL have a fresh admission boundary. M
 - **THEN** common authorization ordering prevents unauthorized new messages/additions and preserves the correct history boundary
 
 ### Requirement: Simple Study Buddies retention and owner departure
-Study Buddies SHALL retain explicit acceptance and exact verified offering authorization for new admission. Members SHALL leave voluntarily, removing active membership and availability. Owner departure SHALL preserve the remaining accepted memberships and the group's existing tasks, notes, contribution attribution and other retained data, transferring Study ownership under the existing succession model where another accepted member remains. Two accepted members SHALL continue collaborating without a group-chat minimum or messaging feature. Study ownership SHALL NOT control additional invitation rights or rewrite historical actual-inviter identity. When no accepted Study members remain, the group SHALL be deleted and pending invitations invalidated with generic group-unavailable handling; durable private notification delivery is deferred to Stage 3C; no archives, membership-history ledger or contribution-recovery infrastructure SHALL be introduced.
+Study Buddies SHALL retain explicit acceptance and exact verified offering authorization for new admission. Members SHALL leave voluntarily, removing active membership and availability. Owner departure SHALL preserve the remaining accepted memberships and the group's existing tasks, notes, contribution attribution and other retained data, transferring Study ownership under the existing succession model where another accepted member remains. Two accepted members SHALL continue collaborating without a group-chat minimum or messaging feature. Study ownership SHALL NOT control additional invitation rights or rewrite historical actual-inviter identity. When no accepted Study members remain, the group SHALL be deleted and pending invitations invalidated with generic group-unavailable handling; no durable group-unavailable notification is required; no archives, membership-history ledger or contribution-recovery infrastructure SHALL be introduced.
 
 #### Scenario: Owner leaves two accepted members
 - **WHEN** the owner leaves a group with two other accepted members
@@ -166,7 +166,7 @@ Existing invitations and accepted memberships SHALL be preserved when introducin
 
 #### Scenario: Last accepted Study member leaves
 - **WHEN** no accepted Study members remain after departure
-- **THEN** the group is deleted, pending invitations cannot be accepted, and affected invitees receive generic unavailable handling (durable notifications are deferred to Stage 3C) without private group or block details
+- **THEN** the group is deleted, pending invitations cannot be accepted, and affected invitees receive generic unavailable/stale-invitation handling without durable notifications without private group or block details
 
 ### Requirement: Study invitation expiry and generation safety
 Every new invitation SHALL expire exactly 168 elapsed hours after trusted database issuance. At database time greater than or equal to the deadline it SHALL NOT be accepted or reserve capacity. Pending/accepted storage statuses MAY be retained with derived expired/unavailable projections. Accepted membership SHALL NOT expire. New issuance after expiry SHALL require fresh current inviter/target offering, visibility, block and capacity authorization, a new generation and explicit operation; retries SHALL NOT extend or replace prior issuance. Acceptance/decline SHALL bind to the recipient's current generation. Legacy unverifiable invitations SHALL be unavailable and non-reserving without modifying accepted data or inventing provenance. Existing groups lacking confirmed offering context SHALL remain usable by accepted members with new admissions closed.
@@ -190,3 +190,18 @@ Every new invitation SHALL expire exactly 168 elapsed hours after trusted databa
 #### Scenario: Pending projection privacy
 - **WHEN** pending/expired recipients or accepted members list their groups
 - **THEN** recipients receive safe invitation metadata, accepted members receive accepted identities and active pending counts, and pending identities are disclosed only to authorized invitation management
+
+### Requirement: Contextual warning lifecycle follows accepted participation
+Private block warnings SHALL use the owner-only contextual contract in student-communication-authorization. Both Study participants SHALL be accepted members; a pending membership row, invitation generation or safe preview SHALL NOT authorize warning retrieval or dismissal. Accepted-member warning access SHALL NOT require a resolved new-admission offering, friendship or DM permission. Ownership transfer SHALL NOT reset a continuing membership episode. Either participant's departure or group deletion SHALL remove the corresponding warning state; later accepted rejoining SHALL create a new episode. Existing shared academic collaboration SHALL remain equally accessible despite privacy/block changes.
+
+#### Scenario: Pending replacement versus accepted rejoining
+- **WHEN** a pending invitation expires and is reissued, or a former accepted member is invited again
+- **THEN** no warning is exposed while pending; only accepted co-membership enables warning retrieval, and accepted rejoining rearms the prior context without recovering an old dismissal
+
+#### Scenario: Owner leaves and accepted members continue
+- **WHEN** an owner leaves and another accepted member becomes owner
+- **THEN** remaining memberships/tasks/availability remain authorized, remaining members' warning dismissals persist, and warnings involving the departed owner are removed
+
+#### Scenario: Offering-unresolved legacy group
+- **WHEN** accepted members of the preserved CSE 416 group share an outgoing block while new admission remains closed for missing authoritative offering context
+- **THEN** accepted collaboration and the outgoing blocker's contextual warning remain available without fabricating offering data or exposing warnings to pending invitees
