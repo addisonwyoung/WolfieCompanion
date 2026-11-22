@@ -67,3 +67,10 @@ Profile Block/Unblock actions and Blocked Students settings SHALL expose only th
 #### Scenario: Warning is not general profile access
 - **WHEN** a blocker sees a private warning about an authorized co-member
 - **THEN** the warning reveals no unrelated private profile fields and grants neither general discovery nor a DM exception; no block-direction information is returned to other members
+
+### Requirement: Verified Study invitation is contextual consent
+A legitimately issued unexpired Study invitation SHALL remain acceptable after recipient privacy/friendship changes, subject to eligibility, exact offering and original-inviter blocks. It SHALL NOT authorize general discovery, profiles, DMs or renewal after expiry. Newly issued invitations SHALL still enforce current private-friend visibility.
+
+#### Scenario: Expired invitation to a now-private non-friend
+- **WHEN** an inviter attempts fresh issuance to a now-private non-friend using an expired invitation or copied UUID
+- **THEN** current visibility authorization denies the operation generically

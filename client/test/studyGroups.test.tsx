@@ -6,7 +6,7 @@ import type { ClassmateApi } from '../src/classmates'
 
 function fixture() {
   const groups: StudyGroup[] = ['Alpha', 'Beta'].map((name, index) => ({
-    group_id: name, course_code: 'CSE 416', course_section: '01', name, owner_id: 'self', created_at: '2026-11-02T12:00:00Z', my_status: 'accepted',
+    group_id: name, course_code: 'CSE 416', course_section: '01', name, owner_id: 'self', created_at: '2026-11-02T12:00:00Z', my_status: 'accepted',can_invite:false,pending_count:0,invitation_id:null,expires_at:null,invitation_state:null,inviter:null,outgoing_invitations:[],professor_first_name:null,professor_last_name:null,semester:null,academic_year:null,
     members: [
       { user_id: 'self', name: 'You', status: 'accepted', role: 'owner', study_role: null },
       { user_id: 'peer', name: 'Peer', status: 'accepted', role: 'member', study_role: null },
@@ -16,7 +16,7 @@ function fixture() {
       { user_id: 'peer', day: 'Wednesday', start_minute: 780, end_minute: 840 },
     ], tasks: [],
   }))
-  const api: StudyGroupApi = { list: vi.fn(async () => structuredClone(groups)), create: vi.fn(), respond: vi.fn(), saveAvailability: vi.fn(), setMemberRole: vi.fn(), addTask: vi.fn(), setTaskComplete: vi.fn(), deleteTask: vi.fn(), leave: vi.fn() }
+  const api: StudyGroupApi = { list: vi.fn(async () => structuredClone(groups)), create: vi.fn(), candidates:vi.fn(async()=>[]),invite:vi.fn(),respond: vi.fn(), saveAvailability: vi.fn(), setMemberRole: vi.fn(), addTask: vi.fn(), setTaskComplete: vi.fn(), deleteTask: vi.fn(), leave: vi.fn() }
   const classmatesApi: ClassmateApi = vi.fn(async () => [])
   return { api, classmatesApi }
 }
