@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Classmate } from './classmates'
+import { isUuid } from './groupMessaging'
 
 export const studyDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
 export type StudyDay = typeof studyDays[number]
@@ -9,22 +11,30 @@ export interface StudyGroupTask {
   created_by_name: string; created_at: string
 }
 export interface StudyGroup {
-  group_id: string; course_code: string; course_section: string | null; name: string; owner_id: string; created_at: string
+  group_id: string; course_code: string; course_section: string | null; name: string; owner_id: string | null; created_at: string
   my_status: 'pending' | 'accepted'; members: StudyGroupMember[]
   availability: (StudyWindow & { user_id: string })[]
   tasks: StudyGroupTask[]
+  professor_first_name: string | null; professor_last_name: string | null; semester: string | null; academic_year: number | null
+  can_invite: boolean; pending_count: number; invitation_id: string | null; expires_at: string | null
+  invitation_state: 'pending' | 'expired' | 'unavailable' | null
+  inviter: { student_id: string; name: string } | null
+  outgoing_invitations: { student_id: string; name: string; invitation_id: string; expires_at: string; state: 'pending' | 'expired' | 'unavailable' }[]
 }
-export interface GroupInviteInput { courseCode: string; section: string; name: string; invitees: string[] }
+export interface StudyOffering { courseCode: string; section: string; professorFirstName: string; professorLastName: string }
+export interface GroupInviteInput extends StudyOffering { name: string; invitees: string[] }
 export interface StudyGroupApi {
   list(): Promise<StudyGroup[]>
-  create(input: GroupInviteInput): Promise<string>
-  respond(groupId: string, accept: boolean): Promise<void>
+  candidates(offering: StudyOffering | null, groupId?: string, search?: string): Promise<Classmate[]>
+  create(input: GroupInviteInput, request: string): Promise<string>
+  invite(groupId: string, invitees: string[], request: string): Promise<void>
+  respond(groupId: string, invitationId: string | null, accept: boolean, request: string): Promise<void>
   saveAvailability(groupId: string, windows: StudyWindow[]): Promise<void>
   setMemberRole(groupId: string, memberId: string, role: string | null): Promise<void>
   addTask(groupId: string, title: string, details: string): Promise<string>
   setTaskComplete(taskId: string, isComplete: boolean): Promise<void>
   deleteTask(taskId: string): Promise<void>
-  leave(groupId: string): Promise<void>
+  leave(groupId: string, request: string): Promise<void>
 }
 export const studyGroupError = 'Study groups could not be loaded. Please retry.'
 
@@ -33,18 +43,34 @@ function parseGroup(value: unknown): StudyGroup {
   const row = value as Record<string, unknown>
   if (typeof row.group_id !== 'string' || typeof row.course_code !== 'string'
     || (row.course_section !== null && typeof row.course_section !== 'string') || typeof row.name !== 'string'
-    || typeof row.owner_id !== 'string' || typeof row.created_at !== 'string'
+    || !(row.owner_id===null||typeof row.owner_id==='string') || typeof row.created_at !== 'string'
     || (row.my_status !== 'pending' && row.my_status !== 'accepted')
     || !Array.isArray(row.members) || !Array.isArray(row.availability)
     || (row.tasks !== undefined && !Array.isArray(row.tasks))) throw new Error(studyGroupError)
+  if(typeof row.can_invite!=='boolean'||!Number.isSafeInteger(row.pending_count)||Number(row.pending_count)<0
+    || ![null,'pending','expired','unavailable'].includes(row.invitation_state as null)
+    || !(row.invitation_id===null||isUuid(row.invitation_id)) || !(row.expires_at===null||typeof row.expires_at==='string'&&Number.isFinite(Date.parse(row.expires_at)))
+    || !Array.isArray(row.outgoing_invitations)
+    || !['professor_first_name','professor_last_name','semester'].every(k=>row[k]===null||typeof row[k]==='string')
+    || !(row.academic_year===null||Number.isSafeInteger(row.academic_year)))throw new Error('Study invitations are unavailable. Refresh the application.')
+  if(row.my_status==='pending'&&(row.owner_id!==null||row.members.length||row.availability.length||(row.tasks as unknown[]|undefined)?.length||row.outgoing_invitations.length||row.can_invite||row.pending_count!==0||row.invitation_state===null))throw new Error(studyGroupError)
+  if(row.my_status==='accepted'&&(typeof row.owner_id!=='string'||row.invitation_state!==null))throw new Error(studyGroupError)
+  const inviter=row.inviter===null?null:row.inviter as Record<string,unknown>
+  if(inviter&&(!isUuid(inviter.student_id)||typeof inviter.name!=='string'))throw new Error(studyGroupError)
+  const outgoing=row.outgoing_invitations.map(value=>{
+    if(!value||typeof value!=='object')throw new Error(studyGroupError)
+    const r=value as Record<string,unknown>
+    if(!isUuid(r.student_id)||typeof r.name!=='string'||!isUuid(r.invitation_id)||typeof r.expires_at!=='string'||!Number.isFinite(Date.parse(r.expires_at))||!['pending','expired','unavailable'].includes(String(r.state)))throw new Error(studyGroupError)
+    return {student_id:r.student_id,name:r.name,invitation_id:r.invitation_id,expires_at:r.expires_at,state:r.state} as StudyGroup['outgoing_invitations'][number]
+  })
   const members = row.members.map(value => {
     if (!value || typeof value !== 'object') throw new Error(studyGroupError)
     const member = value as Record<string, unknown>
     if (typeof member.user_id !== 'string' || typeof member.name !== 'string'
-      || (member.status !== 'pending' && member.status !== 'accepted')
+      || member.status !== 'accepted'
       || (member.role !== 'owner' && member.role !== 'member')
       || (member.study_role !== undefined && member.study_role !== null && typeof member.study_role !== 'string')) throw new Error(studyGroupError)
-    return { ...member, study_role: typeof member.study_role === 'string' ? member.study_role : null } as unknown as StudyGroupMember
+    return { user_id:member.user_id,name:member.name,status:member.status,role:member.role,study_role: typeof member.study_role === 'string' ? member.study_role : null } as unknown as StudyGroupMember
   })
   const availability = row.availability.map(value => {
     if (!value || typeof value !== 'object') throw new Error(studyGroupError)
@@ -63,13 +89,16 @@ function parseGroup(value: unknown): StudyGroup {
       || typeof task.created_by_name !== 'string' || typeof task.created_at !== 'string') throw new Error(studyGroupError)
     return task as unknown as StudyGroupTask
   })
-  return { ...row, members, availability, tasks } as unknown as StudyGroup
+  return {group_id:row.group_id,course_code:row.course_code,course_section:row.course_section,name:row.name,owner_id:row.owner_id,created_at:row.created_at,my_status:row.my_status,
+    members,availability,tasks,can_invite:row.can_invite,pending_count:row.pending_count,invitation_id:row.invitation_id,expires_at:row.expires_at,invitation_state:row.invitation_state,
+    professor_first_name:row.professor_first_name,professor_last_name:row.professor_last_name,semester:row.semester,academic_year:row.academic_year,
+    inviter:inviter?{student_id:inviter.student_id,name:inviter.name}:null,outgoing_invitations:outgoing} as StudyGroup
 }
 
 export function studyGroupApi(client: SupabaseClient): StudyGroupApi {
   async function invoke<T>(name: string, args?: Record<string, unknown>): Promise<T> {
     const { data, error } = await client.rpc(name, args)
-    if (error) throw new Error(error.message || studyGroupError)
+    if (error) throw new Error(error.code==='42501'||error.code==='23505'?'Study invitation or group unavailable. Refresh to check its current state.':error.code==='PGRST202'?'Study invitations are unavailable. Refresh the application.':studyGroupError)
     return data as T
   }
   return {
@@ -78,10 +107,18 @@ export function studyGroupApi(client: SupabaseClient): StudyGroupApi {
       if (!Array.isArray(data)) throw new Error(studyGroupError)
       return data.map(parseGroup)
     },
-    create: input => invoke<string>('create_study_group', {
-      p_course_code: input.courseCode, p_section: input.section, p_name: input.name.trim(), p_invitees: input.invitees,
+    async candidates(offering,groupId,search=''){
+      if(groupId&&!isUuid(groupId)||search.length>100)throw new Error(studyGroupError)
+      const rows=await invoke<unknown>('study_invitation_candidates',{p_course_code:offering?.courseCode??null,p_section:offering?.section??null,p_professor_first_name:offering?.professorFirstName??null,p_professor_last_name:offering?.professorLastName??null,p_group_id:groupId??null,p_search:search})
+      if(!Array.isArray(rows))throw new Error(studyGroupError)
+      return rows.map(row=>{if(!row||!isUuid(row.student_id)||typeof row.name!=='string'||!(row.major===null||typeof row.major==='string'))throw new Error(studyGroupError);return {student_id:row.student_id,name:row.name,major:row.major}})
+    },
+    create: (input,request) => invoke<string>('study_create', {
+      p_course_code: input.courseCode, p_section: input.section,p_professor_first_name:input.professorFirstName,p_professor_last_name:input.professorLastName,
+      p_name: input.name.trim(), p_invitees: [...input.invitees].sort(),p_request_id:request,
     }),
-    async respond(groupId, accept) { await invoke('respond_to_study_group_invite', { p_group_id: groupId, p_accept: accept }) },
+    async invite(groupId,invitees,request){await invoke('study_invite',{p_group_id:groupId,p_invitees:[...invitees].sort(),p_request_id:request})},
+    async respond(groupId,invitationId,accept,request) { await invoke('study_respond', {p_group_id:groupId,p_invitation_id:invitationId,p_accept:accept,p_request_id:request}) },
     async saveAvailability(groupId, windows) {
       await invoke('save_study_group_availability', { p_group_id: groupId, p_windows: windows })
     },
@@ -95,6 +132,6 @@ export function studyGroupApi(client: SupabaseClient): StudyGroupApi {
       await invoke('set_study_group_task_complete', { p_task_id: taskId, p_is_complete: isComplete })
     },
     async deleteTask(taskId) { await invoke('delete_study_group_task', { p_task_id: taskId }) },
-    async leave(groupId) { await invoke('leave_study_group', { p_group_id: groupId }) },
+    async leave(groupId,request) { await invoke('study_leave', { p_group_id: groupId,p_request_id:request }) },
   }
 }

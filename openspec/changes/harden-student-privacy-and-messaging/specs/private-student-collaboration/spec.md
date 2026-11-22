@@ -29,7 +29,7 @@ Any eligible accepted Study Buddies member SHALL be able to invite additional el
 - **THEN** no invitation or membership is created and member-only information remains unavailable
 
 ### Requirement: Eight occupied Study Buddies places
-A Study Buddies group SHALL have at most eight total occupied places, counting all accepted memberships and pending invitations, including the creator. Declined invitations SHALL consume no capacity. Initial selection SHALL support one to seven invitees; additional selection SHALL be limited by remaining capacity. Acceptance SHALL convert the invitee's reserved pending place without consuming another place. Duplicate invitations and exact retries SHALL NOT consume additional places or replace an existing invitation's actual inviter. Invalid or oversized invitation batches SHALL fail atomically without silently excluding selected students.
+A Study Buddies group SHALL have at most eight total occupied places, counting all accepted memberships and verified unexpired pending invitations, including the creator. Declined invitations SHALL consume no capacity. Initial selection SHALL support one to seven invitees; additional selection SHALL be limited by remaining capacity. Acceptance SHALL convert the invitee's reserved pending place without consuming another place. Duplicate invitations and exact retries SHALL NOT consume additional places or replace an existing invitation's actual inviter. Invalid or oversized invitation batches SHALL fail atomically without silently excluding selected students.
 
 #### Scenario: Pending reservations fill the group
 - **WHEN** a group has five accepted members and three pending invitees
@@ -44,7 +44,7 @@ A Study Buddies group SHALL have at most eight total occupied places, counting a
 - **THEN** at most one additional place is reserved, with no ninth participant, partial batch or duplicate notification
 
 ### Requirement: Actual inviter provenance and acceptance
-Each invitation SHALL preserve the authenticated actual inviter independently of current group ownership. Ownership transfer SHALL NOT rewrite inviter identity, substitute the new owner for authorization checks or by itself cancel the invitation. An invitation SHALL remain pending until explicit acceptance; acceptance SHALL revalidate target eligibility, the group's exact current verified offering, applicable privacy authorization with the recorded inviter and bilateral blocking between that inviter and invitee. Acceptance SHALL NOT reject a student solely because another co-member has a block with them. Inviter identity SHALL NOT grant unrelated private profile access. A pending invitation SHALL NOT be reassigned to evade a direct block.
+Each invitation SHALL preserve the authenticated actual inviter independently of current group ownership. Ownership transfer SHALL NOT rewrite inviter identity, substitute the new owner for authorization checks or by itself cancel the invitation. An invitation SHALL be acceptable only within 168 hours of verified issuance; acceptance SHALL revalidate target eligibility, the group's exact current verified offering, verified issuance and bilateral blocking between that inviter and invitee. Privacy/friendship authorization SHALL be checked at issuance, not reimposed because the recipient later becomes private or loses friendship. Acceptance SHALL NOT reject a student solely because another co-member has a block with them. Inviter identity SHALL NOT grant unrelated private profile access. A pending invitation SHALL NOT be reassigned to evade a direct block.
 
 #### Scenario: Inviter and owner are different
 - **WHEN** an accepted non-owner invites a classmate and group ownership later transfers
@@ -132,7 +132,7 @@ Every new or returning messaging member SHALL have a fresh admission boundary. M
 - **THEN** common authorization ordering prevents unauthorized new messages/additions and preserves the correct history boundary
 
 ### Requirement: Simple Study Buddies retention and owner departure
-Study Buddies SHALL retain explicit acceptance and exact verified offering authorization for new admission. Members SHALL leave voluntarily, removing active membership and availability. Owner departure SHALL preserve the remaining accepted memberships and the group's existing tasks, notes, contribution attribution and other retained data, transferring Study ownership under the existing succession model where another accepted member remains. Two accepted members SHALL continue collaborating without a group-chat minimum or messaging feature. Study ownership SHALL NOT control additional invitation rights or rewrite historical actual-inviter identity. When no accepted Study members remain, the group SHALL be deleted and pending invitations invalidated with a generic private group-unavailable notification; no archives, membership-history ledger or contribution-recovery infrastructure SHALL be introduced.
+Study Buddies SHALL retain explicit acceptance and exact verified offering authorization for new admission. Members SHALL leave voluntarily, removing active membership and availability. Owner departure SHALL preserve the remaining accepted memberships and the group's existing tasks, notes, contribution attribution and other retained data, transferring Study ownership under the existing succession model where another accepted member remains. Two accepted members SHALL continue collaborating without a group-chat minimum or messaging feature. Study ownership SHALL NOT control additional invitation rights or rewrite historical actual-inviter identity. When no accepted Study members remain, the group SHALL be deleted and pending invitations invalidated with generic group-unavailable handling; durable private notification delivery is deferred to Stage 3C; no archives, membership-history ledger or contribution-recovery infrastructure SHALL be introduced.
 
 #### Scenario: Owner leaves two accepted members
 - **WHEN** the owner leaves a group with two other accepted members
@@ -158,7 +158,7 @@ All active messaging-group members SHALL be able to see active co-members' displ
 - **THEN** appropriate sender attribution remains without unrelated private fields or current private-picture access
 
 ### Requirement: Preserved legacy and departed-inviter Study invitations
-Existing invitations and accepted memberships SHALL be preserved when introducing inviter provenance. Every new invitation SHALL permanently record its authenticated actual inviter; missing historical inviter identities SHALL NOT be fabricated. Invitations may remain actionable after the inviter leaves or becomes ineligible if the group exists and the invitee remains eligible, subject to applicable privacy, capacity and original-inviter blocking checks. Ownership transfer SHALL NOT replace inviter identity.
+Existing invitations and accepted memberships SHALL be preserved when introducing inviter provenance. Every new invitation SHALL permanently record its authenticated actual inviter; missing historical inviter identities SHALL NOT be fabricated. Invitations may remain actionable after the inviter leaves or becomes ineligible if the group exists and the invitee remains eligible, subject to verified issuance, expiry, capacity and original-inviter blocking checks. Ownership transfer SHALL NOT replace inviter identity.
 
 #### Scenario: Inviter departure with remaining accepted members
 - **WHEN** the actual inviter leaves or becomes ineligible while the group remains and a pending invitee meets the applicable checks
@@ -166,4 +166,27 @@ Existing invitations and accepted memberships SHALL be preserved when introducin
 
 #### Scenario: Last accepted Study member leaves
 - **WHEN** no accepted Study members remain after departure
-- **THEN** the group is deleted, pending invitations cannot be accepted, and affected invitees receive a generic private unavailable notification without private group or block details
+- **THEN** the group is deleted, pending invitations cannot be accepted, and affected invitees receive generic unavailable handling (durable notifications are deferred to Stage 3C) without private group or block details
+
+### Requirement: Study invitation expiry and generation safety
+Every new invitation SHALL expire exactly 168 elapsed hours after trusted database issuance. At database time greater than or equal to the deadline it SHALL NOT be accepted or reserve capacity. Pending/accepted storage statuses MAY be retained with derived expired/unavailable projections. Accepted membership SHALL NOT expire. New issuance after expiry SHALL require fresh current inviter/target offering, visibility, block and capacity authorization, a new generation and explicit operation; retries SHALL NOT extend or replace prior issuance. Acceptance/decline SHALL bind to the recipient's current generation. Legacy unverifiable invitations SHALL be unavailable and non-reserving without modifying accepted data or inventing provenance. Existing groups lacking confirmed offering context SHALL remain usable by accepted members with new admissions closed.
+
+#### Scenario: Public invitee becomes private or loses friendship
+- **WHEN** a verified, unexpired invitation's recipient becomes private or loses friendship after authorized issuance
+- **THEN** explicit acceptance remains possible with current recipient/offering eligibility and no original-inviter block, without granting general discovery or DM permissions
+
+#### Scenario: Deadline crosses during lock wait
+- **WHEN** acceptance waits on a group or pair lock until its deadline has passed
+- **THEN** a trusted post-lock time check rejects acceptance and the invitation no longer reserves a place
+
+#### Scenario: Stale response after a fresh invitation
+- **WHEN** an expired invitation is replaced by a fresh authorized generation and a delayed accept or decline names the older generation
+- **THEN** the fresh invitation remains unchanged and no membership is granted
+
+#### Scenario: Receipt replay after expiry or deletion
+- **WHEN** an old issuance request is retried after expiry, dismissal, replacement or final group deletion
+- **THEN** it cannot issue another invitation, renew a deadline, replace an inviter or recreate the group
+
+#### Scenario: Pending projection privacy
+- **WHEN** pending/expired recipients or accepted members list their groups
+- **THEN** recipients receive safe invitation metadata, accepted members receive accepted identities and active pending counts, and pending identities are disclosed only to authorized invitation management
