@@ -41,3 +41,43 @@ test('busy guard recovers from failures and projects empty/missing-section respo
     const empty=await fixture(t,{enabled:true,provider:async()=>({text,pages:[]})});const r=await(await empty()).json();assert.deepEqual(r.rows,[]);assert.ok(r.warnings.some(w=>w.code===(text?'NO_CLASSES':'NO_TEXT')));
   }
 });
+
+test('hosted OCR authenticates and reserves a durable allowance before calling the provider', async t => {
+  let calls = 0;
+  const reservations: string[] = [];
+  let allowance: boolean | Error = true;
+  const post = await fixture(t, {
+    environment: 'production', authenticatedEnabled: true,
+    origin: 'https://wolfiecompanion.vercel.app',
+    authorize: async token => token === 'verified-token' ? 'verified-user' : null,
+    reserve: async id => { reservations.push(id); if (allowance instanceof Error) throw allowance; return allowance; },
+    provider: async () => { calls++; return calendarRegression; },
+  });
+  const headers = { Origin: 'https://wolfiecompanion.vercel.app', Authorization: 'Bearer verified-token' };
+  assert.equal((await post(png, { Origin: headers.Origin })).status, 401);
+  assert.equal((await post(png, { ...headers, Authorization: 'Bearer forged-token' })).status, 403);
+  assert.equal((await post(png, { ...headers, Origin: 'https://other.example' })).status, 403);
+  assert.equal((await post(Buffer.from('bad'), headers)).status, 400);
+  assert.equal(calls, 0); assert.deepEqual(reservations, []);
+  assert.equal((await post(png, headers)).status, 200);
+  assert.deepEqual(reservations, ['verified-user']); assert.equal(calls, 1);
+  allowance = false;
+  assert.equal((await post(png, headers)).status, 429); assert.equal(calls, 1);
+  allowance = new Error('database offline');
+  assert.equal((await post(png, headers)).status, 503); assert.equal(calls, 1);
+  allowance = true;
+  assert.equal((await post(png, headers)).status, 200); assert.equal(calls, 2);
+});
+
+test('hosted OCR fails closed when authentication is unavailable or origin is invalid', async t => {
+  let calls = 0;
+  for (const origin of ['https://wolfiecompanion.vercel.app', 'http://public.example', 'https://public.example/path']) {
+    const post = await fixture(t, {
+      authenticatedEnabled: true, origin,
+      authorize: async () => { throw new Error('auth offline'); },
+      provider: async () => { calls++; return calendarRegression; },
+    });
+    assert.equal((await post(png, { Origin: origin, Authorization: 'Bearer token' })).status, origin.startsWith('https://wolfiecompanion') ? 503 : 403);
+  }
+  assert.equal(calls, 0);
+});

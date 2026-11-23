@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import ManualClasses from './ManualClasses'
 import ScheduleImportPreview from './ScheduleImportPreview'
 import type { CourseId, Course } from './sampleData'
@@ -11,10 +12,11 @@ import type { RecommendationState } from './useCourseRecommendations'
 import type { FriendRelationship } from './friendshipApi'
 import type { ProfessorCatalogState } from './courseProfessors'
 
-export default function CourseBrowser({ enrolledCourses, onAddClasses, professorCatalog, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
+export default function CourseBrowser({ enrolledCourses, onAddClasses, professorCatalog, client = null, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
   enrolledCourses: Course[]
   onAddClasses: (rows: ClassRow[]) => Promise<void>
   professorCatalog: ProfessorCatalogState
+  client?: SupabaseClient | null
   selectedId: CourseId | null
   onSelect: (id: CourseId) => void
   roster: ClassmateState
@@ -45,7 +47,7 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
       <div className="section-top"><h2 id="courses-heading">Your courses</h2><span className="muted">{enrolledCourses.length} {enrolledCourses.length === 1 ? 'section' : 'sections'}</span></div>
       <p className="muted">Pick a course section to see who’s learning alongside you.</p>
       <ManualClasses onSave={saveClasses} catalog={professorCatalog} />
-      <ScheduleImportPreview onAddClasses={saveClasses} catalog={professorCatalog} />
+      <ScheduleImportPreview onAddClasses={saveClasses} catalog={professorCatalog} client={client} />
       {!enrolledCourses.length && <p className="empty-state">No saved classes yet. Enter classes manually or confirm a reviewed schedule.</p>}
       <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
         <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>

@@ -3,10 +3,12 @@ import { validateRows } from './account'
 import { useEffect, useRef, useState } from 'react'
 import type { ProfessorCatalogState } from './courseProfessors'
 import ProfessorPicker from './ProfessorPicker'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { schedulePreviewHeaders } from './schedulePreviewApi'
 interface Warning { code: string; message: string }
 interface Row { id: number; code: string; section: string; professor_first_name: string; professor_last_name: string; warnings: Warning[] }
 const maxBytes = 10 * 1024 * 1024
-export default function ScheduleImportPreview({ onAddClasses, catalog }: { onAddClasses?: (rows: { code: string; section: string; professor_first_name: string; professor_last_name: string }[]) => Promise<void> | void; catalog: ProfessorCatalogState }) {
+export default function ScheduleImportPreview({ onAddClasses, catalog, client = null }: { client?: SupabaseClient | null; onAddClasses?: (rows: { code: string; section: string; professor_first_name: string; professor_last_name: string }[]) => Promise<void> | void; catalog: ProfessorCatalogState }) {
   const [expanded, setExpanded] = useState(false)
   const expandedPanel = useExpandedScroll<HTMLElement>(expanded)
   const [file, setFile] = useState<File | null>(null)
@@ -54,8 +56,9 @@ export default function ScheduleImportPreview({ onAddClasses, catalog }: { onAdd
     const id = requestId.current
     const abort = new AbortController(); controller.current = abort; setBusy(true)
     try {
+      const headers = await schedulePreviewHeaders(abort.signal, client)
       const response = await fetch(`/api/schedule-preview?layout=${layout}`, {
-        method: 'POST', headers: { 'Content-Type': file.type, 'X-Schedule-Preview': '1' }, body: file, signal: abort.signal,
+        method: 'POST', headers: { ...headers, 'Content-Type': file.type }, body: file, signal: abort.signal,
       })
       const data = await response.json()
       if (id !== requestId.current) return

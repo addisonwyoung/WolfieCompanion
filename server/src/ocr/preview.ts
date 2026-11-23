@@ -4,15 +4,32 @@ import type { OcrProvider, Warning } from './types.js';
 import { extractDocument, diagnostic } from './vision.js';
 import { parseSchedule } from './parser.js';
 import { MAX_IMAGE_BYTES, validateImage } from './image.js';
-export interface PreviewOptions { enabled?: boolean; environment?: string; origin?: string; provider?: OcrProvider }
+import { authorizeOcr, reserveOcr } from './access.js';
+import type { AuthorizeOcr, ReserveOcr } from './access.js';
+export interface PreviewOptions { enabled?: boolean; environment?: string; origin?: string; provider?: OcrProvider; authenticatedEnabled?: boolean; authorize?: AuthorizeOcr; reserve?: ReserveOcr }
 export function schedulePreviewRouter(options: PreviewOptions = {}) {
   const router = express.Router();
   const enabled = (options.enabled ?? process.env.ENABLE_SCHEDULE_PREVIEW === '1') && (process.env.NODE_ENV !== 'production') && (options.environment ?? process.env.NODE_ENV) !== 'production';
+  const authenticated = options.authenticatedEnabled ?? process.env.ENABLE_AUTHENTICATED_SCHEDULE_PREVIEW === '1';
   const origin = options.origin ?? process.env.SCHEDULE_PREVIEW_ORIGIN ?? 'http://localhost:5173';
   let validOrigin = false;
   try { const url = new URL(origin); validOrigin = ['localhost','127.0.0.1','[::1]'].includes(url.hostname) && url.protocol==='http:' && url.origin===origin; } catch { /* invalid origins deny access */ }
+  let validHostedOrigin = false;
+  try { const url = new URL(origin); validHostedOrigin = url.origin === origin && (url.protocol === 'https:' || validOrigin); } catch { /* fail closed */ }
   let busy = false;
-  router.use((req,res,next) => {
+  router.use(async (req,res,next) => {
+    if (authenticated) {
+      if (!validHostedOrigin || req.get('Origin') !== origin || req.get('X-Schedule-Preview') !== '1') { res.status(403).json({error:'Use the configured schedule import page.'}); return; }
+      const token = req.get('Authorization')?.match(/^Bearer (\S+)$/)?.[1];
+      if (!token) { res.status(401).json({error:'Sign in before importing a schedule.'}); return; }
+      try {
+        const userId = await (options.authorize ?? authorizeOcr)(token);
+        if (!userId) { res.status(403).json({error:'A verified student account is required.'}); return; }
+        res.locals.ocrUserId = userId;
+        next();
+      } catch { res.status(503).json({error:'Schedule import is temporarily unavailable. Please try again later.'}); }
+      return;
+    }
     if (!enabled) { res.status(404).json({error:'Schedule preview is disabled. Start the local API with ENABLE_SCHEDULE_PREVIEW=1.'}); return; }
     const address=req.socket.remoteAddress;
     if (!validOrigin || !['127.0.0.1','::1','::ffff:127.0.0.1'].includes(address ?? '') || req.get('Origin')!==origin || req.get('X-Schedule-Preview')!=='1') { res.status(403).json({error:'Use the configured local preview page.'}); return; }
@@ -31,6 +48,12 @@ export function schedulePreviewRouter(options: PreviewOptions = {}) {
     if(busy){res.status(429).json({error:'Another extraction is running. Try again shortly.'});return;}
     busy=true;
     try {
+      if (authenticated) {
+        let reserved: boolean;
+        try { reserved = await (options.reserve ?? reserveOcr)(res.locals.ocrUserId); }
+        catch { res.status(503).json({error:'Schedule import usage limits are unavailable. Please try again later.'}); return; }
+        if (!reserved) { res.status(429).json({error:'The daily schedule import limit has been reached. Try again tomorrow (UTC), or enter your courses manually.'}); return; }
+      }
       const result=parseSchedule(await (options.provider ?? extractDocument)(req.body), req.query.layout as 'class-list'|'weekly-calendar');
       const rows: {code:string;section:string;warnings:Warning[]}[]=[];
       for(const course of result.classes) {
