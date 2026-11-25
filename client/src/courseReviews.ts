@@ -9,6 +9,10 @@ export interface CourseReviewInput {
   review: string
 }
 
+export interface OwnedCourseReview extends CourseEvaluation {
+  createdAt: string
+}
+
 export class DuplicateCourseReviewError extends Error {
   constructor() {
     super('You have already published a review for this offering.')
@@ -28,22 +32,35 @@ function isMissingReviewRelation(error: { code?: string } | null) {
 }
 
 export function courseReviewApi(client: SupabaseClient) {
+  async function ownerRequest(path: string, method = 'GET', body?: unknown): Promise<Record<string, unknown>> {
+    const { data: { session } } = await client.auth.getSession()
+    if (!session) throw new Error('Sign in again before managing your reviews.')
+    const response = await fetch(path, {
+      method,
+      headers: { Authorization: `Bearer ${session.access_token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+    if (response.status === 204) return {}
+    const result = await response.json().catch(() => ({})) as Record<string, unknown>
+    if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Your review could not be managed. Please retry.')
+    return result
+  }
+  function mapOwnedReview(row: Record<string, unknown>): OwnedCourseReview {
+    return {
+      id: String(row.id), offeringId: String(row.offering_id), weeklyHours: Number(row.weekly_hours),
+      difficulty: Number(row.difficulty), classRating: row.class_rating === null ? null : Number(row.class_rating),
+      wouldRecommend: typeof row.would_recommend === 'boolean' ? row.would_recommend : null,
+      review: String(row.review ?? ''), moderationStatus: row.moderation_status === 'flagged' ? 'flagged' : 'appropriate',
+      createdAt: String(row.created_at),
+    }
+  }
   async function loadOffering(offeringId: string): Promise<CourseEvaluation[]> {
     const { data, error } = await client.from('course_reviews_public')
       .select('id,offering_id,difficulty,weekly_hours,class_rating,would_recommend,review,moderation_status,created_at')
       .eq('offering_id', offeringId)
     if (isMissingReviewRelation(error)) throw new CourseReviewStorageUnavailableError()
     if (error) throw new Error('Unable to load course reviews. Please retry.')
-    return (data ?? []).map(row => ({
-      id: row.id,
-      offeringId: row.offering_id,
-      weeklyHours: Number(row.weekly_hours),
-      difficulty: row.difficulty,
-      review: row.review,
-      moderationStatus: row.moderation_status,
-      classRating: row.class_rating === null ? null : Number(row.class_rating),
-      wouldRecommend: row.would_recommend,
-    }))
+    return (data ?? []).map(row => mapOwnedReview(row))
   }
 
   return {
@@ -67,6 +84,22 @@ export function courseReviewApi(client: SupabaseClient) {
       })) as CourseOffering[]
     },
     loadOffering,
+    async myReviews(): Promise<OwnedCourseReview[]> {
+      const result = await ownerRequest('/api/course-reviews/mine')
+      if (!Array.isArray(result.reviews)) throw new Error('Your reviews could not be loaded. Please retry.')
+      return result.reviews.map(row => mapOwnedReview(row as Record<string, unknown>))
+    },
+    async updateReview(reviewId: string, input: CourseReviewInput): Promise<{ review: OwnedCourseReview; moderationStatus: 'appropriate' | 'flagged' }> {
+      const result = await ownerRequest(`/api/course-reviews/${encodeURIComponent(reviewId)}`, 'PATCH', input)
+      if (!result.review || typeof result.review !== 'object') throw new Error('Your review could not be updated. Please retry.')
+      return {
+        review: mapOwnedReview(result.review as Record<string, unknown>),
+        moderationStatus: result.moderationStatus === 'flagged' ? 'flagged' : 'appropriate',
+      }
+    },
+    async deleteReview(reviewId: string): Promise<void> {
+      await ownerRequest(`/api/course-reviews/${encodeURIComponent(reviewId)}`, 'DELETE')
+    },
     async myOfferingIds(): Promise<string[]> {
       const { data, error } = await client.rpc('my_course_review_offerings')
       if (error) throw new Error('Unable to check previous reviews. Please retry.')

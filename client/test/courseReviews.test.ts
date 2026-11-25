@@ -57,7 +57,7 @@ test('loads only catalog-verified offerings with exact section and term details'
 
 test('reads anonymous reviews with moderation and rating fields by stable offering ID', async () => {
   const f = fixture()
-  expect(await f.api.loadOffering(offering.id)).toEqual([{ id: 'review-1', offeringId: offering.id, weeklyHours: 12.5, difficulty: 4, classRating: 5, wouldRecommend: true, moderationStatus: 'appropriate', review: 'Anonymous text' }])
+  expect(await f.api.loadOffering(offering.id)).toEqual([{ id: 'review-1', offeringId: offering.id, weeklyHours: 12.5, difficulty: 4, classRating: 5, wouldRecommend: true, moderationStatus: 'appropriate', review: 'Anonymous text', createdAt: '2026-10-17T00:00:00Z' }])
   expect(f.queryCalls[0].table).toBe('course_reviews_public')
   expect(f.queryCalls[0].selected).toContain('moderation_status')
   expect(f.queryCalls[0].selected).not.toContain('user_id')
@@ -74,6 +74,38 @@ test('submits through the authenticated moderation endpoint, then reloads persis
   }))
   expect(saved).toEqual({ reviews: [expect.objectContaining({ id: 'review-1' })], moderationStatus: 'appropriate' })
   expect(await f.api.myOfferingIds()).toEqual([offering.id])
+})
+
+test('loads only the current user review fields through the authenticated owner endpoint', async () => {
+  const f = fixture()
+  f.fetchSpy.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reviews: [row('mine')] }) } as Response)
+  expect(await f.api.myReviews()).toEqual([{ id: 'mine', offeringId: offering.id, weeklyHours: 12.5, difficulty: 4, classRating: 5, wouldRecommend: true, review: 'Anonymous text', moderationStatus: 'appropriate', createdAt: '2026-10-17T00:00:00Z' }])
+  expect(f.fetchSpy).toHaveBeenCalledWith('/api/course-reviews/mine', { method: 'GET', headers: { Authorization: 'Bearer test-token' } })
+})
+
+test('updates an owner review with a PATCH payload and maps backend errors', async () => {
+  const f = fixture()
+  const savedRow = { ...row('review-id'), weekly_hours: 6, difficulty: 2, class_rating: 4, would_recommend: false, review: 'Edited', moderation_status: 'flagged' }
+  f.fetchSpy.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ review: savedRow, moderationStatus: 'flagged' }) } as Response)
+  const updated = await f.api.updateReview('review-id', { weeklyHours: 6, difficulty: 2, classRating: 4, wouldRecommend: false, review: 'Edited' })
+  expect(updated).toMatchObject({ moderationStatus: 'flagged', review: { id: 'review-id', weeklyHours: 6, review: 'Edited', moderationStatus: 'flagged' } })
+  expect(f.fetchSpy).toHaveBeenCalledWith('/api/course-reviews/review-id', expect.objectContaining({
+    method: 'PATCH', headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ weeklyHours: 6, difficulty: 2, classRating: 4, wouldRecommend: false, review: 'Edited' }),
+  }))
+  f.fetchSpy.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: 'Moderation unavailable' }) } as Response)
+  await expect(f.api.updateReview('review-id', { weeklyHours: 6, difficulty: 2, classRating: 4, wouldRecommend: false, review: 'Edited' })).rejects.toThrow('Moderation unavailable')
+})
+
+test('deletes an owner review and requires a session for owner operations', async () => {
+  const f = fixture()
+  f.fetchSpy.mockResolvedValueOnce({ ok: true, status: 204, json: async () => ({}) } as Response)
+  await expect(f.api.deleteReview('review-id')).resolves.toBeUndefined()
+  expect(f.fetchSpy).toHaveBeenCalledWith('/api/course-reviews/review-id', expect.objectContaining({ method: 'DELETE', headers: { Authorization: 'Bearer test-token' } }))
+  const signedOut = fixture(null)
+  signedOut.fetchSpy.mockClear()
+  await expect(signedOut.api.myReviews()).rejects.toThrow('Sign in again before managing your reviews.')
+  expect(signedOut.fetchSpy).not.toHaveBeenCalled()
 })
 
 test('does not send a review without a signed-in session', async () => {
