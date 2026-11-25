@@ -1,13 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
-import { ReportStore } from '../src/crowd.js';
 import type { PreviewOptions } from '../src/ocr/preview.js';
 import { calendarRegression } from './fixtures/schedule-ocr/documents.js';
 import { OcrError } from '../src/ocr/vision.js';
 const png=Buffer.from([137,80,78,71,13,10,26,10]);
 async function fixture(t, options: PreviewOptions) {
-  const server=createApp(new ReportStore('/unused'),options).listen(0,'127.0.0.1');
+  const server=createApp(options).listen(0,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));
   t.after(()=>new Promise<void>(resolve=>server.close(()=>resolve())));
   const address=server.address();assert.ok(address && typeof address!=='string');

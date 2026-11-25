@@ -13,13 +13,12 @@ Repository inspection: 2026-11-16. This is a source/configuration assessment, no
 | VITE_MAPTILER_API_KEY | client/src/campusExplorerConfig.ts | Public browser key | No; map background. Restrict provider origins/quota. |
 | VITE_MAPTILER_MAP_ID | same | Public | No; approved MapTiler style ID. |
 | VITE_CAMPUS_FEEDBACK_URL | same | Public | No; HTTPS/mailto suggestion link. |
-| SUPABASE_URL | server/src/avatar.ts, classmatePicture.ts, friendPicture.ts, courseReviewModeration.ts | Public | Needed for API integrations, not bare health/crowd startup. Must match client project. |
+| SUPABASE_URL | server/src/avatar.ts, classmatePicture.ts, friendPicture.ts, courseReviewModeration.ts | Public | Needed for API integrations, not bare health/library-occupancy startup. Must match client project. |
 | SUPABASE_PUBLISHABLE_KEY | same | Public | Needed for caller token validation/API operations. Own-avatar upload uses caller permissions. |
 | SUPABASE_SERVICE_ROLE_KEY | peer picture modules and courseReviewModeration.ts | **Secret, privileged** | No for basic accounts; required for peer pictures and review publishing. |
 | OPENAI_API_KEY | server/src/courseReviewModeration.ts | **Secret** | No; required for external moderation in review publishing. |
 | COURSE_REVIEW_HARD_BLOCK_TERMS | same | Private server configuration | No; optional comma/newline-separated terms; empty means no configured terms. |
 | PORT | server/src/index.ts | Nonsecret | No; defaults 3000. Vite proxy assumes 3000. |
-| CROWD_REPORTS_PATH | same | Nonsecret local path | No; defaults to server/data/crowd-reports.json. Do not set empty; use an absolute path if overriding. |
 | ENABLE_SCHEDULE_PREVIEW | index.ts, ocr/preview.ts | Nonsecret | No; only exact 1 enables local browser OCR. |
 | SCHEDULE_PREVIEW_ORIGIN | server/src/ocr/preview.ts | Public origin | No; defaults http://localhost:5173; exact HTTP localhost/127.0.0.1 origin required. |
 | NODE_ENV | index.ts, ocr/preview.ts | Nonsecret | No; production always disables browser OCR. |
@@ -60,7 +59,7 @@ Before granting access, the owner must confirm:
 - Privileged credentials remain under owner/trusted-developer control. Peer-picture endpoints check caller authorization before privileged resolution; review publishing checks eligibility/enrollment before privileged writes. Those checks still require acceptance testing.
 - Provider quotas, billing and project availability cover the demonstration.
 
-Existing eligible users can share data through intended social features; optional sharing controls do not provide tenant isolation between cohorts. OAuth test-user restrictions are not a substitute for database authorization. Anonymous crowd submission has no authentication/moderation, and normal server startup listens on 0.0.0.0 unless OCR opt-in binds it to loopback. Keep the demo API on a trusted local network; this is not a hardened public deployment.
+Existing eligible users can share data through intended social features; optional sharing controls do not provide tenant isolation between cohorts. OAuth test-user restrictions are not a substitute for database authorization. Student crowd submissions and report storage initialization are retired; aggregate library occupancy reads remain anonymous. Normal server startup listens on 0.0.0.0 unless OCR opt-in binds it to loopback. Keep the demo API on a trusted local network; this is not a hardened public deployment.
 
 The simplest complete M5 experience is an owner-controlled dedicated hosted Supabase project plus a trusted developer's local API with necessary secrets. For an untrusted reviewer, public configuration alone produces a reduced-feature experience. An owner-operated API is another option, but routing/hosting must be supplied and verified separately. The repository currently provides only the local Vite proxy.
 

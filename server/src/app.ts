@@ -6,9 +6,10 @@ import { avatarRouter } from './avatar.js';
 import type { ErrorRequestHandler } from 'express';
 import { schedulePreviewRouter } from './ocr/preview.js';
 import type { PreviewOptions } from './ocr/preview.js';
-import { levels, ReportStore } from './crowd.js';
 import { courseReviewRouter } from './courseReviewModeration.js';
-export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
+import { libraryOccupancy, type LibraryOccupancy } from './libraryOccupancy.js';
+export function createApp(preview: PreviewOptions = {}, occupancy: Pick<LibraryOccupancy, 'list'> = libraryOccupancy,
+  history: Pick<LibraryOccupancy, 'history'> = libraryOccupancy) {
   const app = express();
   app.use('/api/classmate-picture', classmatePictureRouter());
   app.use('/api/friend-picture', friendPictureRouter());
@@ -18,23 +19,21 @@ export function createApp(store: ReportStore, preview: PreviewOptions = {}) {
   app.use(express.json({ limit: '8kb' }));
   app.use('/api/course-reviews', courseReviewRouter());
   app.get('/api/health', (_req, res) => { res.json({ status: 'ok' }); });
-  app.get('/api/locations', (_req, res) => { res.json({ locations: store.list() }); });
-  app.get('/api/locations/:id', (req, res) => {
-    const detail = store.detail(req.params.id);
-    if (!detail) { res.status(404).json({ error: 'Location not found.' }); return; }
-    res.json(detail);
+  app.get('/api/libraries', async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ libraries: await occupancy.list() });
   });
-  app.post('/api/locations/:id/reports', async (req, res) => {
-    if (!store.detail(req.params.id)) { res.status(404).json({ error: 'Location not found.' }); return; }
-    const { level, note = '' } = req.body ?? {};
-    if (!levels.includes(level) || typeof note !== 'string' || note.trim().length > 200) {
-      res.status(400).json({ error: 'Choose a valid crowd level and a note of at most 200 characters.' }); return;
-    }
-    res.status(201).json(await store.add(req.params.id, level, note.trim()));
+  app.get('/api/libraries/:id/history', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const id = /^[1-5]$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    if (!Number.isFinite(id)) { res.status(404).json({ error: 'Library not found.' }); return; }
+    const result = await history.history(id);
+    if (!result) { res.status(404).json({ error: 'Library not found.' }); return; }
+    res.json(result);
   });
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {
     const invalid = error.type === 'entity.parse.failed' || error.type === 'entity.too.large';
-    res.status(invalid ? 400 : 500).json({ error: invalid ? 'Invalid request body.' : 'Unable to save report. Please try again.' });
+    res.status(invalid ? 400 : 500).json({ error: invalid ? 'Invalid request body.' : 'Unable to complete request. Please try again.' });
   };
   app.use(errors);
   return app;
