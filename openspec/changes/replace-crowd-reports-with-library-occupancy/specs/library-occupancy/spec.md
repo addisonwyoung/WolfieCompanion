@@ -6,6 +6,26 @@ Help authenticated students compare university-monitored library spaces using SB
 
 ## ADDED Requirements
 
+### Requirement: Bounded cold-start loading and manual recovery
+Both live and historical browser GET requests SHALL allow 90 seconds including reading the response body. After five seconds of a still-pending request the UI SHALL announce accessible delayed-loading guidance. Guidance and timers SHALL be cleared on completion or cancellation. Errors SHALL offer a keyboard-accessible Try again action only for the failed request, with duplicate activation prevented while pending. Cancellation and late-response guards SHALL remain effective. Provider deadlines, caches, deduplication and cooldown SHALL remain unchanged.
+
+#### Scenario: Slow successful request
+- **WHEN** a live or historical request takes 15 or 60 seconds
+- **THEN** delayed guidance appears after five seconds and disappears on success without extra requests or a successful-reading refresh control
+
+#### Scenario: Deadline includes body reading
+- **WHEN** headers arrive but the response body remains pending for 90 seconds
+- **THEN** the request is aborted and an error-only Try again action becomes available without automatic retry
+
+#### Scenario: Independent manual recovery
+- **WHEN** a student activates Try again after a live or historical failure
+- **THEN** only that request is repeated, further activation while pending is ignored, and keyboard focus remains usable after success or failure
+
+#### Scenario: Leave during loading
+- **WHEN** the student leaves while a request is pending
+- **THEN** the browser request and loading timers are cancelled, late responses cannot update the view, and reopening can request data normally
+- **AND** browser cancellation does not cancel shared backend provider work or discard successful cached results
+
 ### Requirement: University-only location comparison
 Study Spot Finder SHALL preserve its existing authenticated navigation and show five responsive selectable cards: ID 1 North Reading Room capacity 900, ID 2 Central Reading Room 300, ID 3 Health Sciences Library 350, ID 4 Music Library 110, and ID 5 3rd Floor 300. SBU SHALL be the sole crowd-information source. Each usable reading SHALL show a percentage, textual crowd level, source attribution and retrieval time. Rounded percentages through 50 SHALL be Low, through 80 Moderate, and above 80 Busy, matching SBU's boundaries; visual percentages SHALL be capped at 100 while preserving valid actual counts.
 
@@ -18,7 +38,7 @@ Study Spot Finder SHALL preserve its existing authenticated navigation and show 
 - **THEN** their labels are respectively Low, Moderate, Moderate and Busy
 
 ### Requirement: On-entry requests and shared freshness
-The browser SHALL request all five live readings through the application backend on feature opening, subject to a shared five-minute process-local cache. Concurrent cache misses for a reading SHALL share upstream work. History SHALL be requested only when a detail view is opened and SHALL have a separate one-hour backend cache with request deduplication. Expiry, idle time, foreground changes and selecting cards SHALL NOT cause live polling or background refresh; the UI SHALL NOT expose a refresh button. Reopening the feature SHALL allow another cache-controlled request.
+The browser SHALL request all five live readings through the application backend on feature opening, subject to a shared five-minute process-local cache. Concurrent cache misses for a reading SHALL share upstream work. History SHALL be requested only when a detail view is opened and SHALL have a separate one-hour backend cache with request deduplication. Expiry, idle time, foreground changes and selecting cards SHALL NOT cause live polling or background refresh; the UI SHALL NOT expose a refresh button for successful readings. An error-only Try again action MAY repeat only the failed live or historical request; this SHALL NOT trigger a request for the other data source or an automatic retry. Reopening the feature SHALL allow another cache-controlled request.
 
 #### Scenario: Concurrent visitors
 - **WHEN** two visitors open the feature concurrently with an empty live cache and another opens within five minutes of success

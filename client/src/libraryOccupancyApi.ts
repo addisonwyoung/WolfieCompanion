@@ -14,6 +14,8 @@ export interface LiveLibraryReading {
 }
 
 export const occupancySource = 'https://library.stonybrook.edu/how-busy-are-the-libraries/'
+export const occupancyRequestTimeoutMs = 90_000
+export const occupancyLoadingDelayMs = 5_000
 
 export interface HistoricalBucket {
   hour: number
@@ -37,13 +39,17 @@ export async function loadLibraryHistory(id: number, signal: AbortSignal): Promi
   if (!Number.isInteger(id) || id < 1 || id > 5) throw new Error('Unknown library')
   const expectedWeeks = id <= 3 ? '52' : id === 4 ? '48,49,50' : '49,50,51'
   const timeout = new AbortController()
-  const timer = window.setTimeout(() => timeout.abort(), 8000)
+  const timer = window.setTimeout(() => timeout.abort(), occupancyRequestTimeoutMs)
+  const requestSignal = AbortSignal.any([signal, timeout.signal])
+  const clearDeadline = () => window.clearTimeout(timer)
+  requestSignal.addEventListener('abort', clearDeadline, { once: true })
   try {
     const response = await fetch(`/api/libraries/${id}/history`, {
-      signal: AbortSignal.any([signal, timeout.signal]), cache: 'no-store',
+      signal: requestSignal, cache: 'no-store',
     })
     if (!response.ok) throw new Error('Historical occupancy unavailable')
     const value: LibraryHistory = await response.json()
+    requestSignal.throwIfAborted()
     if (!value || value.id !== id || !Number.isFinite(value.capacity) || value.capacity <= 0
       || value.sourceUrl !== occupancySource || value.weeks !== expectedWeeks || value.bucketMinutes !== 60 || !Array.isArray(value.buckets)) throw new Error('Invalid history response')
     if (value.status === 'unavailable' && value.buckets.length === 0) return value
@@ -59,7 +65,10 @@ export async function loadLibraryHistory(id: number, signal: AbortSignal): Promi
           && (bucket.percentage === null || (typeof bucket.percentage === 'number' && Number.isFinite(bucket.percentage) && bucket.percentage >= 0))
       }) || !value.buckets.some(bucket => bucket.percentage !== null)) throw new Error('Invalid historical buckets')
     return value
-  } finally { window.clearTimeout(timer) }
+  } catch (error) {
+    if (timeout.signal.aborted) throw new Error('Historical occupancy is taking too long to respond.', { cause: error })
+    throw error
+  } finally { clearDeadline(); requestSignal.removeEventListener('abort', clearDeadline) }
 }
 
 function validReading(value: unknown): value is LiveLibraryReading {
@@ -81,13 +90,17 @@ function validReading(value: unknown): value is LiveLibraryReading {
 
 export async function loadLibraryOccupancy(signal: AbortSignal): Promise<LiveLibraryReading[]> {
   const timeout = new AbortController()
-  const timer = window.setTimeout(() => timeout.abort(), 8000)
+  const timer = window.setTimeout(() => timeout.abort(), occupancyRequestTimeoutMs)
+  const requestSignal = AbortSignal.any([signal, timeout.signal])
+  const clearDeadline = () => window.clearTimeout(timer)
+  requestSignal.addEventListener('abort', clearDeadline, { once: true })
   try {
     const response = await fetch('/api/libraries', {
-      signal: AbortSignal.any([signal, timeout.signal]), cache: 'no-store',
+      signal: requestSignal, cache: 'no-store',
     })
     if (!response.ok) throw new Error('Library occupancy could not be loaded.')
     const body: unknown = await response.json()
+    requestSignal.throwIfAborted()
     if (!body || typeof body !== 'object' || !('libraries' in body) || !Array.isArray(body.libraries)
       || body.libraries.length !== 5 || !body.libraries.every(validReading)
       || new Set(body.libraries.map(row => row.id)).size !== 5) {
@@ -97,7 +110,7 @@ export async function loadLibraryOccupancy(signal: AbortSignal): Promise<LiveLib
   } catch (error) {
     if (timeout.signal.aborted) throw new Error('Library occupancy is taking too long to respond.', { cause: error })
     throw error
-  } finally { window.clearTimeout(timer) }
+  } finally { clearDeadline(); requestSignal.removeEventListener('abort', clearDeadline) }
 }
 
 /** Display-only freshness: never initiates requests or renews provider timestamps. */

@@ -180,3 +180,30 @@ test('GET route uses shared service, no-store and fixed upstream requests withou
   assert.equal((await fetch(base + '/api/libraries/999')).status, 404);
   assert.equal(requests.length, 5);
 });
+
+test('disconnecting a browser preserves shared live work and subsequent cache reuse', async t => {
+  const signals: AbortSignal[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const service = new LibraryOccupancy({ now: () => start, fetch: async (_url, init) => {
+    signals.push(init!.signal!); await gate; return json({ population: 20 });
+  } });
+  const server = createApp({}, service).listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const base = `http://127.0.0.1:${address.port}`;
+  const controller = new AbortController();
+  const abandoned = fetch(base + '/api/libraries', { signal: controller.signal });
+  const rejected = assert.rejects(abandoned, { name: 'AbortError' });
+  while (signals.length < 5) await new Promise(resolve => setImmediate(resolve));
+  controller.abort(); await rejected;
+  assert.ok(signals.every(signal => !signal.aborted));
+  const next = fetch(base + '/api/libraries');
+  assert.deepEqual(await (await fetch(base + '/api/health')).json(), { status: 'ok' });
+  release();
+  const body = await (await next).json();
+  assert.ok(body.libraries.every((row: { status: string }) => row.status === 'fresh'));
+  assert.deepEqual(await (await fetch(base + '/api/libraries')).json(), body);
+  assert.equal(signals.length, 5);
+});

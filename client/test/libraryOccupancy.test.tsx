@@ -176,16 +176,16 @@ test('StrictMode ignored first response does not replace the active request', as
   expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(5)
 })
 
-test.each(['network', 'http', 'malformed'])('request %s failure offers reopen guidance without report fallback', async mode => {
+test.each(['network', 'http', 'malformed'])('request %s failure offers error-only retry without report fallback', async mode => {
   vi.stubGlobal('fetch', vi.fn(async () => {
     if (mode === 'network') throw new Error('offline')
     if (mode === 'http') return new Response('', { status: 503 })
     return new Response(JSON.stringify({ libraries: [{ id: 1 }] }))
   }))
   render(<CrowdMeter />)
-  expect(await screen.findByRole('alert')).toHaveTextContent(/reopen it/)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/try again/i)
   expect(screen.queryByRole('status')).not.toBeInTheDocument()
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 })
 
@@ -196,7 +196,7 @@ test('API adapter times out while reading the body and validates five unique rec
   }) })))
   const pending = loadLibraryOccupancy(new AbortController().signal)
   const rejection = expect(pending).rejects.toThrow(/taking too long/)
-  await vi.advanceTimersByTimeAsync(8000)
+  await vi.advanceTimersByTimeAsync(90000)
   await rejection
   const duplicate = result(); duplicate.libraries[4] = duplicate.libraries[0]!
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(duplicate))))

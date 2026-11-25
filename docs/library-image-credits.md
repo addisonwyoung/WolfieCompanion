@@ -32,13 +32,13 @@ The existing card/detail aspect ratios reserve space before loading. Images use 
 
 ## Production assets and replaceability
 
-- `.gitignore` excludes local originals and other files in the directory, with an exception for optimized WebP assets. The five WebP files are eligible for normal Git tracking; staging/committing is not performed here.
+- `.gitignore` excludes local originals and other files in the directory, with an exception for optimized WebP assets. The five WebP files are tracked in the feature checkpoint; originals remain ignored.
 - `libraryDetails.ts` supplies the same five photos in development and production, without a development-only condition. Existing mappings, alt text, cover positions and failure placeholders are preserved.
 - Vite's build-only public copy filter includes exactly the five named WebP files from `images/library`, excluding original JPEGs and other files in that directory. Other public assets remain unchanged. Vercel can serve the resulting `/images/library/*.webp` static URLs without external hosting or backend changes.
 - Preserve JPEG originals locally. Do not force-add originals. Replacing an image requires changing its WebP file and, as appropriate, its metadata/credit and this document. A filename change also requires updating the build allowlist.
 - Unverified third-party permissions and the staircase's exact floor/sensor relationship remain unresolved. Production inclusion is the user's explicit decision, not evidence of a license grant.
 
-No hotlinks, storage services, image endpoints, occupancy requests, caching changes or runtime dependencies are introduced. OpenSpec progress stays 14/22; Groups 4 and 5 are outside this pass.
+No hotlinks, storage services, image endpoints, occupancy requests, caching changes or runtime dependencies were introduced by the photograph pass. That historical pass ended at 14/22; current overall progress is 21/22 after retirement and local integration verification, with Task 5.3 pending hosted acceptance.
 
 ## Verification
 

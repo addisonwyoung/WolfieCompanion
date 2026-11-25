@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { readableTimestamp } from './dateTime'
-import { loadLibraryOccupancy, occupancySource, occupancyStatus } from './libraryOccupancyApi'
+import { loadLibraryOccupancy, occupancyLoadingDelayMs, occupancySource, occupancyStatus } from './libraryOccupancyApi'
 import type { LiveLibraryReading } from './libraryOccupancyApi'
 import { amenitiesSource, libraryDetails } from './libraryDetails'
 import OccupancyChart from './OccupancyChart'
@@ -40,6 +40,13 @@ export default function CrowdMeter() {
   const [locations, setLocations] = useState<LiveLibraryReading[] | null>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [slow, setSlow] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const pending = useRef(true)
+  const retryFocus = useRef(false)
+  const retryButton = useRef<HTMLButtonElement>(null)
+  const featureHeading = useRef<HTMLHeadingElement>(null)
   const [now, setNow] = useState(() => Date.now())
   const generation = useRef(0)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -49,13 +56,32 @@ export default function CrowdMeter() {
   useEffect(() => {
     const controller = new AbortController()
     const token = ++generation.current
+    const delayed = window.setTimeout(() => {
+      if (!controller.signal.aborted && token === generation.current) setSlow(true)
+    }, occupancyLoadingDelayMs)
     void loadLibraryOccupancy(controller.signal).then(rows => {
-      if (!controller.signal.aborted && token === generation.current) { setLocations(rows); setNow(Date.now()) }
+      if (!controller.signal.aborted && token === generation.current) { setLocations(rows); setNow(Date.now()); setError('') }
     }).catch(() => {
-      if (!controller.signal.aborted && token === generation.current) setError('Library occupancy could not be loaded. Leave Study Spot Finder and reopen it to try again.')
+      if (!controller.signal.aborted && token === generation.current) setError('Library occupancy could not be loaded. Please try again.')
+    }).finally(() => {
+      window.clearTimeout(delayed)
+      if (!controller.signal.aborted && token === generation.current) { pending.current = false; setLoading(false); setSlow(false) }
     })
-    return () => controller.abort()
-  }, [])
+    return () => { controller.abort(); window.clearTimeout(delayed) }
+  }, [attempt])
+
+  function retry() {
+    if (pending.current) return
+    pending.current = true; retryFocus.current = true
+    setLoading(true); setSlow(false); setAttempt(value => value + 1)
+  }
+  useEffect(() => {
+    if (!loading && retryFocus.current) {
+      retryFocus.current = false
+      if (locations) featureHeading.current?.focus()
+      else retryButton.current?.focus()
+    }
+  }, [loading, locations])
 
   useEffect(() => {
     if (!locations) return
@@ -99,10 +125,10 @@ export default function CrowdMeter() {
   const currentStatus = current ? occupancyStatus(current, now) : 'unavailable'
 
   return <section className="study-spaces" aria-label="Study Spot Finder">
-    <div className="welcome"><p className="eyebrow">A LITTLE ROOM TO FOCUS</p><h1>Find your study space.</h1><p>Find the best place to study based on current library occupancy.</p></div>
+    <div className="welcome"><p className="eyebrow">A LITTLE ROOM TO FOCUS</p><h1 ref={featureHeading} tabIndex={-1}>Find your study space.</h1><p>Find the best place to study based on current library occupancy.</p></div>
     <div className="library-source-note"><span className="library-source-tag">University sensor data</span><p>From <a href={occupancySource}>SBU Libraries</a></p></div>
-    {error && <div className="library-notice" role="alert">{error}</div>}
-    {!locations && !error && <p className="panel library-loading" role="status">Loading library occupancy…</p>}
+    {error && <div className="library-notice">{!loading && <p role="alert">{error}</p>}<button type="button" ref={retryButton} className="library-retry" aria-disabled={loading} onClick={retry}>Try again</button></div>}
+    {loading && <p className="panel library-loading" role="status" aria-live="polite">{slow ? 'Loading is taking longer than usual. You can keep waiting or return later.' : 'Loading library occupancy…'}</p>}
     {current && details ? <>
       <button className="library-back" onClick={() => { restoreFocus.current = current.id; setNow(Date.now()); setSelected(null) }}>← All study spaces</button>
       <div className="library-detail">

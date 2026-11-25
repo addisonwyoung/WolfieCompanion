@@ -32,6 +32,8 @@
 .location-link { display: flex; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 17px; border-top: 1px solid #ededee; color: #962b3b; font-size: 12px; font-weight: 650; }
 .library-loading, .library-notice { padding: 18px 20px; margin-bottom: 22px; }
 .library-notice { border: 1px solid #e5d6bd; border-radius: 10px; color: #765627; background: #fcf9f2; font-size: 13px; }
+.library-retry { margin-top: 12px; font-size: 13px; }
+.library-retry[aria-disabled="true"] { opacity: .65; cursor: wait; }
 .library-back { margin-bottom: 22px; font-size: 13px; }
 .library-detail { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .library-detail > * { min-width: 0; }

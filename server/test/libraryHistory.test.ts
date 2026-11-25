@@ -149,3 +149,31 @@ test('a wrong room-specific provider selection is unavailable with authoritative
     assert.equal(result?.weeks, histogram(id).weeks);
   }
 });
+
+test('disconnected history callers preserve deduplicated work, history cache and independent live cache', async t => {
+  let histories = 0, live = 0;
+  let signal!: AbortSignal, release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const service = new LibraryOccupancy({ now: () => start, fetch: async (url, init) => {
+    if (new URL(String(url)).searchParams.get('endpoint') === 'population') { live++; return json({ population: 1 }); }
+    histories++; signal = init!.signal!; await gate; return json(histogram());
+  } });
+  const readings = await service.list();
+  const server = createApp({}, service, service).listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const url = `http://127.0.0.1:${address.port}/api/libraries/1/history`;
+  const controller = new AbortController();
+  const abandoned = fetch(url, { signal: controller.signal });
+  const rejected = assert.rejects(abandoned, { name: 'AbortError' });
+  while (!histories) await new Promise(resolve => setImmediate(resolve));
+  controller.abort(); await rejected; assert.equal(signal.aborted, false);
+  const next = fetch(url); release();
+  const body = await (await next).json();
+  assert.equal(body.status, 'available');
+  assert.equal(Date.parse(body.expiresAt) - Date.parse(body.retrievedAt), 3_600_000);
+  assert.deepEqual(await (await fetch(url)).json(), body);
+  assert.deepEqual(await service.list(), readings);
+  assert.equal(histories, 1); assert.equal(live, 5);
+});

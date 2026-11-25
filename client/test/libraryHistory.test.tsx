@@ -126,8 +126,8 @@ test('history request timeout covers a stalled response body without starting re
     }) }))
     vi.stubGlobal('fetch', fetcher)
     const pending = loadLibraryHistory(1, new AbortController().signal)
-    const rejection = expect(pending).rejects.toThrow(/timeout/)
-    await vi.advanceTimersByTimeAsync(8000)
+    const rejection = expect(pending).rejects.toThrow(/taking too long/)
+    await vi.advanceTimersByTimeAsync(90000)
     await rejection
     await vi.advanceTimersByTimeAsync(3_600_000)
     expect(fetcher).toHaveBeenCalledTimes(1)

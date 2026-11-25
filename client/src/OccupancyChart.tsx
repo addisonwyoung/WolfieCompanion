@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { loadLibraryHistory, occupancySource } from './libraryOccupancyApi'
+import { loadLibraryHistory, occupancyLoadingDelayMs, occupancySource } from './libraryOccupancyApi'
 import type { LibraryHistory, LiveLibraryReading } from './libraryOccupancyApi'
 import { compareOccupancy, matchingHistoricalHourIndex } from './occupancyComparison'
 import './OccupancyChart.css'
@@ -9,15 +9,39 @@ function hourLabel(hour: number) { return `${hour % 12 || 12} ${hour < 12 ? 'AM'
 export default function OccupancyChart({ libraryId, live, now }: { libraryId: number; live?: LiveLibraryReading; now?: number }) {
   const [history, setHistory] = useState<LibraryHistory | null>(null)
   const [failed, setFailed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [slow, setSlow] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const pending = useRef(true)
+  const retryFocus = useRef(false)
+  const retryButton = useRef<HTMLButtonElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
   const [selected, setSelected] = useState<number | null>(null)
   const bars = useRef(new Map<number, HTMLButtonElement>())
   useEffect(() => {
     const controller = new AbortController()
+    const delayed = window.setTimeout(() => { if (!controller.signal.aborted) setSlow(true) }, occupancyLoadingDelayMs)
     void loadLibraryHistory(libraryId, controller.signal).then(value => {
-      if (!controller.signal.aborted) setHistory(value)
-    }).catch(() => { if (!controller.signal.aborted) setFailed(true) })
-    return () => controller.abort()
-  }, [libraryId])
+      if (!controller.signal.aborted) { setHistory(value); setFailed(value.status !== 'available') }
+    }).catch(() => { if (!controller.signal.aborted) setFailed(true) }).finally(() => {
+      window.clearTimeout(delayed)
+      if (!controller.signal.aborted) { pending.current = false; setLoading(false); setSlow(false) }
+    })
+    return () => { controller.abort(); window.clearTimeout(delayed) }
+  }, [libraryId, attempt])
+
+  function retry() {
+    if (pending.current) return
+    pending.current = true; retryFocus.current = true
+    setLoading(true); setSlow(false); setAttempt(value => value + 1)
+  }
+  useEffect(() => {
+    if (!loading && retryFocus.current) {
+      retryFocus.current = false
+      if (history?.status === 'available') heading.current?.focus()
+      else retryButton.current?.focus()
+    }
+  }, [loading, history])
 
   const available = history?.status === 'available'
   const comparison = compareOccupancy(live, history, now)
@@ -32,12 +56,12 @@ export default function OccupancyChart({ libraryId, live, now }: { libraryId: nu
     return `${hourLabel(bucket.hour)}${nextDay}: ${value}`
   }
   return <section className="panel occupancy-history" aria-labelledby="occupancy-history-heading">
-    <p className="eyebrow">PLAN YOUR VISIT</p><h2 id="occupancy-history-heading">Historical hourly occupancy</h2>
+    <p className="eyebrow">PLAN YOUR VISIT</p><h2 id="occupancy-history-heading" ref={heading} tabIndex={-1}>Historical hourly occupancy</h2>
     {comparison && <div className={`history-comparison history-comparison-${comparison.tone}`}>
       <h3>{comparison.label}</h3>
     </div>}
-    {!history && !failed && <p role="status" className="history-message">Loading historical occupancy…</p>}
-    {(failed || history?.status === 'unavailable') && <p className="history-message">Historical data is unavailable for this location. Current occupancy is shown separately.</p>}
+    {loading && <p role="status" aria-live="polite" className="history-message">{slow ? 'Loading is taking longer than usual. You can keep waiting or return later.' : 'Loading historical occupancy…'}</p>}
+    {failed && <div className="history-message">{!loading && <p role="alert">Historical data is unavailable for this location. Current occupancy is shown separately.</p>}<button type="button" ref={retryButton} className="library-retry" aria-disabled={loading} onClick={retry}>Try again</button></div>}
     {available && <>
       <div className="history-chart" role="group" aria-label="Hourly historical occupancy. Use left and right arrow keys to inspect hours.">
         <div className="history-axis" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>

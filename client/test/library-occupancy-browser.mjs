@@ -177,6 +177,38 @@ try {
       console.log(`${width}px: ${label}, no overflow, collapsed disclosure, 1 live + 1 history request`)
     }
   }
+  if (!optimize) for (const width of [1280, 820, 375]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 375 })
+    for (const mode of ['live', 'history']) {
+      await send('Page.navigate', { url: `http://127.0.0.1:5187/test/library-occupancy-preview.html?recovery=${mode}` })
+      if (mode === 'history') {
+        await until(() => evaluate('document.querySelectorAll(".location-card").length === 5'))
+        await evaluate('document.querySelector(".location-card").click()')
+      }
+      await until(() => evaluate('document.querySelector(".library-retry")?.getAttribute("aria-disabled") === "false"'))
+      assert.equal(await evaluate('document.querySelector("[role=alert]") !== null'), true)
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+      const errorShot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+      await writeFile(path.join(profile, `error-${mode}-${width}.png`), Buffer.from(errorShot.data, 'base64'))
+      await evaluate('document.querySelector(".library-retry").focus()')
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' })
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+      await until(() => evaluate('document.querySelector(".library-retry")?.getAttribute("aria-disabled") === "true"'))
+      assert.equal(await evaluate('document.activeElement.classList.contains("library-retry")'), true)
+      await evaluate('document.querySelector(".library-retry").click(); document.querySelector(".library-retry").click()')
+      assert.deepEqual(await evaluate('window.occupancyPreview'), mode === 'live' ? { requests: 2, histories: 0 } : { requests: 1, histories: 2 })
+      await until(() => evaluate('document.querySelector("[role=status]")?.textContent.includes("longer than usual")'))
+      const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+      await writeFile(path.join(profile, `recovery-${mode}-${width}.png`), Buffer.from(shot.data, 'base64'))
+      await evaluate('window.occupancyRecovery.release()')
+      await until(() => evaluate(mode === 'live' ? 'document.querySelectorAll(".location-card").length === 5' : 'document.querySelector(".history-bars") !== null'))
+      await until(() => evaluate(`document.activeElement.tagName === ${JSON.stringify(mode === 'live' ? 'H1' : 'H2')}`))
+      assert.equal(await evaluate('document.querySelector(".library-retry")'), null)
+      assert.equal(await evaluate('document.querySelector("[role=status]")'), null)
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+      console.log(`${width}px: ${mode} error-only keyboard retry, delayed guidance, duplicate protection, independent recovery and focus passed`)
+    }
+  }
   assert.deepEqual(errors, [])
   console.log(`Screenshots: ${profile}`)
 } finally { ws?.close(); chrome.kill(); vite.kill() }
