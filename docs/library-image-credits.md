@@ -38,7 +38,7 @@ The existing card/detail aspect ratios reserve space before loading. Images use 
 - Preserve JPEG originals locally. Do not force-add originals. Replacing an image requires changing its WebP file and, as appropriate, its metadata/credit and this document. A filename change also requires updating the build allowlist.
 - Unverified third-party permissions and the staircase's exact floor/sensor relationship remain unresolved. Production inclusion is the user's explicit decision, not evidence of a license grant.
 
-No hotlinks, storage services, image endpoints, occupancy requests, caching changes or runtime dependencies were introduced by the photograph pass. That historical pass ended at 14/22; current overall progress is 21/22 after retirement and local integration verification, with Task 5.3 pending hosted acceptance.
+No hotlinks, storage services, image endpoints, occupancy requests, caching changes or runtime dependencies were introduced by the photograph pass. That historical pass ended at 14/22; current overall progress is 22/22 after retirement, local integration and functional hosted acceptance. This does not resolve photograph reuse permissions.
 
 ## Verification
 

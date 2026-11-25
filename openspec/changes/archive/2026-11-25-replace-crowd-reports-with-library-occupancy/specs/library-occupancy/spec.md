@@ -6,6 +6,17 @@ Help authenticated students compare university-monitored library spaces using SB
 
 ## ADDED Requirements
 
+### Requirement: Functional hosted acceptance and truthful operational evidence
+Production occupancy routes SHALL return their documented contracts through the frontend origin with usable SBU data, no-store responses and observable live/history cache reuse. Retired report reads SHALL return 404 or 410 without report content. Acceptance evidence SHALL distinguish successful backend-to-SBU HTTPS from client-to-platform health, and observed production latency from deterministic cold-start recovery tests. Exact hosted revisions, Node patch version and process count SHALL be reported as unverified when unavailable; under the approved functional acceptance criteria those operational details SHALL NOT prevent release closure after functional verification succeeds. Verification SHALL NOT introduce mutations, forced sleep, keep-alives or TLS changes.
+
+#### Scenario: Functional verification succeeds without dashboard access
+- **WHEN** production forwarding, live/history contracts, usable SBU data, cache reuse and retired reads pass and the user approves production UI
+- **THEN** hosted acceptance can complete with the unavailable exact revisions/runtime/process details explicitly documented as unverified
+
+#### Scenario: Warm production responses do not exercise cold start
+- **WHEN** production requests succeed quickly without an observed idle-backend wake-up
+- **THEN** the record states that controlled cold-start recovery remains deterministically tested locally rather than claiming a production cold-start test passed
+
 ### Requirement: Bounded cold-start loading and manual recovery
 Both live and historical browser GET requests SHALL allow 90 seconds including reading the response body. After five seconds of a still-pending request the UI SHALL announce accessible delayed-loading guidance. Guidance and timers SHALL be cleared on completion or cancellation. Errors SHALL offer a keyboard-accessible Try again action only for the failed request, with duplicate activation prevented while pending. Cancellation and late-response guards SHALL remain effective. Provider deadlines, caches, deduplication and cooldown SHALL remain unchanged.
 
