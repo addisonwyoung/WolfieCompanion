@@ -6,6 +6,7 @@ import CourseBrowser from '../src/CourseBrowser'
 import { courses } from '../src/sampleData'
 import type { Course } from '../src/sampleData'
 import type { ProfessorCatalogState } from '../src/courseProfessors'
+import type { SupabaseClient } from '@supabase/supabase-js'
 const professorCatalog: ProfessorCatalogState = { status: 'success', professors: [], retry: vi.fn() }
 function App() {
  const [list,setList]=useState<Course[]>(courses)
@@ -66,6 +67,7 @@ test('replacement/layout/clear/close discard stale responses and prevent duplica
     vi.mocked(fetch).mockImplementationOnce(()=>new Promise(r=>{resolve=r}) as Promise<Response>)
     start();choose();fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
     expect(screen.getByRole('button',{name:'Reading schedule…'})).toBeDisabled()
+    await waitFor(() => expect(resolve).toBeTypeOf('function'))
     if(action==='replace') choose()
     if(action==='layout') fireEvent.change(screen.getByLabelText('Screenshot layout'),{target:{value:'weekly-calendar'}})
     if(action==='clear') fireEvent.click(screen.getByRole('button',{name:'Clear preview'}))
@@ -90,11 +92,24 @@ test('late failure after clear cannot replace current status; unmount releases i
   let reject!: (error: Error)=>void
   vi.mocked(fetch).mockImplementationOnce(()=>new Promise((_r,j)=>{reject=j}))
   start();choose();fireEvent.click(screen.getByRole('button',{name:'Extract classes'}))
+  await waitFor(() => expect(reject).toBeTypeOf('function'))
   fireEvent.click(screen.getByRole('button',{name:'Clear preview'}))
   reject(new Error('stale error'));await new Promise(r=>setTimeout(r,0))
   expect(screen.getByRole('status')).not.toHaveTextContent('stale error')
   choose();const {cleanup}=await import('@testing-library/react');cleanup()
   expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
+})
+test('signed-in schedule import sends the active account token with the image', async () => {
+  const client = { auth: { getSession: async () => ({ data: { session: { access_token: 'active-student' } }, error: null }) } } as unknown as SupabaseClient
+  render(<ScheduleImportPreview catalog={professorCatalog} client={client} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Import schedule' }))
+  choose()
+  fireEvent.click(screen.getByRole('button', { name: 'Extract classes' }))
+  await screen.findByLabelText('Course code')
+  expect(fetch).toHaveBeenCalledWith('/api/schedule-preview?layout=class-list', expect.objectContaining({
+    headers: { Authorization: 'Bearer active-student', 'Content-Type': 'image/png', 'X-Schedule-Preview': '1' },
+    body: expect.any(File),
+  }))
 })
 test('reviewed imports update the course list once, retain sections and survive clearing',async()=>{
   vi.mocked(fetch).mockResolvedValueOnce(response([

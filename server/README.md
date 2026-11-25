@@ -140,6 +140,62 @@ Six synthetic PNG screenshots, expected codes/metadata, and the live-evaluation 
 
 Attached section labels such as `CSE 310-01` now yield section `01`, preserving leading zeros. A bare Lecture line followed by `8:00 AM` is not a section. Conflicting attached/explicit labels are flagged for review. Common location tokens BLDG/ROOM/RM are excluded as departments; other syntactic false positives can remain, so this is still unverified extraction rather than catalog matching.
 
+## Production schedule import (Render + Vercel)
+
+This reuses the existing Google Vision project and `/api/schedule-preview` route.
+The hosted mode verifies the Supabase bearer token and student eligibility before
+reading uploads. The frontend attaches its current signed-in session automatically.
+
+1. Review and apply `supabase/migrations/202611230001_authenticated_schedule_ocr.sql`
+   in the existing Supabase project's SQL Editor. It adds only a usage-counter table
+   and a service-role-only reservation function; it does not change courses or accounts.
+   Do not run the test bootstrap on the hosted project.
+2. In the same Google project used for local OCR, open IAM & Admin → Service Accounts.
+   Use a dedicated service account with API-use permissions (Service Usage Consumer
+   when required). If a JSON credential is needed, Keys → Add key → Create new key → JSON.
+   Personal `gcloud auth application-default login` credentials remain local; do not
+   upload those. No Storage bucket or broad Owner/Editor role is needed for inline images.
+3. In Render → backend service → Environment → Secret Files, add
+   `google-vision.json` and paste the service-account JSON file contents.
+   Never commit the downloaded file or put it in Vercel.
+4. Add these Render environment variables:
+
+   ```dotenv
+   GOOGLE_APPLICATION_CREDENTIALS=/etc/secrets/google-vision.json
+   ENABLE_AUTHENTICATED_SCHEDULE_PREVIEW=1
+   SCHEDULE_PREVIEW_ORIGIN=https://wolfiecompanion.vercel.app
+   ENABLE_SCHEDULE_PREVIEW=0
+   NODE_ENV=production
+   ```
+
+   Keep the existing `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and
+   `SUPABASE_SERVICE_ROLE_KEY` values. The service key is used only on the backend
+   to reserve quota. No new frontend environment variables are needed.
+5. Commit/push the application changes and deploy both Render and Vercel. The
+   existing Vercel `/api` rewrite forwards the upload and Authorization header.
+6. Sign into the production site with an eligible student account. In Your courses,
+   choose Import schedule, select a PNG/JPEG and layout, and Extract classes. Review
+   the detected rows and choose professors before saving. Extraction alone does not
+   save courses. A health check does not verify Vision access.
+
+Limits: 5 attempts per student and 100 total per UTC day. Reservations are atomic
+in Supabase and persist across restarts/replicas. A reserved attempt is consumed even
+if Google fails or the browser cancels; no automatic paid retries occur. One request
+runs at a time per backend process. Invalid authentication or failed file-size/type/signature validation does not reserve quota. A corrupt image that passes these checks may still consume an attempt.
+Only date, quota scope (student ID or global), and attempt counts are stored; this
+endpoint does not store images or OCR text. Google receives each extracted image.
+These app limits do not cap usage by other applications sharing the Google project.
+
+401: sign in again. 403: check eligible account and exact frontend origin. 429: wait
+for an active request or the next UTC day, depending on the message. 503 about usage:
+check the migration and backend Supabase service key. 502/504: check Google credentials,
+Vision enablement, billing/permissions, or provider timeout. Turning
+`ENABLE_AUTHENTICATED_SCHEDULE_PREVIEW=0` disables hosted extraction; manual course entry
+remains available. The local development mode below is separate.
+
+References: [Render secret files](https://render.com/docs/configure-environment-variables#secret-files),
+[Vision authentication](https://docs.cloud.google.com/vision/docs/authentication).
+
 ## Browser schedule preview (local development)
 
 Start the API from `server`:
@@ -156,7 +212,7 @@ npm run dev -- --host localhost --port 5173 --strictPort
 
 Open `http://localhost:5173`, then Import schedule beside Your courses. Choose a PNG/JPEG up to 10 MiB, select its layout, and click Extract classes. Review/edit course and section rows, add/remove classes, or Clear/Close. Click Add to Your courses after reviewing to update the dashboard for this session only; reload restores sample courses. Nothing is saved to a database. Google ADC/billing/API setup is still required for real extraction; each explicit extraction uses an OCR unit.
 
-POST `/api/schedule-preview?layout=class-list|weekly-calendar` accepts raw image bytes with matching PNG/JPEG content type, `X-Schedule-Preview: 1`, and Origin `http://localhost:5173`. The Vite proxy forwards it to the API. `SCHEDULE_PREVIEW_ORIGIN` can specify another exact HTTP localhost/127.0.0.1 origin if using a different Vite port. Opt-in binds the server to 127.0.0.1; the endpoint is disabled by default and always disabled in production. It rejects unrelated origins/headers and allows one active extraction at a time. No public deployment or authentication is provided by this local feature.
+POST `/api/schedule-preview?layout=class-list|weekly-calendar` accepts raw image bytes with matching PNG/JPEG content type, `X-Schedule-Preview: 1`, and Origin `http://localhost:5173`. The Vite proxy forwards it to the API. `SCHEDULE_PREVIEW_ORIGIN` can specify another exact HTTP localhost/127.0.0.1 origin if using a different Vite port. Local opt-in binds the server to 127.0.0.1 and is always disabled in production. It rejects unrelated origins/headers and allows one active extraction at a time. Hosted access requires the separate authenticated opt-in described above.
 
 Responses contain only `{ rows: [{ code, section, warnings }], warnings, requiresReview: true }`; raw OCR text and image positions remain outside the browser response. Errors use 400 invalid input, 413 too large, 415 unsupported media, 403 local access checks, 404 disabled, 429 busy, and 502/504 provider failure/timeout. Clear/replacement discards browser results, but cannot guarantee cancellation of an already accepted Google request. No images/results are persisted or logged by this endpoint.
 
