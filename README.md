@@ -82,7 +82,7 @@ A fully local Supabase stack is possible in principle with the [official CLI/Doc
 | Map background | Approved public MapTiler key/map ID, appropriate provider origin restrictions and quota. Without these, map background is unavailable; location browsing does not need a tile key. Optional feedback URL enables suggestion links. |
 | Social demonstration | Multiple eligible independent browser sessions and suitable enrollment/friendship data. Group chat creation needs the creator plus two accepted friends. New accounts start empty. |
 | Reminders | Persistent in-app reminders; no email or closed-app push implementation. |
-| Crowd reports | Anonymous Express endpoints, separate from Supabase campus records. JSON file defaults to `server/data/crowd-reports.json`. Requires one process and writable persistent disk. Separate local APIs do not share reports. |
+| Study Spot Finder | SBU library occupancy through Express, with independent live/history in-memory caches. Student reports and JSON storage startup are retired; saved report files remain untouched. Campus Explorer Supabase records are separate and unchanged. |
 
 Current services are React/Vite, Express, Supabase Auth/Postgres/Storage/Realtime, optional Google Vision, OpenAI moderation and MapTiler. Firebase, Socket.IO, Resend/SendGrid and Mapbox are not required by the implementation. Prisma is a scaffold.
 

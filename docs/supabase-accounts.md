@@ -33,7 +33,7 @@ Picture uploads commit the profile reference before deleting the previous object
 
 Enter classes manually without enabling OCR, or use the development-only schedule preview and confirm Add to Your courses. Course codes accept 2–4 department letters and three digits; sections accept up to 20 letters, digits, or hyphens, or blank. Extraction, edits, Clear, and Close never save by themselves. Explicit confirmation saves only course/section values; images and raw OCR text are not persisted. Save errors retain drafts for retry. Saved classes restore automatically on another login/device without re-uploading. These are self-reported current classes; semester history, official registration verification, and class removal UI are outside this change.
 
-Existing crowd and evaluation demonstrations remain separate from this account model. Production OCR remains disabled; refer to server/README.md for its local opt-in and Google Vision requirements.
+Study Spot Finder university occupancy remains separate from this account model; student crowd reporting is retired. Production OCR remains disabled; refer to server/README.md for its local opt-in and Google Vision requirements.
 
 ## Course evaluations
 

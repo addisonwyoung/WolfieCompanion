@@ -31,7 +31,7 @@
 | Classmate recommendations | PostgreSQL stores course, major, and interest data that the backend then uses to generate classmate recommendations |
 | Messaging & group chats | Socket.IO supports real-time communication, while PostgreSQL provides persistent conversation storage |
 | Availability & group scheduling | Schedule and availability data stored in PostgreSQL can be compared by backend logic to identify overlapping meeting times | 
-| Study-space crowd reporting | Mapbox displays campus study locations, and PostgreSQL stores reports, while Socket.IO provides live crowd-level updates |
+| Study Spot Finder | SBU live and historical library occupancy through Express with independent on-demand memory caches; student reporting is retired. Campus Explorer keeps its separate Supabase locations. |
 | Assignment reminders | Assignment/deadline data is stored in PostgreSQL and Resend will deliver reminder notifcations | 
 | Anonymous course evaluations | PostgreSQL stores course evaluations, while backend authorization controls access and maintains anonymity | 
 

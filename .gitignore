@@ -4,6 +4,10 @@ node_modules/
 # Build output
 dist/
 
+# Keep original library photographs local; optimized WebP assets may be tracked.
+client/public/images/library/*
+!client/public/images/library/*.webp
+
 # Environment variables
 .env
 .env.*

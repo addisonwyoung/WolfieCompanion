@@ -1,22 +1,94 @@
 # Wolfie API
 
-For current M5 installation, environment loading, service requirements and limitations, start with the [root setup guide](../README.md). The API now includes authenticated avatar, peer-picture and review routes in addition to the anonymous crowd prototype described below. Historical OCR examples use a team project ID; use your own authorized project instead. Current enrollment persistence is described in the client/root guides; the older browser-preview section's session-only behavior is historical.
+## Library occupancy
+
+`GET /api/libraries` is an anonymous, read-only aggregate endpoint used by the
+library UI; legacy report backend routes and storage initialization are retired. Requests go
+only to SBU's fixed population proxy for IDs 1–5; caller cookies, authorization,
+query parameters and arbitrary URLs are not forwarded. No API key, new dependency,
+database migration or additional environment setting is needed.
+
+The response is `{ "libraries": [...] }`, always with five catalog entries. Example
+entry for a successful reading of 450 people (illustrative, not a live fixture):
+
+```json
+{
+  "id": 1,
+  "name": "North Reading Room",
+  "capacity": 900,
+  "population": 450,
+  "percentage": 50,
+  "crowdLevel": "Low",
+  "estimatedRemainingCapacity": 450,
+  "status": "fresh",
+  "retrievedAt": "2026-11-24T12:00:00.000Z",
+  "freshUntil": "2026-11-24T12:05:00.000Z",
+  "usableUntil": "2026-11-24T12:30:00.000Z",
+  "sourceUrl": "https://library.stonybrook.edu/how-busy-are-the-libraries/"
+}
+```
+
+Catalog capacities are North Reading Room 900, Central Reading Room 300, Health
+Sciences Library 350, Music Library 110, and 3rd Floor 300, verified from SBU's
+widget configuration. They are occupancy denominators, not available-seat counts.
+Remaining capacity is `max(0, capacity - population)`, not a promise of empty seats.
+Percentages are rounded and capped at 100; Low is through 50%, Moderate through
+80%, Busy above 80%. Valid over-capacity counts remain visible in `population`.
+
+Fresh readings are reused for five minutes from retrieval. Concurrent misses share
+one in-flight request per library. Five requests run concurrently; one library's
+failure does not discard the other results. Each upstream request has a five-second
+timeout covering headers/body. Failed requests enter a 30-second retry cooldown.
+The last good value can be returned as `stale` through 30 minutes from its original
+retrieval; failures do not renew its timestamp. After that it becomes `unavailable`:
+population, percentage, level, estimated remaining capacity and all three time
+fields are null. No fabricated zeros are used. Valid measured zero remains 0%/Low.
+Malformed JSON, HTTP failures, missing/non-numeric/negative/non-finite counts and
+counts strictly above 1.5 times capacity are failures. The anomaly boundary is
+confirmed in SBU's [widget fetchPopulation implementation](https://library.stonybrook.edu/wp-content/plugins/sbu-occupancy/assets/js/occupancy.js):
+`raw > cap * 1.5`. Wolfie uses stale/unavailable instead of SBU's zero fallback.
+
+`retrievedAt` is our successful fetch completion time, not a sensor timestamp.
+The frontend uses `freshUntil` and `usableUntil` to advance freshness
+locally: stale at five minutes, unavailable with no usable current metrics after
+30 minutes even if the view stays open. That display-only expiry must not make
+requests. The backend supplies those timestamps without renewing cached retrieval times.
+
+There are no background jobs, polling, or automatic retries. Expiry alone sends no
+requests; a subsequent endpoint call checks freshness. Responses use
+`Cache-Control: no-store` so browser/CDN caches do not extend backend freshness.
+The default service is shared within one Express process, including concurrent
+visitors. Restarts clear it; separate instances have separate caches and may each
+contact SBU. No report storage or persistent disk is needed for library occupancy or API startup.
+`/api/health` does not call SBU. `GET /api/libraries/:id/history` now provides an
+independent one-hour-cached histogram for IDs 1–5, using fixed dayOffset 0, 60-minute
+24-bucket windows and SBU's official reference weeks (IDs 1–3: 52; ID 4: 48,49,50;
+ID 5: 49,50,51). History success/in-flight/failure keys include room and week
+selection; provider metadata must match. See the [history contract and verified findings](../docs/library-occupancy.md)
+for returned order/reference timestamps, missing/zero/over-capacity handling,
+history-only failure states, and request/caching tests. No live cache behavior changes.
+
+Focused verification: from `server/`, run
+`node --import tsx --test test/libraryOccupancy.test.ts`; `npm test` includes these
+tests alongside existing backend checks. Tests inject fetch/time and do not call
+SBU. `npm run build` performs the existing Prisma generation and TypeScript build.
+
+## Existing service setup
+
+For current M5 installation, environment loading, service requirements and limitations, start with the [root setup guide](../README.md). The API includes authenticated avatar, peer-picture and review routes plus anonymous university library occupancy reads. Historical OCR examples use a team project ID; use your own authorized project instead. Current enrollment persistence is described in the client/root guides; the older browser-preview section's session-only behavior is historical.
 
 Preserve an existing `server/.env`; for a fresh clone, copy `server/.env.example` to `server/.env` and configure it as described in the root guide. Run `npm ci` then `npm run dev` from `server/`. The entry point imports `dotenv/config`, loading `.env` from that working directory; exported shell values take precedence. Vite separately loads `client/.env.local`. Restart the server after environment edits. Default port: 3000 (`PORT` overrides it).
-Reports persist in server/data/crowd-reports.json. `CROWD_REPORTS_PATH` can select another file (use an absolute path). Missing storage starts empty; invalid storage stops startup rather than discarding reports.
+Student-submitted crowd reporting is retired. Existing report files remain untouched and unused. Startup does not read or write report JSON, require a writable report directory, or consume the former report-path setting.
 
 Prisma tooling separately loads `PRISMA_ENV_FILE` or `.env` by default. Only `PRISMA_ENV_FILE=.env.supabase` selects `DIRECT_URL`; otherwise it uses `DATABASE_URL`. Set the selector in the invoking shell before running Prisma from `server/`, not only inside the file it is intended to select. Preserve any existing `.env.supabase`; Express does not load it or use this selector. No database command or connection is needed for normal API startup. Shell values take precedence over both dotenv loaders.
 
-Use one server process and persistent writable disk. This anonymous student prototype has no authentication or moderation; it is not intended for public production use.
+- GET /api/health: provider-independent health status.
+- GET /api/libraries: five university-provided live readings.
+- GET /api/libraries/:id/history: independent historical hourly occupancy.
 
-- GET /api/health: health status.
-- GET /api/locations: six locations with latestReport (null when unknown).
-- GET /api/locations/:id: location, latestReport and ten recent reports newest first.
-- POST /api/locations/:id/reports: JSON {"level":"Low","note":"many seats available"}. Levels: Empty, Low, Moderate, Busy, Full. Note optional, at most 200 trimmed characters. Returns 201 and a server-timestamped report. Errors: 400 invalid input, 404 unknown location, 500 save failure.
+The former GET /api/locations, GET /api/locations/:id and POST /api/locations/:id/reports routes are removed and return 404 for ordinary requests. They expose no legacy data and accept no reports. Supabase campus_locations and its study_spot category belong to Campus Explorer and are unchanged.
 
-IDs are lowercase hyphenated names, e.g. north-reading-room. Every submission appends history; the last accepted report determines the current summary. No report means unknown, never Empty.
-
-`npm test` runs isolated API/storage tests; `npm run build` generates Prisma Client before compiling the server. The `prisma-client` generator writes to `src/generated/prisma` (relative to `prisma/schema.prisma`), matching the import in `src/lib/prisma.ts`. Generated files stay gitignored. The current checked-in schema is a scaffold without models; the installed Prisma 7 CLI supports generating that client without adding database models. Generation does not connect to a database and works without local env files or database credentials; runtime Prisma access still requires its configured connection URL. CI uses the same build command after `npm ci`. Back up the JSON file before manually resetting demo data. Do not run multiple processes against the same file.
+`npm test` runs isolated API, occupancy, report-retirement and OCR tests; `npm run build` generates Prisma Client before compiling the server. The `prisma-client` generator writes to `src/generated/prisma` (relative to `prisma/schema.prisma`), matching the import in `src/lib/prisma.ts`. Generated files stay gitignored. The current checked-in schema is a scaffold without models; the installed Prisma 7 CLI supports generating that client without adding database models. Generation does not connect to a database and works without local env files or database credentials; runtime Prisma access still requires its configured connection URL. CI uses the same build command after `npm ci`. Existing saved report files are historical data; leave them in place.
 
 ## Schedule OCR experiment: cloud setup
 
