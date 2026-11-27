@@ -13,11 +13,12 @@ export function Avatar({ name, url }: { name: string; url?: string }) {
 }
 
 const interestCategories = [
-  { name: 'sports & fitness', interests: ['Volleyball', 'Basketball', 'Soccer', 'Going to the Gym', 'Running', 'Hiking', 'Yoga', 'Walking', 'Baseball', 'Tennis', 'Swimming', 'Rock Climbing', 'Dance'] },
-  { name: 'games & entertainment', interests: ['Video Games', 'Board Games', 'Anime & Manga', 'Movies', 'TV Shows', 'Listening to Music', 'Reading', 'Comic Books'] },
-  { name: 'technology & business', interests: ['Web Development', 'Game Development', 'Robotics', 'Engineering', 'Trading & Investing'] },
-  { name: 'arts', interests: ['Crafting', 'Drawing', 'Painting', 'Graphic Design', 'Photography', 'Video Editing', 'Creative Writing', 'Knitting & Crocheting', 'Playing an Instrument', 'Singing', 'Pottery'] },
+  { name: 'sports & fitness', interests: ['Volleyball', 'Basketball', 'Soccer', 'Working Out', 'Running', 'Hiking', 'Yoga', 'Walking', 'Baseball', 'Tennis', 'Swimming', 'Rock Climbing', 'Dance', 'Badminton', 'Pickleball', 'Cycling', 'Golf', 'Pilates', 'Lacrosse', 'Football', 'Fishing'] },
+  { name: 'games & entertainment', interests: ['Video Games', 'Board Games', 'Anime & Manga', 'Movies', 'TV Shows', 'Listening to Music', 'Reading', 'Comic Books', 'Watching Sports', 'Going to Concerts', 'Listening to Podcasts', 'LEGOs'] },
+  { name: 'technology & business', interests: ['Web Development', 'Game Development', 'Robotics', 'Engineering', 'Trading & Investing', 'Web Design', '3D Printing', 'Entrepreneurship'] },
+  { name: 'arts', interests: ['Crafting', 'Drawing', 'Painting', 'Graphic Design', 'Photography', 'Video Editing', 'Creative Writing', 'Knitting & Crocheting', 'Playing an Instrument', 'Singing', 'Pottery', 'Acting', 'Vlogging', 'Streaming', 'Songwriting', 'Musical Theater', 'DJing'] },
   { name: 'food', interests: ['Cooking', 'Baking', 'Trying New Foods', 'Trying New Cafes'] },
+  { name: 'other', interests: ['Traveling', 'Shopping', 'Thrifting', 'Gardening', 'Volunteering', 'Learning Languages', 'Pets', 'Collecting', 'Fashion/Makeup', 'Journaling', 'Astronomy'] },
 ] as const
 const catalogInterests = new Set(interestCategories.flatMap(category => category.interests.map(interest => interest.toLowerCase())))
 function cleanInterestDraft(interests: string[]) {

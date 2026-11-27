@@ -6,8 +6,8 @@ import NotificationBell from './NotificationBell'
 
 type Menu = 'academics' | 'explore' | 'profile' | 'notifications'
 type Destination = { view: AppView; label: string }
-const academics: Destination[] = [{ view: 'academic', label: 'Assignments & Exams' }, { view: 'evaluations', label: 'Course evaluations' }]
-const explore: Destination[] = [{ view: 'explorer', label: 'Campus Explorer' }, { view: 'spaces', label: 'Study spaces' }]
+const academics: Destination[] = [{ view: 'academic', label: 'Assignments & Exams' }, { view: 'evaluations', label: 'Course Evaluations' }]
+const explore: Destination[] = [{ view: 'explorer', label: 'Campus Explorer' }, { view: 'spaces', label: 'Study Spaces' }]
 
 export function NavigationHeader({ children }: { children?: ReactNode }) {
   return <header className="site-header"><div className="header-inner"><a href="#main" className="brand"><span className="brand-mark" aria-hidden="true">W</span><span>Wolfie <strong>Companion</strong></span></a>{children}</div></header>
@@ -79,7 +79,7 @@ export default function AppNavigation({ view, onNavigate, onSignOut, checkItem, 
     {ready && <div className="header-primary">
       <button type="button" className="header-nav-button" aria-current={view === 'dashboard' ? 'page' : undefined} aria-pressed={view === 'dashboard'} onClick={() => navigate('dashboard')}>Dashboard</button>
       <MessagesNavigation active={view === 'messages'} onClick={() => navigate('messages')}/>
-      <button type="button" className="header-nav-button" aria-current={view === 'study-groups' ? 'page' : undefined} aria-pressed={view === 'study-groups'} onClick={() => navigate('study-groups')}>Study buddies</button>
+      <button type="button" className="header-nav-button" aria-current={view === 'study-groups' ? 'page' : undefined} aria-pressed={view === 'study-groups'} onClick={() => navigate('study-groups')}>Study Buddies</button>
       {menu('academics', 'Academics', academics)}{menu('explore', 'Explore', explore)}
     </div>}
     <div className="header-actions">

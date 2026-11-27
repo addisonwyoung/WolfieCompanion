@@ -11,8 +11,12 @@ function review(id: string, offeringId = courseOfferings[0].id): CourseEvaluatio
 }
 function api(overrides: Partial<CourseReviewApi> = {}) {
   return {
+    loadCatalogCourses: vi.fn(async () => []),
     loadOfferings: vi.fn(async () => courseOfferings),
     loadOffering: vi.fn(async () => [review('stored-review')]),
+    myReviews: vi.fn(async () => []),
+    updateReview: vi.fn(async (id, input) => ({ review: { ...review(id), ...input, createdAt: '2026-11-01' }, moderationStatus: 'appropriate' as const })),
+    deleteReview: vi.fn(async () => {}),
     myOfferingIds: vi.fn(async () => []),
     myCurrentOfferingIds: vi.fn(async () => [courseOfferings[0].id]),
     myVerifiedOfferingIds: vi.fn(async () => courseOfferings.map(item => item.id)),
@@ -26,6 +30,7 @@ test('loads persisted anonymous reviews and selects offering-specific review key
   render(<CourseEvaluations api={reviews} />)
   expect(await screen.findByText('Persisted anonymous review.')).toBeInTheDocument()
   expect(reviews.loadOffering).toHaveBeenCalledWith(courseOfferings[0].id)
+  expect(screen.getByRole('button', { name: /CSE 416: Software Engineering/ })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.queryByText(/@/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Student A|reviewer@example\.com|00000000-0000-0000/i)).not.toBeInTheDocument()
 
@@ -46,12 +51,192 @@ test('shows the calculated average class rating for the selected offering', asyn
   expect(averageLabel.parentElement).toHaveTextContent('4.0 / 5')
 })
 
-test('shows when the current user has already published a review for the offering', async () => {
-  const reviews = api({ myOfferingIds: vi.fn(async () => [courseOfferings[0].id]) })
-  render(<CourseEvaluations api={reviews} />)
+test('shows a top action for a reviewable offering and scrolls to the review form', async () => {
+  const scrollIntoView = vi.fn()
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+  render(<CourseEvaluations api={api()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Go to your review' }))
+  expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+})
 
-  expect(await screen.findByText('You’ve already published a review for this offering. Reading reviews remains available.')).toBeInTheDocument()
+test('shows catalog-only courses in Search other without allowing reviews', async () => {
+  const reviews = api({
+    loadCatalogCourses: vi.fn(async () => [{ code: 'CSE 416', courseNumber: '416', title: 'Software Engineering', professors: [{ firstName: 'Ada', lastName: 'Lovelace' }] }]),
+    loadOfferings: vi.fn(async () => []),
+    myCurrentOfferingIds: vi.fn(async () => []),
+    myVerifiedOfferingIds: vi.fn(async () => []),
+  })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
+  fireEvent.change(screen.getByLabelText('Search published offerings'), { target: { value: 'CSE 416' } })
+  const course = await screen.findByRole('button', { name: /CSE 416: Software Engineering/ })
+  expect(course.querySelectorAll('span')).toHaveLength(2)
+  expect(course).toHaveTextContent('Ada Lovelace')
+  expect(course).toHaveTextContent('Fall 2026')
+  expect(course).not.toHaveTextContent('Section')
+  fireEvent.click(course)
+  expect(await screen.findByText('This course is in the catalog, but no verified section offering is available yet.')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No verified offering yet' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Publish review' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Go to your review' })).not.toBeInTheDocument()
+})
+
+test('shows every exact offering and hides the generic course entry once offerings exist', async () => {
+  const exact: CourseOffering[] = [
+    { id: 'cse-416-fall-2026-lee-01', code: 'CSE 416', title: 'Software Engineering', professor: 'Dr. Lee', semester: 'Fall', year: 2026, section: '01', published: true },
+    { id: 'cse-416-fall-2026-lee-02', code: 'CSE 416', title: 'Software Engineering', professor: 'Dr. Lee', semester: 'Fall', year: 2026, section: '02', published: true },
+  ]
+  const reviews = api({
+    loadCatalogCourses: vi.fn(async () => [{ code: 'CSE 416', courseNumber: '416', title: 'Software Engineering', professors: [] }]),
+    loadOfferings: vi.fn(async () => exact),
+    myCurrentOfferingIds: vi.fn(async () => []),
+    myVerifiedOfferingIds: vi.fn(async () => []),
+  })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
+  const list = await screen.findByRole('list', { name: 'Other published offerings' })
+  await waitFor(() => expect(list.querySelectorAll('button')).toHaveLength(2))
+  expect(list.textContent).toContain('Section 01')
+  expect(list.textContent).toContain('Section 02')
+  expect(list.querySelectorAll('button[aria-label="CSE 416: Software Engineering"]')).toHaveLength(0)
+})
+
+test('keeps a generic entry for each professor until that professor has a verified offering', async () => {
+  const exact: CourseOffering[] = [
+    { id: 'cse-416-fall-2026-ada-01', code: 'CSE 416', title: 'Software Engineering', professor: 'Ada Lovelace', professorFirstName: 'Ada', professorLastName: 'Lovelace', semester: 'Fall', year: 2026, section: '01', published: true },
+    { id: 'cse-416-fall-2026-pat-02', code: 'CSE 416', title: 'Software Engineering', professor: 'Pat Example', professorFirstName: 'Pat', professorLastName: 'Example', semester: 'Fall', year: 2026, section: '02', published: true },
+  ]
+  const reviews = api({
+    loadCatalogCourses: vi.fn(async () => [{ code: 'CSE 416', courseNumber: '416', title: 'Software Engineering', professors: [
+      { firstName: 'Ada', lastName: 'Lovelace' },
+      { firstName: 'Grace', lastName: 'Hopper' },
+      { firstName: 'Pat', lastName: 'Example' },
+    ] }]),
+    loadOfferings: vi.fn(async () => exact),
+    myCurrentOfferingIds: vi.fn(async () => []),
+    myVerifiedOfferingIds: vi.fn(async () => []),
+  })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
+  fireEvent.change(screen.getByLabelText('Search published offerings'), { target: { value: 'CSE 416' } })
+  const list = await screen.findByRole('list', { name: 'Other published offerings' })
+  await waitFor(() => expect(list.querySelectorAll('button')).toHaveLength(3))
+  const buttons = [...list.querySelectorAll('button')]
+  expect(buttons.find(button => button.textContent?.includes('Grace Hopper'))).toHaveTextContent('Fall 2026')
+  expect(buttons.find(button => button.textContent?.includes('Grace Hopper'))).not.toHaveTextContent('Section')
+  expect(buttons.find(button => button.textContent?.includes('Ada Lovelace'))).toHaveTextContent('Section 01')
+  expect(buttons.find(button => button.textContent?.includes('Pat Example'))).toHaveTextContent('Section 02')
+})
+
+test('shows only five verified offerings until the user searches', async () => {
+  const offerings: CourseOffering[] = Array.from({ length: 6 }, (_, index) => ({
+    id: `cse-${300 + index}`,
+    code: `CSE ${300 + index}`,
+    title: `Course ${index + 1}`,
+    professor: 'Dr. Lee',
+    semester: 'Fall',
+    year: 2026,
+    section: '01',
+    published: true,
+  }))
+  const reviews = api({
+    loadCatalogCourses: vi.fn(async () => [{ code: 'BIO 201', courseNumber: '201', title: 'Organisms to Ecosystems', professors: [] }]),
+    loadOfferings: vi.fn(async () => offerings),
+    myCurrentOfferingIds: vi.fn(async () => []),
+    myVerifiedOfferingIds: vi.fn(async () => []),
+  })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
+  const list = await screen.findByRole('list', { name: 'Other published offerings' })
+  await waitFor(() => expect(list.querySelectorAll('button')).toHaveLength(5))
+  expect(screen.getByText('Showing 5 verified offerings. Search to find more courses.')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Search published offerings'), { target: { value: 'CSE 305' } })
+  expect(await screen.findByRole('button', { name: /CSE 305: Course 6/ })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Search published offerings'), { target: { value: 'BIO 201' } })
+  expect(await screen.findByRole('button', { name: /BIO 201: Organisms to Ecosystems/ })).toBeInTheDocument()
+})
+
+test('shows when the current user has already published a review for the offering', async () => {
+  const reviews = api({ myReviews: vi.fn(async () => [{ ...review('mine'), createdAt: '2026-11-01' }]) })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Your reviews' }))
+
+  expect(await screen.findByText('You’ve already published a review for this offering.')).toBeInTheDocument()
+  expect(screen.getByRole('list', { name: 'Your published anonymous review' }).querySelector('li')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Edit review' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Delete review' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Publish review' })).not.toBeInTheDocument()
+})
+
+test('edits a saved review from a past offering without current enrollment', async () => {
+  const mine = { ...review('mine'), createdAt: '2025-01-01' }
+  const updated = { ...mine, weeklyHours: 12, difficulty: 5, classRating: 2, wouldRecommend: false, review: 'Updated thoughts.' }
+  const reviews = api({ myReviews: vi.fn().mockResolvedValueOnce([mine]).mockResolvedValue([updated]), loadOffering: vi.fn().mockResolvedValueOnce([mine]).mockResolvedValue([updated]), myCurrentOfferingIds: vi.fn(async () => []), myVerifiedOfferingIds: vi.fn(async () => []), updateReview: vi.fn(async () => ({ review: updated, moderationStatus: 'appropriate' as const })) })
+  render(<CourseEvaluations api={reviews} />)
+  expect(await screen.findByRole('button', { name: 'Go to your review' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Your reviews' }))
+  const history = await screen.findByRole('list', { name: 'Your submitted reviews' })
+  fireEvent.click(history.querySelector('button')!)
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit review' }))
+  expect(screen.getByLabelText('Weekly hours')).toHaveValue(8)
+  fireEvent.change(screen.getByLabelText('Weekly hours'), { target: { value: '12' } })
+  fireEvent.change(screen.getByLabelText('Difficulty'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('Class rating'), { target: { value: '2' } })
+  fireEvent.click(screen.getByLabelText('No'))
+  fireEvent.change(screen.getByLabelText('Written review'), { target: { value: 'Updated thoughts.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  expect(await screen.findByText('Your review was updated.')).toBeInTheDocument()
+  expect(reviews.updateReview).toHaveBeenCalledWith('mine', { weeklyHours: 12, difficulty: 5, classRating: 2, wouldRecommend: false, review: 'Updated thoughts.' })
+  await waitFor(() => expect(screen.getByText('average hours / week').parentElement).toHaveTextContent('12.0'))
+  expect(screen.getByText('average difficulty').parentElement).toHaveTextContent('5.0 / 5')
+  expect(screen.getByText('average class rating').parentElement).toHaveTextContent('2.0 / 5')
+  expect(screen.getByRole('meter', { name: /No would you recommend/ })).toHaveAttribute('aria-valuenow', '1')
+  expect(screen.getByText('review').parentElement).toHaveTextContent('1')
+})
+
+test('confirms deletion, updates review history, and allows another submission', async () => {
+  const mine = { ...review('mine'), createdAt: '2025-01-01' }
+  const reviews = api({ myReviews: vi.fn().mockResolvedValueOnce([mine]).mockResolvedValue([]), deleteReview: vi.fn(async () => {}), loadOffering: vi.fn(async () => []) })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete review' }))
+  expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(screen.getByRole('button', { name: 'Delete review' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Delete review' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm deletion' }))
+  expect(await screen.findByText('Review deleted. You can submit another review.')).toBeInTheDocument()
+  expect(reviews.deleteReview).toHaveBeenCalledWith('mine')
+  expect(await screen.findByRole('button', { name: 'Publish review' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No evaluations yet' })).toBeInTheDocument()
+})
+
+test('keeps flagged reviews out of aggregate summaries', async () => {
+  const reviews = api({ loadOffering: vi.fn(async () => [{ ...review('flagged'), moderationStatus: 'flagged' }]) })
+  render(<CourseEvaluations api={reviews} />)
+  expect(await screen.findByText('No appropriate reviews to display yet.')).toBeInTheDocument()
+  expect(screen.queryByText('average hours / week')).not.toBeInTheDocument()
+  expect(screen.getByText('Flagged reviews (1)')).toBeInTheDocument()
+})
+
+test('keeps the saved review and edit draft when an update fails', async () => {
+  const mine = { ...review('mine'), createdAt: '2025-01-01' }
+  const reviews = api({ myReviews: vi.fn(async () => [mine]), updateReview: vi.fn(async () => { throw new Error('Update failed.') }) })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit review' }))
+  fireEvent.change(screen.getByLabelText('Written review'), { target: { value: 'Keep my edit.' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+  expect(await screen.findByText('Update failed.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Written review')).toHaveValue('Keep my edit.')
+})
+
+test('keeps a review visible when deletion fails', async () => {
+  const mine = { ...review('mine'), createdAt: '2025-01-01' }
+  const reviews = api({ myReviews: vi.fn(async () => [mine]), deleteReview: vi.fn(async () => { throw new Error('Delete failed.') }) })
+  render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete review' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm deletion' }))
+  expect(await screen.findByText('Delete failed.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Delete review' })).toBeInTheDocument()
 })
 
 test('allows review submission only for the exact enrolled course offering', async () => {
@@ -68,6 +253,7 @@ test('allows review submission only for the exact enrolled course offering', asy
     submit,
   })
   render(<CourseEvaluations api={reviews} />)
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
 
   expect(await screen.findByRole('button', { name: 'Publish review' })).toBeInTheDocument()
   for (const offeringName of [/Section 02/, /Spring 2026/, /Fall 2025/, /BIO 201/]) {
@@ -127,7 +313,7 @@ test('persists a valid submission and keeps duplicate errors on the selected off
   fireEvent.click(screen.getByLabelText('No'))
   fireEvent.click(screen.getByRole('button', { name: 'Publish review' }))
   await screen.findByText('You have already published a review for this offering.')
-  expect(screen.getByText(/already published a review for this offering. Reading reviews remains available/)).toBeInTheDocument()
+  expect(screen.getByText('You have already published a review for this offering.')).toBeInTheDocument()
 })
 
 test('calculates average difficulty and weekly hours from individual review ratings', () => {
