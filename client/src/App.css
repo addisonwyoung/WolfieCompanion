@@ -41,6 +41,7 @@ textarea { resize: vertical; }
 .interest-chip span { color: #8f2634; font-size: 14px; line-height: 1; }
 .interest-categories { display: grid; gap: 7px; margin-top: 14px; }
 .interest-category { border: 1px solid #e5e5e8; border-radius: 7px; padding: 0 9px; }
+.interest-category[open] { padding-bottom: 8px; }
 .interest-category summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; cursor: pointer; font-size: 12px; font-weight: 600; text-transform: capitalize; }
 .interest-category[open] summary { margin-bottom: 8px; border-bottom: 1px solid #ededee; }
 .interest-category-count { color: #73737c; font-size: 10px; font-weight: 400; text-transform: none; }
