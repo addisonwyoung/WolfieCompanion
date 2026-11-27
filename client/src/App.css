@@ -112,7 +112,11 @@ footer > span:first-child { font-weight: 600; }
 .go-to-review-button:hover { background: #f4f3f7; }
 .evaluation-layout { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .offering-panel, .summary-panel, .submission-panel { padding: 22px; }
-.offering-panel > label { margin-top: 18px; }
+.offering-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 16px; padding: 4px; border-radius: 9px; background: #f3f2f5; }
+.offering-tabs button { min-width: 0; min-height: 38px; padding: 7px 5px; border: 0; border-radius: 6px; background: transparent; color: #5d5a64; font-size: 11px; font-weight: 600; line-height: 1.25; cursor: pointer; }
+.offering-tabs button[aria-selected="true"] { background: #fff; color: #922333; box-shadow: 0 1px 3px rgb(30 25 35 / 12%); }
+.offering-tab-panel { margin-top: 14px; }
+.offering-tab-panel > label { margin-top: 0; }
 .offering-list, .review-list { list-style: none; padding: 0; margin: 14px 0 0; }
 .offering-list { display: grid; gap: 8px; }
 .offering-button { width: 100%; display: grid; text-align: left; gap: 3px; padding: 11px; }

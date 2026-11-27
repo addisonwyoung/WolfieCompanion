@@ -13,6 +13,13 @@ export interface OwnedCourseReview extends CourseEvaluation {
   createdAt: string
 }
 
+export interface CatalogCourse {
+  code: string
+  title: string
+  courseNumber: string
+  professors: { firstName: string; lastName: string }[]
+}
+
 export class DuplicateCourseReviewError extends Error {
   constructor() {
     super('You have already published a review for this offering.')
@@ -64,6 +71,32 @@ export function courseReviewApi(client: SupabaseClient) {
   }
 
   return {
+    async loadCatalogCourses(): Promise<CatalogCourse[]> {
+      const [catalogResult, professorResult] = await Promise.all([
+        client.from('course_catalog')
+          .select('course_code,course_number,course_name')
+          .order('course_code').order('course_number'),
+        client.from('course_professors')
+          .select('course_code,course_number,professor_first_name,professor_last_name')
+          .eq('active', true)
+          .order('course_code').order('course_number').order('professor_last_name').order('professor_first_name'),
+      ])
+      if (catalogResult.error) throw new Error('Unable to load the course catalog. Please retry.')
+      if (professorResult.error) throw new Error('Unable to load approved course professors. Please retry.')
+      const professorsByCourse = new Map<string, { firstName: string; lastName: string }[]>()
+      for (const professor of professorResult.data ?? []) {
+        const key = `${professor.course_code} ${professor.course_number}`.toLocaleUpperCase()
+        const names = professorsByCourse.get(key) ?? []
+        names.push({ firstName: professor.professor_first_name, lastName: professor.professor_last_name })
+        professorsByCourse.set(key, names)
+      }
+      return (catalogResult.data ?? []).map(row => ({
+        code: `${row.course_code} ${row.course_number}`,
+        title: row.course_name,
+        courseNumber: row.course_number,
+        professors: professorsByCourse.get(`${row.course_code} ${row.course_number}`.toLocaleUpperCase()) ?? [],
+      }))
+    },
     async loadOfferings(): Promise<CourseOffering[]> {
       const { data, error } = await client.from('course_offerings')
         .select('id,course_code,course_number,course_title,professor_name,professor_first_name,professor_last_name,section,semester,academic_year,catalog_verified')
@@ -76,6 +109,8 @@ export function courseReviewApi(client: SupabaseClient) {
         code: row.course_code,
         title: row.course_title,
         professor: row.professor_name,
+        ...(row.professor_first_name ? { professorFirstName: row.professor_first_name } : {}),
+        ...(row.professor_last_name ? { professorLastName: row.professor_last_name } : {}),
         semester: row.semester,
         year: row.academic_year,
         section: row.section ?? undefined,

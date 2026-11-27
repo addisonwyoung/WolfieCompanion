@@ -10,6 +10,8 @@ function fixture(session: { access_token: string } | null = { access_token: 'tes
   const queryCalls: { table: string; selected?: string; filters: [string, unknown][] }[] = []
   let rows: Record<string, unknown>[] = [row('review-1')]
   let offeringRows: Record<string, unknown>[] = []
+  let catalogRows: Record<string, unknown>[] = []
+  let professorRows: Record<string, unknown>[] = []
   let fetchResponse: Partial<Response> = { ok: true, status: 201, json: async () => ({ moderationStatus: 'appropriate' }) }
   const client = {
     auth: { getSession: vi.fn(async () => ({ data: { session }, error: null })) },
@@ -24,6 +26,8 @@ function fixture(session: { access_token: string } | null = { access_token: 'tes
         order() { return builder },
         then(resolve: (value: unknown) => unknown, reject: (reason?: unknown) => unknown) {
           const data = table === 'course_offerings' ? offeringRows
+            : table === 'course_catalog' ? catalogRows
+              : table === 'course_professors' ? professorRows.filter(item => !call.filters.some(([column, value]) => column === 'course_code' && item.course_code !== value))
             : table === 'course_enrollments' ? []
               : rows.filter(item => !call.filters.some(([column, value]) => column === 'offering_id' && item.offering_id !== value))
           return Promise.resolve({ data, error: null }).then(resolve, reject)
@@ -41,16 +45,28 @@ function fixture(session: { access_token: string } | null = { access_token: 'tes
     api, client, queryCalls, fetchSpy,
     setRows(next: Record<string, unknown>[]) { rows = next },
     setOfferingRows(next: Record<string, unknown>[]) { offeringRows = next },
+    setCatalogRows(next: Record<string, unknown>[]) { catalogRows = next },
+    setProfessorRows(next: Record<string, unknown>[]) { professorRows = next },
     setFetchResponse(next: Partial<Response>) { fetchResponse = next },
   }
 }
 
 afterEach(() => vi.restoreAllMocks())
 
+test('loads the course catalog as course-only search entries', async () => {
+  const f = fixture()
+  f.setCatalogRows([{ course_code: 'CSE', course_number: '416', course_name: 'Software Engineering' }])
+  f.setProfessorRows([{ course_code: 'CSE', course_number: '416', professor_first_name: 'Ada', professor_last_name: 'Lovelace', active: true }])
+  expect(await f.api.loadCatalogCourses()).toEqual([{ code: 'CSE 416', courseNumber: '416', title: 'Software Engineering', professors: [{ firstName: 'Ada', lastName: 'Lovelace' }] }])
+  expect(f.queryCalls[0]).toMatchObject({ table: 'course_catalog', selected: 'course_code,course_number,course_name' })
+  expect(f.queryCalls[1]).toMatchObject({ table: 'course_professors', selected: 'course_code,course_number,professor_first_name,professor_last_name' })
+  expect(f.queryCalls[1].filters).toContainEqual(['active', true])
+})
+
 test('loads only catalog-verified offerings with exact section and term details', async () => {
   const f = fixture()
-  f.setOfferingRows([{ id: offering.id, course_code: 'CSE 416', course_number: '416', course_title: offering.title, professor_name: 'Ada Lovelace', section: '01', semester: 'Fall', academic_year: 2026, catalog_verified: true }])
-  expect(await f.api.loadOfferings()).toEqual([{ ...offering, professor: 'Ada Lovelace', courseNumber: '416' }])
+  f.setOfferingRows([{ id: offering.id, course_code: 'CSE 416', course_number: '416', course_title: offering.title, professor_name: 'Ada Lovelace', professor_first_name: 'Ada', professor_last_name: 'Lovelace', section: '01', semester: 'Fall', academic_year: 2026, catalog_verified: true }])
+  expect(await f.api.loadOfferings()).toEqual([{ ...offering, professor: 'Ada Lovelace', professorFirstName: 'Ada', professorLastName: 'Lovelace', courseNumber: '416' }])
   expect(f.queryCalls[0].table).toBe('course_offerings')
   expect(f.queryCalls[0].filters).toContainEqual(['catalog_verified', true])
 })

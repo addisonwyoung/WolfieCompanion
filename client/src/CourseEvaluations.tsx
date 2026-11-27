@@ -1,11 +1,29 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { summarizeEvaluations } from './evaluationData'
 import type { CourseOffering } from './evaluationData'
 import type { CourseEvaluation } from './evaluationData'
 import { DuplicateCourseReviewError } from './courseReviews'
-import type { CourseReviewApi, OwnedCourseReview } from './courseReviews'
+import type { CatalogCourse, CourseReviewApi, OwnedCourseReview } from './courseReviews'
 
 interface BarValue { label: string; count: number; tone?: 'yes' | 'no' }
+type CatalogOnlyOffering = CourseOffering & { catalogOnly: true }
+
+function catalogOnlyOffering(course: CatalogCourse, professor?: CatalogCourse['professors'][number]): CatalogOnlyOffering {
+  const professorName = professor ? `${professor.firstName} ${professor.lastName}` : ''
+  return {
+    id: `catalog-${course.code.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-')}${professor ? `-${professorName.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-')}` : '-any-professor'}`,
+    code: course.code,
+    title: course.title,
+    courseNumber: course.courseNumber,
+    professor: professorName,
+    professorFirstName: professor?.firstName,
+    professorLastName: professor?.lastName,
+    semester: 'Fall',
+    year: 2026,
+    published: true,
+    catalogOnly: true,
+  }
+}
 
 function ReviewBarChart({ title, id, rows }: { title: string; id: string; rows: BarValue[] }) {
   const total = rows.reduce((sum, row) => sum + row.count, 0)
@@ -25,6 +43,11 @@ function ReviewBarChart({ title, id, rows }: { title: string; id: string; rows: 
 
 export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const [query, setQuery] = useState('')
+  const [activeOfferingTab, setActiveOfferingTab] = useState<'current' | 'reviews' | 'search'>('current')
+  const [catalogCourses, setCatalogCourses] = useState<CatalogCourse[]>([])
+  const [catalogError, setCatalogError] = useState('')
+  const [catalogAttempt, setCatalogAttempt] = useState(0)
+  const [catalogLoading, setCatalogLoading] = useState(true)
   const [offerings, setOfferings] = useState<CourseOffering[]>([])
   const [offeringsError, setOfferingsError] = useState(false)
   const [offeringsAttempt, setOfferingsAttempt] = useState(0)
@@ -54,13 +77,51 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   const [notice, setNotice] = useState('')
   const submissionPanelRef = useRef<HTMLElement | null>(null)
 
-  const visibleOfferings = offerings.filter(offering =>
-    `${offering.code} ${offering.title}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-  )
   const enrolledOfferings = currentOfferingIds === null ? [] : offerings.filter(offering => currentOfferingIds.includes(offering.id))
-  const currentOfferings = visibleOfferings.filter(offering => currentOfferingIds?.includes(offering.id))
-  const otherOfferings = currentOfferingIds === null ? visibleOfferings : visibleOfferings.filter(offering => !currentOfferingIds.includes(offering.id))
-  const selected = offerings.find(offering => offering.id === selectedId) ?? enrolledOfferings[0] ?? offerings[0] ?? null
+  const currentOfferings = enrolledOfferings
+  const otherOfferings = currentOfferingIds === null ? [] : offerings.filter(offering => !currentOfferingIds.includes(offering.id))
+  const catalogOnlyCourses = useMemo(() => {
+    const normalize = (value: string) => value.trim().toLocaleLowerCase().replace(/\s+/g, ' ')
+    const normalizeName = (value: string) => normalize(value).replace(/^(dr\.?|prof\.?|professor)\s+/, '')
+    return catalogCourses.flatMap(course => {
+      const matchingOfferings = offerings.filter(offering => normalize(offering.code) === normalize(course.code))
+      if (course.professors.length === 0) return matchingOfferings.length === 0 ? [catalogOnlyOffering(course)] : []
+      const unmatchedProfessors = course.professors.filter(professor => !matchingOfferings.some(offering => {
+        if (offering.professorFirstName && offering.professorLastName) {
+          return normalizeName(offering.professorFirstName) === normalizeName(professor.firstName)
+            && normalizeName(offering.professorLastName) === normalizeName(professor.lastName)
+        }
+        return normalizeName(offering.professor) === normalizeName(`${professor.firstName} ${professor.lastName}`)
+      }))
+      return unmatchedProfessors.map(professor => catalogOnlyOffering(course, professor))
+    })
+  }, [catalogCourses, offerings])
+  const matchingOtherOfferings = [...otherOfferings, ...catalogOnlyCourses].filter(offering =>
+    `${offering.code} ${offering.title} ${offering.professor}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+  )
+  const displayedOtherOfferings = query.trim() ? matchingOtherOfferings : otherOfferings.slice(0, 5)
+  const selected = offerings.find(offering => offering.id === selectedId)
+    ?? catalogOnlyCourses.find(offering => offering.id === selectedId)
+    ?? enrolledOfferings[0]
+    ?? offerings[0]
+    ?? null
+
+  useEffect(() => {
+    let active = true
+    void api.loadCatalogCourses().then(data => {
+      if (active) {
+        setCatalogCourses(data)
+        setCatalogError('')
+        setCatalogLoading(false)
+      }
+    }).catch(error => {
+      if (active) {
+        setCatalogError(error instanceof Error ? error.message : 'Unable to load the course catalog. Please retry.')
+        setCatalogLoading(false)
+      }
+    })
+    return () => { active = false }
+  }, [api, catalogAttempt])
 
   useEffect(() => {
     let active = true
@@ -74,6 +135,11 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
 
   useEffect(() => {
     if (!selected) return
+    if ('catalogOnly' in selected && selected.catalogOnly) {
+      setPersistedByOffering(current => ({ ...current, [selected.id]: [] }))
+      setLoadErrors(current => ({ ...current, [selected.id]: false }))
+      return
+    }
     let active = true
     void api.loadOffering(selected.id).then(data => {
       if (!active) return
@@ -141,8 +207,9 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   }))
   const submittedReview = selected ? myReviews?.find(item => item.offeringId === selected.id) ?? null : null
   const alreadySubmitted = submittedReview !== null || (selected ? submittedIds.includes(selected.id) : false)
-  const canReviewSelected = selected !== null && eligibleOfferingIds?.includes(selected.id) === true
-  const loadState = selected ? (loadErrors[selected.id] ? 'error' : Object.hasOwn(persistedByOffering, selected.id) ? 'ready' : 'loading') : 'loading'
+  const selectedIsCatalogOnly = selected !== null && 'catalogOnly' in selected && selected.catalogOnly
+  const canReviewSelected = selected !== null && !selectedIsCatalogOnly && eligibleOfferingIds?.includes(selected.id) === true
+  const loadState = selectedIsCatalogOnly ? 'catalog' : selected ? (loadErrors[selected.id] ? 'error' : Object.hasOwn(persistedByOffering, selected.id) ? 'ready' : 'loading') : 'loading'
 
   function selectOffering(id: string) {
     setSelectedId(id)
@@ -264,43 +331,49 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
     <div className="evaluation-layout">
       <section className="panel offering-panel" aria-labelledby="offerings-heading">
         <h2 id="offerings-heading">Published offerings</h2>
-        <label htmlFor="offering-search">Search by course code or title</label>
-        <input id="offering-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. CSE 416" />
         {offeringsError && <div className="error" role="alert"><p>Course offerings could not be loaded.</p><button type="button" onClick={() => setOfferingsAttempt(value => value + 1)}>Retry offerings</button></div>}
         {!offeringsError && offerings.length === 0 && <p className="muted" role="status">{offeringsAttempt === 0 ? 'Loading published offerings…' : 'No catalog-verified offerings are available yet.'}</p>}
-        {currentOfferingIds === null && !currentOfferingsError && <p className="muted" role="status">Loading your current classes…</p>}
-        {currentOfferingsError && <div className="error" role="alert"><p>{currentOfferingsError}</p><button type="button" onClick={() => setCurrentOfferingsAttempt(value => value + 1)}>Retry current classes</button></div>}
-        <h3 className="review-heading current-offerings-heading">Your current offerings</h3>
-        {currentOfferings.length > 0 ? <ul className="offering-list" aria-label="Your current course offerings">
-          {currentOfferings.map(offering => <li key={offering.id}><button className="offering-button" aria-pressed={selectedId === offering.id} onClick={() => { setSelectedId(offering.id); setNotice(''); setErrors({}) }}>
-            <strong>{offering.code}: {offering.title}</strong><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span>
-          </button></li>)}
-        </ul> : currentOfferingIds !== null && !currentOfferingsError && <p className="muted" role="status">No current-semester enrollments have a published offering yet.</p>}
-        <h3 className="review-heading">Other published offerings</h3>
-        <ul className="offering-list" aria-label="Other published course offerings">
-          {otherOfferings.map(offering => <li key={offering.id}><button className="offering-button" aria-pressed={selectedId === offering.id} onClick={() => { setSelectedId(offering.id); setNotice(''); setErrors({}) }}>
-            <strong>{offering.code}: {offering.title}</strong><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span>
-          </button></li>)}
-        </ul>
-        {!offeringsError && offerings.length > 0 && visibleOfferings.length === 0 && <div className="empty-state search-empty" role="status"><h3>No matching offerings</h3><p>Try a different course code or title.</p></div>}
-        <h3 className="review-heading">Your reviews</h3>
-        {myReviewsError && <div className="error" role="alert"><p>{myReviewsError}</p><button type="button" onClick={() => setMyReviewsAttempt(value => value + 1)}>Retry your reviews</button></div>}
-        {myReviews === null && !myReviewsError && <p className="muted" role="status">Loading your reviews…</p>}
-        {myReviews?.length === 0 && <p className="muted">You haven’t written any reviews yet.</p>}
-        {myReviews && myReviews.length > 0 && <ul className="offering-list" aria-label="Your submitted reviews">{myReviews.map(item => {
-          const offering = offerings.find(candidate => candidate.id === item.offeringId)
-          return <li key={item.id}><button type="button" className="offering-button" aria-pressed={selected?.id === item.offeringId} disabled={Boolean(editingReviewId || isManagingReview)} onClick={() => selectOffering(item.offeringId)}><strong>{offering ? `${offering.code}: ${offering.title}` : 'Past course offering'}</strong><span>{offering ? `${offering.professor}${offering.section ? ` · Section ${offering.section}` : ''} · ${offering.semester} ${offering.year}` : item.createdAt.slice(0, 10)}</span></button></li>
-        })}</ul>}
+        <div className="offering-tabs" role="tablist" aria-label="Course offering lists">
+          <button id="current-offerings-tab" type="button" role="tab" aria-selected={activeOfferingTab === 'current'} aria-controls="current-offerings-panel" onClick={() => setActiveOfferingTab('current')}>Your current offerings</button>
+          <button id="your-reviews-tab" type="button" role="tab" aria-selected={activeOfferingTab === 'reviews'} aria-controls="your-reviews-panel" onClick={() => setActiveOfferingTab('reviews')}>Your reviews</button>
+          <button id="search-other-tab" type="button" role="tab" aria-selected={activeOfferingTab === 'search'} aria-controls="search-other-panel" onClick={() => setActiveOfferingTab('search')}>Search other</button>
+        </div>
+        {activeOfferingTab === 'current' && <div id="current-offerings-panel" className="offering-tab-panel" role="tabpanel" aria-labelledby="current-offerings-tab">
+          {currentOfferingIds === null && !currentOfferingsError && <p className="muted" role="status">Loading your current classes…</p>}
+          {currentOfferingsError && <div className="error" role="alert"><p>{currentOfferingsError}</p><button type="button" onClick={() => setCurrentOfferingsAttempt(value => value + 1)}>Retry current classes</button></div>}
+          {currentOfferings.length > 0 ? <ul className="offering-list" aria-label="Your current course offerings">{currentOfferings.map(offering => <li key={offering.id}><button type="button" className="offering-button" aria-pressed={selected?.id === offering.id} onClick={() => selectOffering(offering.id)}><strong>{offering.code}: {offering.title}</strong><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span></button></li>)}</ul> : currentOfferingIds !== null && !currentOfferingsError && <p className="muted" role="status">No current-semester enrollments have a published offering yet.</p>}
+        </div>}
+        {activeOfferingTab === 'reviews' && <div id="your-reviews-panel" className="offering-tab-panel" role="tabpanel" aria-labelledby="your-reviews-tab">
+          {myReviewsError && <div className="error" role="alert"><p>{myReviewsError}</p><button type="button" onClick={() => setMyReviewsAttempt(value => value + 1)}>Retry your reviews</button></div>}
+          {myReviews === null && !myReviewsError && <p className="muted" role="status">Loading your reviews…</p>}
+          {myReviews?.length === 0 && <p className="muted">You haven’t written any reviews yet.</p>}
+          {myReviews && myReviews.length > 0 && <ul className="offering-list" aria-label="Your submitted reviews">{myReviews.map(item => {
+            const offering = offerings.find(candidate => candidate.id === item.offeringId)
+            return <li key={item.id}><button type="button" className="offering-button" aria-pressed={selected?.id === item.offeringId} disabled={Boolean(editingReviewId || isManagingReview)} onClick={() => selectOffering(item.offeringId)}><strong>{offering ? `${offering.code}: ${offering.title}` : 'Past course offering'}</strong><span>{offering ? `${offering.professor}${offering.section ? ` · Section ${offering.section}` : ''}` : 'Offering details unavailable'}</span><span>{offering ? `${offering.semester} ${offering.year}` : item.createdAt.slice(0, 10)}</span></button></li>
+          })}</ul>}
+        </div>}
+        {activeOfferingTab === 'search' && <div id="search-other-panel" className="offering-tab-panel" role="tabpanel" aria-labelledby="search-other-tab">
+          <label htmlFor="offering-search">Search published offerings</label>
+          <input id="offering-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="e.g. CSE 416" />
+          {!query.trim() && otherOfferings.length > 5 && <p className="field-help">Showing 5 verified offerings. Search to find more courses.</p>}
+          {!query.trim() && otherOfferings.length <= 5 && catalogCourses.length > 0 && <p className="field-help">Search the catalog to find other courses.</p>}
+          {catalogError && <div className="error" role="alert"><p>{catalogError}</p><button type="button" onClick={() => { setCatalogLoading(true); setCatalogAttempt(value => value + 1) }}>Retry course catalog</button></div>}
+          {catalogLoading && <p className="muted" role="status">Loading the course catalog…</p>}
+          {currentOfferingIds === null && !currentOfferingsError && <p className="muted" role="status">Loading your current classes…</p>}
+          {currentOfferingsError && <div className="error" role="alert"><p>{currentOfferingsError}</p><button type="button" onClick={() => setCurrentOfferingsAttempt(value => value + 1)}>Retry current classes</button></div>}
+          {!catalogLoading && !catalogError && displayedOtherOfferings.length > 0 && <ul className="offering-list" aria-label="Other published offerings">{displayedOtherOfferings.map(offering => <li key={offering.id}><button type="button" className="offering-button" aria-pressed={selected?.id === offering.id} onClick={() => selectOffering(offering.id)}><strong>{offering.code}: {offering.title}</strong>{'catalogOnly' in offering && offering.catalogOnly ? <>{offering.professor && <span>{offering.professor}</span>}<span>Fall 2026</span></> : <><span>{offering.professor}{offering.section ? ` · Section ${offering.section}` : ''}</span><span>{offering.semester} {offering.year}</span></>}</button></li>)}</ul>}
+          {!catalogLoading && !catalogError && currentOfferingIds !== null && !currentOfferingsError && displayedOtherOfferings.length === 0 && <div className="empty-state search-empty" role="status"><h3>{query.trim() ? 'No matching courses' : 'No verified offerings to show'}</h3><p>{query.trim() ? 'Try a different course code or title.' : 'Search the catalog to find courses without a verified offering yet.'}</p></div>}
+        </div>}
       </section>
 
       <div className="evaluation-content" aria-live="polite">
         <section className="panel summary-panel" aria-labelledby="selected-offering-heading">
           {!selected ? <><p className="eyebrow">SELECTED OFFERING</p><h2 id="selected-offering-heading">Select a course offering</h2><p className="muted">Verified offerings will appear here once available.</p></> : <>
           <p className="eyebrow">SELECTED OFFERING</p><h2 id="selected-offering-heading">{selected.code}: {selected.title}</h2>
-          <p className="muted">{selected.professor}{selected.section ? ` · Section ${selected.section}` : ''} · {selected.semester} {selected.year}</p>
+          {selectedIsCatalogOnly ? <><p className="muted">{selected.professor && `${selected.professor} · `}Fall 2026</p><p className="muted">This course is in the catalog, but no verified section offering is available yet.</p></> : <p className="muted">{selected.professor}{selected.section ? ` · Section ${selected.section}` : ''} · {selected.semester} {selected.year}</p>}
           {loadState === 'loading' && <p role="status">Loading course reviews…</p>}
           {loadState === 'error' && <div className="error" role="alert"><p>Saved course reviews could not be loaded.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry reviews</button></div>}
-          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div>{averageClassRating !== null && <div><strong>{averageClassRating.toFixed(1)} / 5</strong><span>average class rating</span></div>}<div><strong>{ordinaryReviews.length}</strong><span>{ordinaryReviews.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'ready' && flaggedReviews.length === 0 ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
+          {averages ? <div className="evaluation-stats"><div><strong>{averages.hours.toFixed(1)}</strong><span>average hours / week</span></div><div><strong>{averages.difficulty.toFixed(1)} / 5</strong><span>average difficulty</span></div>{averageClassRating !== null && <div><strong>{averageClassRating.toFixed(1)} / 5</strong><span>average class rating</span></div>}<div><strong>{ordinaryReviews.length}</strong><span>{ordinaryReviews.length === 1 ? 'review' : 'reviews'}</span></div></div> : loadState === 'catalog' ? <div className="empty-state no-reviews" role="status"><h3>No verified offering yet</h3><p>You can browse this catalog course here. Reviews become available when a professor and section offering is verified.</p></div> : loadState === 'ready' && flaggedReviews.length === 0 ? <div className="empty-state no-reviews" role="status"><h3>No evaluations yet</h3><p>Be the first to share an anonymous review for this offering.</p></div> : null}
           {ordinaryReviews.length > 0 && <div className="review-chart-grid">
             <ReviewBarChart title="Would you recommend this class?" id="recommendation-chart-heading" rows={[{ label: 'Yes', count: recommendYes, tone: 'yes' }, { label: 'No', count: recommendNo, tone: 'no' }]} />
             <ReviewBarChart title="Difficulty rating (out of 5)" id="difficulty-chart-heading" rows={difficultyDistribution} />
