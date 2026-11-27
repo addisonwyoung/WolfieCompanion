@@ -35,9 +35,9 @@ test('all destinations retain existing URL routing and mark direct pages and dro
   fixture()
   expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
   for (const [menu, label, view] of [
-    ['', 'Messages', 'messages'], ['', 'Study buddies', 'study-groups'],
-    ['Academics', 'Assignments & Exams', 'academic'], ['Academics', 'Course evaluations', 'evaluations'],
-    ['Explore', 'Campus Explorer', 'explorer'], ['Explore', 'Study spaces', 'spaces'], ['', 'Dashboard', 'dashboard'],
+    ['', 'Messages', 'messages'], ['', 'Study Buddies', 'study-groups'],
+    ['Academics', 'Assignments & Exams', 'academic'], ['Academics', 'Course Evaluations', 'evaluations'],
+    ['Explore', 'Campus Explorer', 'explorer'], ['Explore', 'Study Spaces', 'spaces'], ['', 'Dashboard', 'dashboard'],
   ]) {
     if (menu) fireEvent.click(screen.getByRole('button', { name: menu, exact: true }))
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}`) }))
@@ -69,10 +69,10 @@ test('keyboard users can tab into disclosures, use arrows/Home/End and return fo
   const academics = screen.getByRole('button', { name: 'Academics', exact: true })
   academics.focus(); await user.keyboard('{Enter}{Tab}')
   expect(screen.getByRole('button', { name: 'Assignments & Exams' })).toHaveFocus()
-  await user.keyboard('{End}'); expect(screen.getByRole('button', { name: 'Course evaluations' })).toHaveFocus()
+  await user.keyboard('{End}'); expect(screen.getByRole('button', { name: 'Course Evaluations' })).toHaveFocus()
   await user.keyboard('{Home}{ArrowDown}{Escape}'); expect(academics).toHaveFocus()
   await user.keyboard('{ArrowUp}')
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Course evaluations' })).toHaveFocus())
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Course Evaluations' })).toHaveFocus())
   await user.keyboard('{Enter}')
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('evaluations')
   expect(academics).toHaveFocus()

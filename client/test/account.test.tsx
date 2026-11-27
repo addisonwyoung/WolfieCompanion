@@ -20,7 +20,7 @@ function fake(initial:Session|null=null){
  return {client:{auth} as unknown as SupabaseClient,auth,unsubscribe,emit:(id:string|null,event='SIGNED_IN')=>{current=id?session(id):null;listener(event,current)}}
 }
 function navigateHeader(name: string) {
- const group = name === 'Assignments & Exams' || name === 'Course evaluations' ? 'Academics' : name === 'Campus Explorer' || name === 'Study spaces' ? 'Explore' : name === 'Sign out' ? 'Account' : null
+ const group = name === 'Assignments & Exams' || name === 'Course Evaluations' ? 'Academics' : name === 'Campus Explorer' || name === 'Study Spaces' ? 'Explore' : name === 'Sign out' ? 'Account' : null
  if(group && !screen.queryByRole('button',{name,exact:true}))fireEvent.click(screen.getByRole('button',{name:group,exact:true}))
  fireEvent.click(screen.getByRole('button',{name,exact:true}))
 }
@@ -222,7 +222,7 @@ test('classmate dialog clears across course, navigation and auth changes and ign
  fireEvent.click(screen.getByRole('button',{name:/AMS 210/}));expect(screen.queryByRole('dialog')).not.toBeInTheDocument();expect(abortSignals[0].aborted).toBe(true)
  await act(async()=>profileResolvers[0]({data:{student_id:'peer',name:'Student Name',major:null,has_shared_avatar:false},error:null}));expect(screen.queryByText('Student Name')).not.toBeInTheDocument()
  await screen.findByRole('button',{name:'View profile of Peer Name'});expect(classmateCalls[1]).toEqual({p_course_code:'AMS 210',p_section:'02',p_professor_first_name:'Grace',p_professor_last_name:'Hopper'})
- fireEvent.click(screen.getByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(profileResolvers).toHaveLength(2));navigateHeader('Study spaces');expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(profileResolvers).toHaveLength(2));navigateHeader('Study Spaces');expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'View profile of Peer Name'}));await waitFor(()=>expect(profileResolvers).toHaveLength(3));act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'});expect(screen.queryByRole('dialog')).not.toBeInTheDocument();expect(abortSignals[2].aborted).toBe(true)
  await act(async()=>profileResolvers[2]({data:{student_id:'peer',name:'Student Name',major:null,has_shared_avatar:false},error:null}));expect(screen.queryByText('Student Name')).not.toBeInTheDocument()
