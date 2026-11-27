@@ -136,8 +136,6 @@ export default function CourseEvaluations({ api }: { api: CourseReviewApi }) {
   useEffect(() => {
     if (!selected) return
     if ('catalogOnly' in selected && selected.catalogOnly) {
-      setPersistedByOffering(current => ({ ...current, [selected.id]: [] }))
-      setLoadErrors(current => ({ ...current, [selected.id]: false }))
       return
     }
     let active = true
