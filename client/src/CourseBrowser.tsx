@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import ManualClasses from './ManualClasses'
 import ScheduleImportPreview from './ScheduleImportPreview'
 import type { CourseId, Course } from './sampleData'
 import type { ClassmateState } from './useClassmates'
-import { duplicateCourseCode } from './account'
+import { duplicateCourseCode, validateRows } from './account'
 import type { StudentProfile, ClassRow } from './account'
 import { rankRecommendations } from './courseRecommendations'
 import type { RankedRecommendation } from './courseRecommendations'
@@ -12,13 +13,15 @@ import type { RecommendationState } from './useCourseRecommendations'
 import type { FriendRelationship } from './friendshipApi'
 import type { ProfessorCatalogState } from './courseProfessors'
 
-export default function CourseBrowser({ enrolledCourses, onAddClasses, professorCatalog, client = null, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
+export default function CourseBrowser({ enrolledCourses, onAddClasses, onEditCourse, onRemoveCourse, professorCatalog, client = null, selectedId, onSelect, roster, onRetry, onViewProfile, profile, recommendations, onRetryRecommendations, relationshipById = new Map(), friendActionBusy = new Set(), onSendFriend, onOpenFriendRequests }: {
   enrolledCourses: Course[]
   onAddClasses: (rows: ClassRow[]) => Promise<void>
+  onEditCourse?: (enrollmentId: string, row: ClassRow) => Promise<Course>
+  onRemoveCourse?: (enrollmentId: string) => Promise<void>
   professorCatalog: ProfessorCatalogState
   client?: SupabaseClient | null
   selectedId: CourseId | null
-  onSelect: (id: CourseId) => void
+  onSelect: (id: CourseId | null) => void
   roster: ClassmateState
   onViewProfile?: (id: string) => void
   onRetry: () => void
@@ -31,6 +34,11 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
   onOpenFriendRequests?: () => void
 }) {
   const [activeList, setActiveList] = useState<'classmates' | 'recommendations'>('classmates')
+  const [editing, setEditing] = useState<Course | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null)
+  const [changeBusy, setChangeBusy] = useState(false)
+  const [changeMessage, setChangeMessage] = useState('')
+  const [editRow, setEditRow] = useState<ClassRow>({ code: '', section: '', professor_first_name: '', professor_last_name: '' })
   const selected = enrolledCourses.find(course => course.id === selectedId)
   const { classmates } = roster
   const rankedRecommendations: RankedRecommendation[] = recommendations?.status === 'success' && profile
@@ -42,6 +50,34 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
     if (duplicate) throw new Error(`${duplicate} is already on your dashboard for this semester and academic year. You can add it again in another semester or academic year.`)
     await onAddClasses(rows)
   }
+  async function saveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editing || !('enrollmentId' in editing) || !editing.enrollmentId || !onEditCourse || changeBusy) return
+    if (!validateRows([editRow])) { setChangeMessage('Enter a valid course code, section, and professor first and last name.'); return }
+    const duplicate = duplicateCourseCode([editRow], enrolledCourses.filter(course => course.id !== editing.id).map(course => course.code))
+    if (duplicate) { setChangeMessage(`${duplicate} is already on your dashboard for this semester and academic year.`); return }
+    setChangeBusy(true); setChangeMessage('Saving course changes…')
+    try {
+      const updated = await onEditCourse(editing.enrollmentId, editRow)
+      onSelect(updated.id)
+      setEditing(null); setChangeMessage('')
+    } catch (error) { setChangeMessage(error instanceof Error ? error.message : 'Course could not be updated. Please retry.') }
+    finally { setChangeBusy(false) }
+  }
+  async function confirmDelete() {
+    if (!deleteTarget || !('enrollmentId' in deleteTarget) || !deleteTarget.enrollmentId || !onRemoveCourse || changeBusy) return
+    setChangeBusy(true); setChangeMessage('Removing course…')
+    try {
+      const wasSelected = selectedId === deleteTarget.id
+      await onRemoveCourse(deleteTarget.enrollmentId)
+      if (wasSelected) {
+        const next = enrolledCourses.find(course => course.id !== deleteTarget.id)
+        onSelect(next?.id ?? null)
+      }
+      setDeleteTarget(null); setChangeMessage('')
+    } catch (error) { setChangeMessage(error instanceof Error ? error.message : 'Course could not be removed. Please retry.') }
+    finally { setChangeBusy(false) }
+  }
   return <div className="course-browser">
     <section className="panel courses" aria-labelledby="courses-heading">
       <div className="section-top"><h2 id="courses-heading">Your courses</h2><span className="muted">{enrolledCourses.length} {enrolledCourses.length === 1 ? 'section' : 'sections'}</span></div>
@@ -49,10 +85,25 @@ export default function CourseBrowser({ enrolledCourses, onAddClasses, professor
       <ManualClasses onSave={saveClasses} catalog={professorCatalog} />
       <ScheduleImportPreview onAddClasses={saveClasses} catalog={professorCatalog} client={client} />
       {!enrolledCourses.length && <p className="empty-state">No saved classes yet. Enter classes manually or confirm a reviewed schedule.</p>}
-      <div className="course-controls">{enrolledCourses.map(course => <button key={course.id} aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
-        <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
-        <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.professorFirstName && course.professorLastName && <span className="course-state">{course.professorFirstName} {course.professorLastName}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : course.verificationStatus === 'verified' ? 'View classmates' : 'Verification required'}</span>
-      </button>)}</div>
+      <div className="course-controls">{enrolledCourses.map(course => <div className={`course-control-row${selectedId === course.id ? ' course-control-row-selected' : ''}`} key={course.id}>
+        <button className="course-select-button" aria-pressed={selectedId === course.id} onClick={() => onSelect(course.id)}>
+          <span className="course-symbol" aria-hidden="true">{course.code.startsWith('CSE') ? '</>' : '∑'}</span>
+          <strong>{course.code}</strong>{course.section && <span className="course-state">Section {course.section}</span>}{course.professorFirstName && course.professorLastName && <span className="course-state">{course.professorFirstName} {course.professorLastName}</span>}{course.verificationStatus && course.verificationStatus !== 'verified' && <span className="course-state">{course.verificationStatus === 'pending' ? 'Course awaiting verification' : course.verificationStatus === 'rejected' ? 'Course not verified' : 'Legacy class needs confirmation'}</span>}<span className="course-state">{selectedId === course.id ? 'Selected ✓' : course.verificationStatus === 'verified' ? 'View classmates' : 'Verification required'}</span>
+        </button>
+        {course.enrollmentId && (onEditCourse || onRemoveCourse) && <div className="course-management-actions">
+          {onEditCourse && <button type="button" aria-label={`Edit ${course.code}`} title="Edit course" disabled={changeBusy} onClick={() => { setEditRow({ code: course.code, section: course.section ?? '', professor_first_name: course.professorFirstName ?? '', professor_last_name: course.professorLastName ?? '' }); setEditing(course); setChangeMessage('') }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m4 16.5-.8 4.3 4.3-.8L20 7.5 16.5 4 4 16.5Z"/><path d="m14.8 5.7 3.5 3.5"/></svg></button>}
+          {onRemoveCourse && <button type="button" aria-label={`Delete ${course.code}`} title="Delete course" disabled={changeBusy} onClick={() => { setDeleteTarget(course); setChangeMessage('') }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6"/></svg></button>}
+        </div>}
+      </div>)}</div>
+      {editing && <div className="course-modal-backdrop" onKeyDown={event => { if (event.key === 'Escape' && !changeBusy) { setEditing(null); setChangeMessage('') } }}><section className="course-modal panel" role="dialog" aria-modal="true" aria-labelledby="edit-course-title"><h2 id="edit-course-title">Edit course</h2><form onSubmit={saveEdit}>
+        <label>Course Code<input autoFocus value={editRow.code} disabled={changeBusy} onChange={event => setEditRow(row => ({ ...row, code: event.target.value }))} placeholder="CSE 310" /></label>
+        <label>Section<input value={editRow.section} maxLength={20} disabled={changeBusy} onChange={event => setEditRow(row => ({ ...row, section: event.target.value }))} placeholder="01" /></label>
+        <label>Professor First Name<input value={editRow.professor_first_name} maxLength={80} disabled={changeBusy} onChange={event => setEditRow(row => ({ ...row, professor_first_name: event.target.value }))} /></label>
+        <label>Professor Last Name<input value={editRow.professor_last_name} maxLength={80} disabled={changeBusy} onChange={event => setEditRow(row => ({ ...row, professor_last_name: event.target.value }))} /></label>
+        {changeMessage && <p role={changeMessage.startsWith('Saving') ? 'status' : 'alert'}>{changeMessage}</p>}
+        <div className="course-modal-actions"><button type="button" disabled={changeBusy} onClick={() => { setEditing(null); setChangeMessage('') }}>Cancel</button><button className="primary" type="submit" disabled={changeBusy}>{changeBusy ? 'Saving…' : 'Save changes'}</button></div>
+      </form></section></div>}
+      {deleteTarget && <div className="course-modal-backdrop" onKeyDown={event => { if (event.key === 'Escape' && !changeBusy) { setDeleteTarget(null); setChangeMessage('') } }}><section className="course-modal panel" role="alertdialog" aria-modal="true" aria-labelledby="delete-course-title" aria-describedby="delete-course-description"><h2 id="delete-course-title">Remove {deleteTarget.code}?</h2><p id="delete-course-description">This will remove the course from your current dashboard and stop course access tied to this enrollment.</p>{changeMessage && <p role={changeMessage.startsWith('Removing') ? 'status' : 'alert'}>{changeMessage}</p>}<div className="course-modal-actions"><button type="button" autoFocus disabled={changeBusy} onClick={() => { setDeleteTarget(null); setChangeMessage('') }}>Keep course</button><button className="danger" type="button" disabled={changeBusy} onClick={() => void confirmDelete()}>{changeBusy ? 'Removing…' : 'Remove course'}</button></div></section></div>}
     </section>
     {selected && <section className="classmates" aria-label={`${selected.code} student lists`}>
       {selected.verificationStatus !== 'verified' ? <div className="panel empty-state">

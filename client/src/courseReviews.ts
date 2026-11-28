@@ -157,6 +157,7 @@ export function courseReviewApi(client: SupabaseClient) {
       const { data, error } = await client.from('course_enrollments')
         .select('course_offering_id')
         .eq('verification_status', 'verified')
+        .is('revoked_at', null)
         .not('course_offering_id', 'is', null)
       if (error) throw new Error('Unable to check your verified course enrollments. Please retry.')
       return [...new Set((data ?? []).map(row => row.course_offering_id).filter((id): id is string => Boolean(id)))]

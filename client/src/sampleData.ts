@@ -2,7 +2,7 @@
 export const years = ['First year', 'Second year', 'Third year', 'Fourth year', 'Graduate'] as const
 export type Year = typeof years[number]
 export type CourseId = string
-export interface Course { id: CourseId; code: string; section?: string; sections?: string[]; professorFirstName?: string; professorLastName?: string; verificationStatus?: string }
+export interface Course { id: CourseId; code: string; section?: string; sections?: string[]; professorFirstName?: string; professorLastName?: string; verificationStatus?: string; enrollmentId?: string }
 export interface Student {
   id: string
   name: string

@@ -58,12 +58,26 @@ button.primary:hover { background: #8d1929; }
 .courses { padding: 24px; }
 .courses > p { font-size: 12px; margin-top: 8px; }
 .course-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
-.course-controls button { display: flex; flex-direction: column; align-items: flex-start; padding: 14px 12px; border-radius: 9px; text-align: left; }
+.course-control-row { position: relative; min-width: 0; height: 100%; }
+.course-control-row-selected { border-radius: 10px; box-shadow: 0 0 0 1px #b22c3c; background: #fcf1f1; }
+.course-controls .course-select-button { width: 100%; height: 100%; min-height: 140px; display: flex; flex-direction: column; align-items: flex-start; padding: 14px 12px 42px; border-radius: 9px; text-align: left; }
+.course-management-actions { position: absolute; right: 3px; bottom: 8px; display: flex; gap: 5px; }
+.course-controls .course-management-actions button { display: grid; width: 32px; height: 30px; place-items: center; padding: 5px; border-radius: 7px; color: #5b2630; }
+.course-management-actions svg { width: 17px; height: 17px; }
+.course-controls .course-select-button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; box-shadow: inset 0 0 0 1px #b22c3c; }
+.course-controls .course-select-button[aria-pressed='true'] :is(strong, .course-symbol, .course-state) { color: #9b2030; }
+.course-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgb(20 19 22 / 54%); }
+.course-modal { width: min(100%, 460px); padding: 24px; box-shadow: 0 18px 60px rgb(0 0 0 / 24%); }
+.course-modal h2 { margin-top: 0; }
+.course-modal #delete-course-description { margin: 18px 0 22px; }
+.course-modal form, .course-modal label { display: grid; gap: 8px; }
+.course-modal form { gap: 14px; }
+.course-modal input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #aaaab2; border-radius: 7px; font: inherit; }
+.course-modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 8px; }
+.course-modal-actions .danger { color: #fff; background: #a82032; border-color: #a82032; }
 .course-symbol { font-family: monospace; font-size: 18px; color: #73737c; margin-bottom: 16px; }
 .course-controls strong { font-size: 14px; white-space: nowrap; }
 .course-state { font-size: 10px; color: #6f6f78; margin-top: 5px; }
-.course-controls button[aria-pressed='true'] { border-color: #b22c3c; background: #fcf1f1; box-shadow: inset 0 0 0 1px #b22c3c; }
-.course-controls button[aria-pressed='true'] :is(strong, .course-symbol, .course-state) { color: #9b2030; }
 .classmates { margin-top: 32px; }
 .course-list-switcher { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; gap: 7px; margin-bottom: 18px; padding: 4px; border: 1px solid #e2e2e4; border-radius: 10px; background: #f5f5f5; }
 .course-list-switcher button { min-height: 40px; padding: 8px 14px; border-color: transparent; background: transparent; color: #55555e; font-size: 12px; }
@@ -169,6 +183,7 @@ footer > span:first-child { font-weight: 600; }
 .no-reviews { margin-top: 20px; background: #f7f7f5; border-radius: 8px; }
 .no-reviews h3, .search-empty h3 { font-size: 15px; }
 .submission-panel form { margin-top: 8px; }
+.review-offering-display { display: block; width: 100%; min-height: 44px; padding: 9px; border: 1px solid #bdbdc5; border-radius: 6px; background: #f7f7f8; color: #25252a; }
 .submission-panel textarea { min-height: 110px; }
 .review-take-again { display: flex; flex-wrap: wrap; gap: 12px; border: 0; padding: 0; margin: 16px 0 8px; }
 .review-take-again legend { width: 100%; margin-bottom: 6px; font-weight: 600; }

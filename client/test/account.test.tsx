@@ -24,7 +24,7 @@ function navigateHeader(name: string) {
  if(group && !screen.queryByRole('button',{name,exact:true}))fireEvent.click(screen.getByRole('button',{name:group,exact:true}))
  fireEvent.click(screen.getByRole('button',{name,exact:true}))
 }
-beforeEach(()=>{mock.dm={contact:vi.fn().mockResolvedValue({student_id:'peer',name:'Message Peer',conversation_id:'thread',can_send:true,reason:null}),inbox:vi.fn().mockResolvedValue([{conversation_id:'thread',student_id:'peer',name:'Message Peer',last_message_at:'2026-10-23T20:00:00Z',preview:'Saved private row'}]),history:vi.fn().mockResolvedValue([{id:'saved',conversation_id:'thread',sequence:1,sender_id:'peer',client_message_id:'request',body:'Saved private row',created_at:'2026-10-23T20:00:00Z'}]),send:vi.fn()};mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[],plannerCourses:[]}),saveClasses:vi.fn().mockResolvedValue({courses:[{id:'cse-310',code:'CSE 310',sections:['01']}],plannerCourses:[{id:'cse-310',databaseId:'legacy',code:'CSE 310',sections:['01']}]}),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
+beforeEach(()=>{mock.dm={contact:vi.fn().mockResolvedValue({student_id:'peer',name:'Message Peer',conversation_id:'thread',can_send:true,reason:null}),inbox:vi.fn().mockResolvedValue([{conversation_id:'thread',student_id:'peer',name:'Message Peer',last_message_at:'2026-10-23T20:00:00Z',preview:'Saved private row'}]),history:vi.fn().mockResolvedValue([{id:'saved',conversation_id:'thread',sequence:1,sender_id:'peer',client_message_id:'request',body:'Saved private row',created_at:'2026-10-23T20:00:00Z'}]),send:vi.fn()};mock.api={eligible:vi.fn().mockResolvedValue(true),load:vi.fn().mockResolvedValue({profile:profile(),courses:[],plannerCourses:[]}),saveClasses:vi.fn().mockResolvedValue({courses:[{id:'cse-310',code:'CSE 310',sections:['01']}],plannerCourses:[{id:'cse-310',databaseId:'legacy',code:'CSE 310',sections:['01']}]}),editCourse:vi.fn(),removeCourse:vi.fn(),saveProfile:vi.fn(async p=>({profile:p,cleanupPath:null})),pictureUrl:vi.fn(),removeObject:vi.fn()}})
 test('Campus Explorer opens lazily, preserves filters across navigation and clears on account teardown', async () => {
   const f = fake(session('a'))
   const order = vi.fn()
@@ -88,6 +88,18 @@ test('late A cannot populate B and refresh does not discard workspace',async()=>
  await act(async()=>resolveA({profile:profile('a'),courses:[{id:'bad',databaseId:'old-course',code:'AAA 100'}], plannerCourses:[]}));expect(screen.queryByText('Student a')).not.toBeInTheDocument();act(()=>f.emit('b','TOKEN_REFRESHED'));expect(screen.getByText('Student b')).toBeInTheDocument();expect(mock.api.load).toHaveBeenCalledTimes(2);act(()=>f.emit(null));await screen.findByRole('button',{name:'Continue with Google'})
 })
 test('missing config is actionable',()=>{render(<App client={null}/>);expect(screen.getByRole('alert')).toHaveTextContent('VITE_SUPABASE_URL')})
+
+test('dashboard edit refreshes the selected course and removal clears its course data',async()=>{
+ const original={id:'cse-310-section-01-prof-ada-lovelace',enrollmentId:'enrollment-old',databaseId:'planner-old',code:'CSE 310',section:'01',professorFirstName:'Ada',professorLastName:'Lovelace',verificationStatus:'verified'}
+ const corrected={id:'cse-316-section-02-prof-grace-hopper',enrollmentId:'enrollment-new',databaseId:'planner-new',code:'CSE 316',section:'02',professorFirstName:'Grace',professorLastName:'Hopper',verificationStatus:'verified'}
+ vi.mocked(mock.api.load).mockResolvedValue({profile:profile(),courses:[original],plannerCourses:[]})
+ vi.mocked(mock.api.editCourse).mockResolvedValue({course:corrected,plannerCourses:[]})
+ vi.mocked(mock.api.removeCourse).mockResolvedValue({courses:[],plannerCourses:[]})
+ render(<App client={fake(session('a')).client}/>);await screen.findByText('CSE 310')
+ fireEvent.click(screen.getByRole('button',{name:'Edit CSE 310'}));fireEvent.change(screen.getByLabelText('Course Code'),{target:{value:'CSE 316'}});fireEvent.change(screen.getByLabelText('Section'),{target:{value:'02'}});fireEvent.change(screen.getByLabelText('Professor First Name'),{target:{value:'Grace'}});fireEvent.change(screen.getByLabelText('Professor Last Name'),{target:{value:'Hopper'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save changes'}));expect(await screen.findByRole('heading',{name:/Classmates in CSE 316 · Section 02/})).toBeInTheDocument();expect(mock.api.editCourse).toHaveBeenCalledWith('enrollment-old',{code:'CSE 316',section:'02',professor_first_name:'Grace',professor_last_name:'Hopper'})
+ fireEvent.click(screen.getByRole('button',{name:'Delete CSE 316'}));fireEvent.click(screen.getByRole('button',{name:'Remove course'}));await screen.findByText(/No saved classes yet/);expect(mock.api.removeCourse).toHaveBeenCalledWith('enrollment-new');expect(screen.queryByText(/Classmates in CSE 316/)).not.toBeInTheDocument()
+})
 
 test('header menus preserve dashboard draft state and account menu signs out through existing Auth',async()=>{
  const f=fake(session('a'));render(<App client={f.client}/>);await screen.findByText('Student a')

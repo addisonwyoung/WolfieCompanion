@@ -49,6 +49,7 @@ async function fixture(t: TestContext, classify = async () => ({ classification:
       const builder: Record<string, unknown> = {
         select(columns: string) { call.columns = columns; return builder; },
         eq(column: string, value: unknown) { call.filters.push([column, value]); return builder; },
+        is(column: string, value: unknown) { call.filters.push([column, value]); return builder; },
         order() { return builder; },
         update(value: Record<string, unknown>) { call.operation = 'update'; update = value; return builder; },
         delete() { call.operation = 'delete'; return builder; },

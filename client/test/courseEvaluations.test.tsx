@@ -34,8 +34,11 @@ test('loads persisted anonymous reviews and selects offering-specific review key
   expect(screen.queryByText(/@/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Student A|reviewer@example\.com|00000000-0000-0000/i)).not.toBeInTheDocument()
 
-  fireEvent.change(screen.getByLabelText('Course offering'), { target: { value: courseOfferings[1].id } })
+  fireEvent.click(screen.getByRole('tab', { name: 'Search other' }))
+  fireEvent.click(screen.getByRole('button', { name: /Prof\. Patel.*Spring 2026/ }))
   await waitFor(() => expect(reviews.loadOffering).toHaveBeenCalledWith(courseOfferings[1].id))
+  expect(screen.getByText('CSE 416 · Prof. Patel · Spring 2026')).toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: 'Course offering' })).not.toBeInTheDocument()
 })
 
 test('shows the calculated average class rating for the selected offering', async () => {
@@ -328,7 +331,8 @@ test('distinguishes review loading failures from no reviews', async () => {
   const reviews = api({ loadOffering: vi.fn(async () => { throw new Error('down') }) })
   render(<CourseEvaluations api={reviews} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Saved course reviews could not be loaded')
-  expect(screen.getByLabelText('Course offering')).toHaveValue(courseOfferings[0].id)
+  expect(screen.getByText('CSE 416 · Dr. Lee · Fall 2025')).toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: 'Course offering' })).not.toBeInTheDocument()
   expect(screen.queryByText(/Sample review/)).not.toBeInTheDocument()
   expect(screen.getByLabelText('Written review')).toBeInTheDocument()
 })
