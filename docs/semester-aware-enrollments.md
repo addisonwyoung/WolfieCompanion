@@ -20,7 +20,9 @@ Apply `supabase/migrations/202610260001_course_professor_verification.sql` after
 
 Apply `supabase/migrations/202610260002_verified_section_classmates.sql` after the professor-verification migration. It keeps pending and rejected courses on the dashboard but requires verified current-semester enrollment before classmate, recommendation, profile, and course-based friend functions allow access. Once an enrollment is verified, those lists become available on the next request or page reload.
 
-Review the new migration before running it. It preserves the existing `course_offerings` IDs and `course_reviews` references. It keeps `user_courses` and `user_course_sections` as planner compatibility links because `academic_items` references those rows. It does not delete planner items or legacy course rows.
+Review the new migration before running it. It preserves the existing `course_offerings` IDs and `course_reviews` references. It keeps `user_courses` and `user_course_sections` as planner compatibility links because `academic_items` references those rows. The later course-removal migration deletes a course's items and cascading reminders when its last active current-term membership is removed, while retaining the compatibility course row for historical enrollment references.
+
+After manually applying `202611270001_course_membership_management.sql`, apply `202611280001_delete_coursework_on_course_removal.sql`, then `202611280002_delete_owned_review_on_course_removal.sql` in the Supabase SQL Editor. Apply the academic reminders migration first so reminder occurrences cascade with deleted academic items. The final migration also deletes only the removing student's review for the exact offering, if no other active current-term membership still uses that offering. It leaves classmates' reviews and the student's reviews for other offerings untouched. The client does not apply database migrations.
 
 ## Catalog and unknown-course review
 

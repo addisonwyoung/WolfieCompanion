@@ -29,12 +29,12 @@ describe('dashboard course management', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('requires delete confirmation, keeps planner items described, and selects a remaining course', async () => {
+  it('warns that course work, reminders, and its review will be deleted, then selects a remaining course', async () => {
     const onRemoveCourse = vi.fn().mockResolvedValue(undefined)
     const onSelect = vi.fn()
     render(<CourseBrowser {...props} onSelect={onSelect} onRemoveCourse={onRemoveCourse} enrolledCourses={[course, { ...course, id: 'bio-201', enrollmentId: 'enrollment-2', code: 'BIO 201' }]} />)
     fireEvent.click(screen.getByRole('button', { name: 'Delete CSE 310' }))
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('This will remove the course from your current dashboard and stop course access tied to this enrollment.')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('This removes the course from your dashboard. Its assignments, reminders, and your review for that course offering will also be permanently deleted.')
     expect(onRemoveCourse).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Remove course' }))
     await waitFor(() => expect(onRemoveCourse).toHaveBeenCalledWith('enrollment-1'))

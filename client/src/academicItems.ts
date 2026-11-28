@@ -3,6 +3,7 @@ import type { ReminderOffset } from './academicReminders'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const itemTypes = ['assignment', 'exam', 'quiz', 'project'] as const
+export const academicItemsChangedEvent = 'wolfie:academic-items-changed'
 export type ItemType = typeof itemTypes[number]
 export interface AcademicInput {
   reminder_offsets?: ReminderOffset[] | null;

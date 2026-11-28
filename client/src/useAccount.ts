@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import { accountApi } from './account'
 import type { StudentProfile, ClassRow, PictureChange, SavedCourse } from './account'
+import { academicItemsChangedEvent } from './academicItems'
 
 type State = { status: 'loading' | 'signed-out' | 'ineligible' | 'error' | 'ready'; userId: string | null; profile: StudentProfile | null; courses: SavedCourse[]; plannerCourses: SavedCourse[]; message: string }
 const empty: State = { status: 'loading', userId: null, profile: null, courses: [], plannerCourses: [], message: '' }
@@ -101,6 +102,7 @@ export function useAccount(client: SupabaseClient) {
     const result = await api.removeCourse(enrollmentId)
     if (!mounted.current || run !== generation.current) throw new Error('Your session changed. Reload before removing a course.')
     setState(previous => ({ ...previous, courses: result.courses, plannerCourses: result.plannerCourses }))
+    window.dispatchEvent(new Event(academicItemsChangedEvent))
   }
   async function signIn() {
     denied.current = false; callbackError.current = false

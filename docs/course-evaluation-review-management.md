@@ -18,4 +18,4 @@ All three management routes require a valid Supabase bearer token and an eligibl
 2. Deploy the client to Vercel. The current `client/vercel.json` rewrite sends `/api/:path*` to `https://wolfiecompanion.onrender.com/api/:path*`, so the client uses the updated Render API without a new rewrite.
 3. Sign in with two eligible accounts in a local or staging setup. Confirm each account sees only its own history, can edit and delete its own review, cannot modify another account's review, sees updated course summaries, and can submit again after deletion.
 
-Do not run a Supabase migration for this feature.
+The review-management API itself does not require a Supabase migration. Dashboard course-removal cleanup is separate: apply `202611280002_delete_owned_review_on_course_removal.sql` after the course-membership and coursework-removal migrations. It deletes only the student's review for that exact offering; reviews from other owners and reviews for other offerings remain.

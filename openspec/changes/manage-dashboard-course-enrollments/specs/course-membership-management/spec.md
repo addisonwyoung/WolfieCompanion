@@ -34,7 +34,7 @@ The system SHALL let an eligible authenticated student edit or remove each of th
 - **THEN** the saved entry remains unchanged, the dashboard keeps the course available for retry, and no success is announced
 
 ### Requirement: Revoke access derived from an old course membership
-After a successful edit or removal, the old membership SHALL no longer authorize classmates, recommendations, classmate profile lookup, or other course-scoped actions. The interface SHALL clear old course results and ignore pending responses for the old selection. The student SHALL retain their personal assignments and exams, existing friendships, direct messages, and owned course reviews.
+After a successful edit or removal, the old membership SHALL no longer authorize classmates, recommendations, classmate profile lookup, or other course-scoped actions. The interface SHALL clear old course results and ignore pending responses for the old selection. Editing SHALL retain personal assignments and exams. Removing the last active current-term membership for a planner course SHALL delete its assignments, exams, reminders, and the owner's review for the exact offering after confirmation. Other owners' reviews and the student's reviews for other offerings SHALL remain. Existing friendships and direct messages SHALL remain.
 
 #### Scenario: Old course lookup after edit or removal
 - **WHEN** the student or another caller attempts a course-scoped lookup that depends on the changed or removed membership
@@ -44,6 +44,10 @@ After a successful edit or removal, the old membership SHALL no longer authorize
 - **WHEN** a selected course is edited or removed while classmate or recommendation data is visible or loading
 - **THEN** old course data disappears immediately and a late response cannot restore it
 
-#### Scenario: Keep personal and social records
+#### Scenario: Keep unrelated social and review records
 - **WHEN** a course membership is edited or removed
-- **THEN** the student's assignments, exams, existing friendships, direct messages, and owned reviews remain available and unchanged
+- **THEN** existing friendships, direct messages, reviews by other owners, and the student's reviews for other offerings remain available and unchanged
+
+#### Scenario: Remove course work, reminders, and matching review
+- **WHEN** a student confirms removal of the last active current-term membership for a planner course
+- **THEN** linked assignments, exams, reminder notifications, and the student's review for the exact course offering are deleted, and the course is no longer offered in assignment tasks

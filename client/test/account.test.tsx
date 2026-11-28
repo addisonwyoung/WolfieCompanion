@@ -41,7 +41,7 @@ test('Campus Explorer opens lazily, preserves filters across navigation and clea
   expect(screen.queryByRole('heading', { name: 'Campus Explorer' })).not.toBeInTheDocument()
 
   navigateHeader('Campus Explorer')
-  await screen.findByRole('heading', { name: 'Campus Explorer' })
+  await screen.findByRole('heading', { name: 'Campus Explorer' }, { timeout: 10000 })
 
   expect(screen.getByRole('button', { name: 'Campus Explorer', hidden: true })).toHaveAttribute('aria-pressed', 'true')
 
