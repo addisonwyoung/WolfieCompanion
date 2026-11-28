@@ -89,6 +89,19 @@ export function useAccount(client: SupabaseClient) {
     const { courses, plannerCourses } = await api.saveClasses(rows)
     if (mounted.current && run === generation.current) setState(previous => ({ ...previous, courses, plannerCourses }))
   }
+  async function editCourse(enrollmentId: string, row: ClassRow) {
+    const run = generation.current
+    const result = await api.editCourse(enrollmentId, row)
+    if (!mounted.current || run !== generation.current) throw new Error('Your session changed. Reload before editing a course.')
+    setState(previous => ({ ...previous, courses: previous.courses.map(course => course.enrollmentId === enrollmentId ? result.course : course), plannerCourses: result.plannerCourses }))
+    return result.course
+  }
+  async function removeCourse(enrollmentId: string) {
+    const run = generation.current
+    const result = await api.removeCourse(enrollmentId)
+    if (!mounted.current || run !== generation.current) throw new Error('Your session changed. Reload before removing a course.')
+    setState(previous => ({ ...previous, courses: result.courses, plannerCourses: result.plannerCourses }))
+  }
   async function signIn() {
     denied.current = false; callbackError.current = false
     const { error } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback`, queryParams: { hd: 'stonybrook.edu', prompt: 'select_account' } } })
@@ -106,5 +119,5 @@ export function useAccount(client: SupabaseClient) {
     for (const path of cleanupPaths) { try { await api.removeObject(path) } catch { remaining.push(path) } }
     if (mounted.current && run === generation.current) setCleanupPaths(remaining)
   }
-  return { ...state, api, saveProfile, saveClasses, signIn, signOut, retryCleanup, cleanupPaths, retry: async () => { const { data } = await client.auth.getSession(); await hydrate(data.session) } }
+  return { ...state, api, saveProfile, saveClasses, editCourse, removeCourse, signIn, signOut, retryCleanup, cleanupPaths, retry: async () => { const { data } = await client.auth.getSession(); await hydrate(data.session) } }
 }

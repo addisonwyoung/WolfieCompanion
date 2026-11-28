@@ -17,7 +17,7 @@ export interface StudentProfile {
 }
 export interface ClassRow { code: string; section: string; professor_first_name: string; professor_last_name: string }
 // id remains the code-derived UI identifier; databaseId is the saved membership UUID.
-export interface SavedCourse extends Course { databaseId: string }
+export interface SavedCourse extends Course { databaseId: string; enrollmentId?: string }
 export interface PictureChange { file?: File; remove?: boolean }
 export function validateRows(rows: ClassRow[]) {
   return rows.length > 0 && rows.length <= 100 && rows.every(r => /^[a-z]{2,5}\s*\d{3}[a-z]?$/i.test(r.code.trim()) && /^[a-z0-9-]{1,20}$/i.test(r.section.trim()) && r.professor_first_name.trim().length > 0 && r.professor_first_name.trim().length <= 80 && r.professor_last_name.trim().length > 0 && r.professor_last_name.trim().length <= 80)
@@ -82,7 +82,7 @@ export function accountApi(client: SupabaseClient) {
           if (row.section && !current.sections?.includes(row.section)) current.sections = [...(current.sections ?? []), row.section].sort()
           if (current.verificationStatus !== 'pending') current.verificationStatus = row.verification_status
         } else {
-          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
+          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, enrollmentId: row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
         }
       }
       if (typeof (p.data as StudentProfile).is_private !== 'boolean') throw new Error('Privacy settings are unavailable. Reload your account before saving.')
@@ -104,12 +104,34 @@ export function accountApi(client: SupabaseClient) {
         if (course) {
           if (row.section && !course.sections?.includes(row.section)) course.sections = [...(course.sections ?? []), row.section].sort()
           if (course.verificationStatus !== 'pending') course.verificationStatus = row.verification_status
-        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
+        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, enrollmentId: row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
       }
       const { data: planner, error: plannerError } = await client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code')
       if (plannerError) throw new Error('Classes were saved, but planner course links could not be refreshed. Reload your workspace to retry.')
       const plannerCourses: SavedCourse[] = (planner ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() }))
       return { courses: [...grouped.values()], plannerCourses }
+    },
+    async editCourse(enrollmentId: string, row: ClassRow): Promise<{ course: SavedCourse; plannerCourses: SavedCourse[] }> {
+      if (!enrollmentId || !validateRows([row])) throw new Error('Enter a valid course code, section, and professor first and last name.')
+      const { data, error } = await client.rpc('edit_current_course_enrollment', {
+        p_enrollment_id: enrollmentId,
+        p_course_code: row.code,
+        p_section: row.section,
+        p_professor_first_name: row.professor_first_name,
+        p_professor_last_name: row.professor_last_name,
+      })
+      if (error || !data || typeof data.enrollment_id !== 'string') throw new Error('Course could not be updated. Your changes are still here; please retry.')
+      const loaded = await this.load()
+      const course = loaded.courses.find(candidate => candidate.enrollmentId === data.enrollment_id)
+      if (!course) throw new Error('Course was updated, but the dashboard could not refresh. Reload your workspace to see it.')
+      return { course, plannerCourses: loaded.plannerCourses }
+    },
+    async removeCourse(enrollmentId: string): Promise<{ courses: SavedCourse[]; plannerCourses: SavedCourse[] }> {
+      if (!enrollmentId) throw new Error('Choose a current course to remove.')
+      const { error } = await client.rpc('remove_current_course_enrollment', { p_enrollment_id: enrollmentId })
+      if (error) throw new Error('Course could not be removed. Please retry.')
+      const loaded = await this.load()
+      return { courses: loaded.courses, plannerCourses: loaded.plannerCourses }
     },
     async saveProfile(profile: StudentProfile, picture: PictureChange = {}, isCurrent: () => boolean = () => true) {
       const next = normalizeProfile(profile)

@@ -276,6 +276,7 @@ export function courseReviewRouter(env: NodeJS.ProcessEnv = process.env, depende
         .eq('user_id', auth.user.id)
         .eq('course_offering_id', offeringId)
         .eq('verification_status', 'verified')
+        .is('revoked_at', null)
         .maybeSingle();
       if (enrollmentError) throw enrollmentError;
       if (!enrollment) { res.status(403).json({ error: 'A verified enrollment in this exact offering is required to publish a review.' }); return; }
