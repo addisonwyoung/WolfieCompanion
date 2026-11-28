@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AcademicApi, AcademicItem } from './academicItems'
+import { academicItemsChangedEvent } from './academicItems'
 
 // Mounted only within a workspace keyed to the current user. Cleanup invalidates every response.
 export function useAcademicItems(api: AcademicApi) {
@@ -23,6 +24,10 @@ export function useAcademicItems(api: AcademicApi) {
     return () => { generation.current++ }
   }, [api, attempt])
   const retry = useCallback(() => { setStatus('loading'); setMessage(''); setAttempt(n => n + 1) }, [])
+  useEffect(() => {
+    window.addEventListener(academicItemsChangedEvent, retry)
+    return () => window.removeEventListener(academicItemsChangedEvent, retry)
+  }, [retry])
   async function mutate(operation: () => Promise<AcademicItem | void>, success: string, deletedId?: string) {
     if (saving.current) return false
     saving.current = true; setBusy(true); setMessage(''); setActionFailed(false)

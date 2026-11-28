@@ -46,6 +46,42 @@ export function normalizeProfile(profile: StudentProfile): StudentProfile {
   if (interests.some(s => s.length > 50)) throw new Error('Each interest must be at most 50 characters.')
   return next
 }
+type CurrentEnrollment = {
+  enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null
+  professor_first_name: string | null; professor_last_name: string | null; verification_status: string
+}
+function coursesFromEnrollments(rows: CurrentEnrollment[]): SavedCourse[] {
+  const grouped = new Map<string, SavedCourse>()
+  for (const row of rows) {
+    const section = row.section ?? ''
+    const firstName = row.professor_first_name?.trim() ?? ''
+    const lastName = row.professor_last_name?.trim() ?? ''
+    const professorKey = `${firstName.toLowerCase()}:${lastName.toLowerCase()}`
+    const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}-prof-${professorKey.replace(/[^a-z0-9]+/g, '-')}`
+    const key = `${row.code}:${section}:${professorKey}`
+    const current = grouped.get(key)
+    if (current) {
+      if (row.section && !current.sections?.includes(row.section)) current.sections = [...(current.sections ?? []), row.section].sort()
+      if (current.verificationStatus !== 'pending') current.verificationStatus = row.verification_status
+    } else {
+      grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, enrollmentId: row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
+    }
+  }
+  return [...grouped.values()]
+}
+function plannerCoursesFromEnrollments(rows: CurrentEnrollment[]): SavedCourse[] {
+  const courses = new Map<string, SavedCourse>()
+  for (const row of rows) {
+    if (!row.legacy_course_id) continue
+    let course = courses.get(row.legacy_course_id)
+    if (!course) {
+      course = { id: row.code.toLowerCase().replace(' ', '-'), databaseId: row.legacy_course_id, code: row.code, sections: [] }
+      courses.set(row.legacy_course_id, course)
+    }
+    if (row.section && !course.sections?.includes(row.section)) course.sections = [...(course.sections ?? []), row.section].sort()
+  }
+  return [...courses.values()]
+}
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 export const supabase = url && key ? createClient(url, key, { auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true } }) : null
@@ -63,53 +99,23 @@ export function accountApi(client: SupabaseClient) {
       return data === true
     },
     async load(): Promise<{ profile: StudentProfile; courses: SavedCourse[]; plannerCourses: SavedCourse[] }> {
-      const [p, c, planner] = await Promise.all([
+      const [p, c] = await Promise.all([
         client.rpc('ensure_profile').single(),
         client.rpc('my_current_enrollments'),
-        client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code'),
       ])
-      if (p.error || c.error || planner.error || !p.data) throw new Error('Unable to load your profile and classes. Please retry.')
-      const grouped = new Map<string, SavedCourse>()
-      for (const row of (c.data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; professor_first_name: string | null; professor_last_name: string | null; verification_status: string }[]) {
-        const section = row.section ?? ''
-        const firstName = row.professor_first_name?.trim() ?? ''
-        const lastName = row.professor_last_name?.trim() ?? ''
-        const professorKey = `${firstName.toLowerCase()}:${lastName.toLowerCase()}`
-        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}-prof-${professorKey.replace(/[^a-z0-9]+/g, '-')}`
-        const key = `${row.code}:${section}:${professorKey}`
-        const current = grouped.get(key)
-        if (current) {
-          if (row.section && !current.sections?.includes(row.section)) current.sections = [...(current.sections ?? []), row.section].sort()
-          if (current.verificationStatus !== 'pending') current.verificationStatus = row.verification_status
-        } else {
-          grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, enrollmentId: row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
-        }
-      }
+      if (p.error || c.error || !p.data) throw new Error('Unable to load your profile and classes. Please retry.')
+      const enrollments = (c.data ?? []) as CurrentEnrollment[]
       if (typeof (p.data as StudentProfile).is_private !== 'boolean') throw new Error('Privacy settings are unavailable. Reload your account before saving.')
-      return { profile: p.data as StudentProfile, courses: [...grouped.values()], plannerCourses: (planner.data ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() })) }
+      return { profile: p.data as StudentProfile, courses: coursesFromEnrollments(enrollments), plannerCourses: plannerCoursesFromEnrollments(enrollments) }
     },
     async saveClasses(rows: ClassRow[]): Promise<{ courses: SavedCourse[]; plannerCourses: SavedCourse[] }> {
       if (!validateRows(rows)) throw new Error('Enter a valid course code, section, and professor first and last name for every class. Save 1 to 100 rows at a time.')
-      const { data, error } = await client.rpc('save_enrollments', { rows })
+      const { error } = await client.rpc('save_enrollments', { rows })
       if (error) throw new Error('Classes could not be saved. Your draft is still here; please retry.')
-      const grouped = new Map<string, SavedCourse>()
-      for (const row of (data ?? []) as { enrollment_id: string; legacy_course_id: string | null; code: string; section: string | null; professor_first_name: string | null; professor_last_name: string | null; verification_status: string }[]) {
-        const section = row.section ?? ''
-        const firstName = row.professor_first_name?.trim() ?? ''
-        const lastName = row.professor_last_name?.trim() ?? ''
-        const professorKey = `${firstName.toLowerCase()}:${lastName.toLowerCase()}`
-        const key = `${row.code}:${section}:${professorKey}`
-        const id = `${row.code.toLowerCase().replace(' ', '-')}-section-${section.toLowerCase() || 'unknown'}-prof-${professorKey.replace(/[^a-z0-9]+/g, '-')}`
-        const course = grouped.get(key)
-        if (course) {
-          if (row.section && !course.sections?.includes(row.section)) course.sections = [...(course.sections ?? []), row.section].sort()
-          if (course.verificationStatus !== 'pending') course.verificationStatus = row.verification_status
-        } else grouped.set(key, { id, databaseId: row.legacy_course_id ?? row.enrollment_id, enrollmentId: row.enrollment_id, code: row.code, section: row.section ?? undefined, sections: row.section ? [row.section] : [], ...(firstName ? { professorFirstName: firstName } : {}), ...(lastName ? { professorLastName: lastName } : {}), verificationStatus: row.verification_status })
-      }
-      const { data: planner, error: plannerError } = await client.from('user_courses').select('id,course_code,user_course_sections(section)').order('course_code')
-      if (plannerError) throw new Error('Classes were saved, but planner course links could not be refreshed. Reload your workspace to retry.')
-      const plannerCourses: SavedCourse[] = (planner ?? []).map(row => ({ id: row.course_code.toLowerCase().replace(' ', '-'), databaseId: row.id, code: row.course_code, sections: row.user_course_sections.map(s => s.section).sort() }))
-      return { courses: [...grouped.values()], plannerCourses }
+      const { data, error: refreshError } = await client.rpc('my_current_enrollments')
+      if (refreshError) throw new Error('Classes were saved, but course choices could not be refreshed. Reload your workspace to retry.')
+      const enrollments = (data ?? []) as CurrentEnrollment[]
+      return { courses: coursesFromEnrollments(enrollments), plannerCourses: plannerCoursesFromEnrollments(enrollments) }
     },
     async editCourse(enrollmentId: string, row: ClassRow): Promise<{ course: SavedCourse; plannerCourses: SavedCourse[] }> {
       if (!enrollmentId || !validateRows([row])) throw new Error('Enter a valid course code, section, and professor first and last name.')

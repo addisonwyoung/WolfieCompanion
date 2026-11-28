@@ -2,17 +2,21 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Preserve academic items on course removal
-The database and application SHALL preserve a student's academic items when a dashboard course membership is removed. Removing a course SHALL NOT silently delete, orphan, or make the student's assignments and exams inaccessible. The personal course reference needed to view and manage those items SHALL remain available in the academic agenda, separate from active course membership and its classmate or recommendation access. Editing a course SHALL retain its associated academic items with the corrected course record. Course membership removal SHALL NOT delete academic items, friendships, or direct messages.
+### Requirement: Remove coursework when its last active course membership is removed
+After explicit confirmation, removing a student's last active current-term membership for a planner course SHALL atomically delete that course's academic items and their reminder occurrences. If another active current-term membership still uses the same planner course, its items SHALL remain available. Planner choices SHALL include only courses with active current-term memberships. Editing a course SHALL retain its associated academic items with the corrected course record. Course removal SHALL NOT delete friendships, direct messages, or the student's reviews for other offerings.
 
-#### Scenario: Remove a course with linked academic items
-- **WHEN** a student removes a dashboard course that has pending or completed academic items
-- **THEN** the course disappears from active dashboard membership while all linked items remain available to that student in the academic agenda
+#### Scenario: Remove the last membership with linked academic items
+- **WHEN** a student confirms removal of the last active current-term membership for a planner course that has academic items
+- **THEN** the membership and planner choice disappear, and all linked academic items and reminder occurrences are deleted in the same transaction
+
+#### Scenario: Another current membership still uses the planner course
+- **WHEN** a student removes one membership while another active current-term membership still references the same planner course
+- **THEN** the selected membership disappears while the planner choice, academic items, and reminders remain
 
 #### Scenario: Correct a course with linked academic items
 - **WHEN** a student edits a course entry that has linked academic items
 - **THEN** the items remain associated with the corrected course record and are still available for editing and completion
 
-#### Scenario: Keep removal private
-- **WHEN** a course membership is removed while its academic items remain stored
-- **THEN** other students cannot access those personal items, and the removed membership no longer grants course-based discovery access
+#### Scenario: Failed cleanup
+- **WHEN** coursework or reminder cleanup fails during confirmed removal
+- **THEN** the transaction rolls back and the membership, planner choice, items, and reminders remain unchanged
